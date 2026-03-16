@@ -1,0 +1,19 @@
+# Aviation ERP - PRODUCTION READY
+
+## Completed:
+- [x] Seed data with Specialty Aviation Paint (13 pigments)
+- [x] Full APIs: products, formulas, stock adjust, barcode, PO upload
+- [x] Transaction-safe tinting
+- [x] Enhanced Dashboard: Tinting execute, Carpet deduct
+
+## Quick Start (Port 5005):
+1. `cd aviation_erp`
+2. `pip install -r requirements.txt`
+3. Copy `.env.example` → `.env` (optional; SQLite default no PG needed!)
+4. `flask db upgrade`
+5. `python seed.py`
+6. `py init_db_fixed.py` then `py seed_fixed.py` then `py run.py` or `py app_fixed.py`
+7. http://localhost:5005/staff-dashboard
+
+**✅ Fully functional Aviation ERP!** Test tinting 'Specialty Aviation Paint' ID ~32, carpet cuts.
+

@@ -1,0 +1,1 @@
+# TODO: Fix staff_dashboard.html Issue Buttons\n\n1. [ ] Create TODO.md (done)\n2. [ ] Fix Issue buttons in Paints table\n3. [ ] Fix Issue buttons in Carpets table\n4. [ ] Fix Issue buttons in Others table\n5. [ ] Update modal input IDs to use underscores\n6. [ ] Replace modal bridge script\n7. [ ] Test modal functionality\n8. [ ] Mark complete
