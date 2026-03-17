@@ -262,8 +262,17 @@ def issue_item():
     
     return redirect(url_for('staff_inventory'))
 
+@app.route('/delete-product/<int:id>', methods=['POST'])
+def delete_product(id):
+    product = Product.query.get_or_404(id)
+    db.session.delete(product)
+    db.session.commit()
+    flash('Product deleted successfully!', 'success')
+    return redirect(url_for('admin_dashboard'))
+
 if __name__ == '__main__':
     print(f'Connecting to: {app.config["SQLALCHEMY_DATABASE_URI"][:20]}...')
     print("SUCCESS: Connected to Supabase Cloud")
     port = int(os.environ.get('PORT', 5005))
     app.run(host='0.0.0.0', debug=True, port=port)
+

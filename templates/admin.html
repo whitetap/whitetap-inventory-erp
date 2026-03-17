@@ -8,54 +8,63 @@
 
 {% block content %}
 <div class="container-fluid">
-    <!-- Flash Messages (base.html already handles this) -->
+    <!-- Add New Product Button -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <button class="btn btn-success btn-lg w-100 rounded-2xl py-4 text-2xl fw-bold shadow-lg" type="button" data-bs-toggle="collapse" data-bs-target="#addProductForm" style="background: linear-gradient(135deg, #10b981, #059669); border: none;">
+                ➕ Add New Product
+            </button>
+        </div>
+    </div>
 
-    <!-- Add New Product Form -->
+    <!-- Add New Product Form (Collapsible) -->
     <div class="row g-4 mb-5">
         <div class="col-12">
-            <div class="card">
-                <div class="card-body p-5">
-                    <h2 class="card-title text-4xl font-bold text-white mb-5 text-center">➕ Add New Product</h2>
-                    <form method="POST" action="{{ url_for('admin_add_product') }}" class="row g-4">
-                        <div class="col-md-6">
-                            <label class="form-label text-white fw-bold fs-4 mb-3">Product Name <span class="text-danger">*</span></label>
-                            <input type="text" name="name" required placeholder="e.g. Aviation Gloss White" class="form-control bg-white/20 border-white/30 text-white fs-6 p-4 rounded-2xl" style="font-size:1.25rem;">
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label text-white fw-bold fs-4 mb-3">SKU <span class="text-danger">*</span></label>
-                            <input type="text" name="sku" required placeholder="e.g. PNT-77-W" class="form-control bg-white/20 border-white/30 text-white fs-6 p-4 rounded-2xl" style="font-size:1.25rem;">
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label text-white fw-bold fs-4 mb-3">Unit of Measure <span class="text-danger">*</span></label>
-                            <select name="unit_of_measure" required class="form-select bg-white/20 border-white/30 text-white fs-6 p-4 rounded-2xl" style="font-size:1.25rem;">
-                                <option value="">Select Unit</option>
-                                <option value="ml">Milliliters (ml)</option>
-                                <option value="liters">Liters</option>
-                                <option value="kg">Kilograms (kg)</option>
-                                <option value="sq_ft">Square Feet (sq_ft)</option>
-                                <option value="m2">Square Meters (m²)</option>
-                            </select>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label text-white fw-bold fs-4 mb-3">Min Stock Level</label>
-                            <input type="number" name="min_stock_level" step="0.01" min="0" placeholder="0" value="0" class="form-control bg-white/20 border-white/30 text-white fs-6 p-4 rounded-2xl" style="font-size:1.25rem;">
-                        </div>
-                        <div class="col-12">
-                            <label class="form-label text-white fw-bold fs-4 mb-3">Initial Stock Quantity</label>
-                            <input type="number" name="current_stock" step="0.01" min="0" placeholder="0" value="0" class="form-control bg-white/20 border-white/30 text-white fs-6 p-4 rounded-2xl" style="font-size:1.25rem;">
-                        </div>
-                        <div class="col-12">
-                            <button type="submit" class="btn w-100 btn-lg py-4 text-2xl fw-black rounded-2xl shadow-2xl" style="background: linear-gradient(135deg, #10b981, #059669); border: none;">
-                                🚀 Save Product to Supabase
-                            </button>
-                        </div>
-                    </form>
+            <div class="collapse" id="addProductForm">
+                <div class="card">
+                    <div class="card-body p-5">
+                        <h2 class="card-title text-3xl font-bold text-white mb-5 text-center">➕ Add New Product</h2>
+                        <form method="POST" action="{{ url_for('admin_add_product') }}" class="row g-4">
+                            <div class="col-md-6">
+                                <label class="form-label text-white fw-bold fs-4 mb-3">Product Name <span class="text-danger">*</span></label>
+                                <input type="text" name="name" required placeholder="e.g. Aviation Gloss White" class="form-control" style="background-color: #f8f9fa !important; color: #333 !important; font-size:1.25rem; padding: 1rem; border-radius: 1rem; border: 1px solid #dee2e6;">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label text-white fw-bold fs-4 mb-3">SKU <span class="text-danger">*</span></label>
+                                <input type="text" name="sku" required placeholder="e.g. PNT-77-W" class="form-control" style="background-color: #f8f9fa !important; color: #333 !important; font-size:1.25rem; padding: 1rem; border-radius: 1rem; border: 1px solid #dee2e6;">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label text-white fw-bold fs-4 mb-3">Unit of Measure <span class="text-danger">*</span></label>
+                                <select name="unit_of_measure" required class="form-select" style="background-color: #f8f9fa !important; color: #333 !important; font-size:1.25rem; padding: 1rem; border-radius: 1rem; border: 1px solid #dee2e6;">
+                                    <option value="">Select Unit</option>
+                                    <option value="ml">Milliliters (ml)</option>
+                                    <option value="liters">Liters</option>
+                                    <option value="kg">Kilograms (kg)</option>
+                                    <option value="sq_ft">Square Feet (sq_ft)</option>
+                                    <option value="m2">Square Meters (m²)</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label text-white fw-bold fs-4 mb-3">Min Stock Level</label>
+                                <input type="number" name="min_stock_level" step="0.01" min="0" placeholder="0" value="0" class="form-control" style="background-color: #f8f9fa !important; color: #333 !important; font-size:1.25rem; padding: 1rem; border-radius: 1rem; border: 1px solid #dee2e6;">
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label text-white fw-bold fs-4 mb-3">Initial Stock Quantity</label>
+                                <input type="number" name="current_stock" step="0.01" min="0" placeholder="0" value="0" class="form-control" style="background-color: #f8f9fa !important; color: #333 !important; font-size:1.25rem; padding: 1rem; border-radius: 1rem; border: 1px solid #dee2e6;">
+                            </div>
+                            <div class="col-12">
+                                <button type="submit" class="btn w-100 btn-lg py-4 text-2xl fw-black rounded-2xl shadow-2xl mb-3" style="background: linear-gradient(135deg, #10b981, #059669); border: none;">
+                                    🚀 Save Product to Supabase
+                                </button>
+                            </div>
+                        </form>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Products List with Restock -->
+    <!-- Products List with Restock & Delete -->
     <div class="row">
         <div class="col-12">
             <div class="card">
@@ -72,6 +81,7 @@
                                         <th class="text-end">Stock</th>
                                         <th class="text-end">Min Level</th>
                                         <th class="text-end">Restock</th>
+                                        <th class="text-end">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -102,11 +112,19 @@
                                                 </div>
                                             </form>
                                         </td>
+                                        <td>
+                                            <form action="{{ url_for('delete_product', id=product.id) }}" method="POST" style="display:inline;">
+                                                <button type="submit" class="btn btn-link text-danger p-0" onclick="return confirm('Are you sure you want to delete this product?')">
+                                                    <i class="fas fa-trash fs-5"></i>
+                                                </button>
+                                            </form>
+                                        </td>
                                     </tr>
                                     {% endfor %}
                                 </tbody>
                             </table>
                         </div>
+
                     {% else %}
                         <div class="text-center py-5">
                             <i class="fas fa-boxes fa-3x text-muted mb-3"></i>
@@ -119,7 +137,32 @@
         </div>
     </div>
 
-    <div class="row mt-4">
+    <!-- Delete Confirmation Modals -->
+    {% for product in products %}
+    <div class="modal fade" id="deleteModal{{ product.id }}" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content bg-dark text-white border-0">
+                <div class="modal-header border-0">
+                    <h5 class="modal-title">Confirm Delete</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Are you sure you want to delete <strong>{{ product.name }}</strong> (SKU: {{ product.sku }})?</p>
+                    <p class="text-warning">This action cannot be undone.</p>
+                </div>
+                <div class="modal-footer border-0">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <form method="POST" action="{{ url_for('delete_product', id=product.id) }}" style="display:inline;">
+                        <button type="submit" class="btn btn-danger">Delete Product</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+
+    <!-- Footer -->
+    <div class="row mt-5">
         <div class="col-12 text-center">
             <small class="text-muted">UUIDs auto-generated • Supabase PostgreSQL • <span class="text-danger fw-bold">* Required fields</span></small>
         </div>
