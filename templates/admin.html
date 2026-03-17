@@ -1,145 +1,128 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Dashboard - Aviation ERP</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="bg-gradient-to-br from-gray-900 to-slate-900 min-h-screen p-8">
-    <div class="max-w-4xl mx-auto">
-        <header class="mb-12">
-            <h1 class="text-5xl font-bold text-white mb-4 drop-shadow-lg">Admin Dashboard</h1>
-            <p class="text-xl text-gray-300 mb-6">Manage Products & Restock Inventory</p>
-            <a href="{{ url_for('staff_inventory') }}" class="inline-flex items-center text-emerald-400 hover:text-emerald-300 text-lg font-semibold mb-8">
-                📦 Staff Inventory
-            </a>
-        </header>
+{% extends "base.html" %}
 
-        <!-- Flash Messages -->
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                {% for category, message in messages %}
-                    <div class="mb-8 p-6 rounded-2xl backdrop-blur-sm shadow-2xl border-2 {% if category == 'success' %}bg-emerald-500/20 border-emerald-400/50 text-emerald-100{% else %}bg-red-500/20 border-red-400/50 text-red-100{% endif %}">
-                        <div class="flex items-center">
-                            {% if category == 'success' %}
-                                <div class="w-8 h-8 bg-emerald-400 rounded-xl flex items-center justify-center mr-4 text-white font-bold text-lg">✅</div>
-                            {% else %}
-                                <div class="w-8 h-8 bg-red-400 rounded-xl flex items-center justify-center mr-4 text-white font-bold text-lg">⚠️</div>
-                            {% endif %}
-                            <div>
-                                <h3 class="font-bold text-xl mb-1">{{ 'Success!' if category == 'success' else 'Error!' }}</h3>
-                                <p>{{ message }}</p>
-                            </div>
+{% block title %}Admin Dashboard - Aviation ERP{% endblock %}
+
+{% block page_title %}Admin Dashboard{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Flash Messages (base.html already handles this) -->
+
+    <!-- Add New Product Form -->
+    <div class="row g-4 mb-5">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body p-5">
+                    <h2 class="card-title text-4xl font-bold text-white mb-5 text-center">➕ Add New Product</h2>
+                    <form method="POST" action="{{ url_for('admin_add_product') }}" class="row g-4">
+                        <div class="col-md-6">
+                            <label class="form-label text-white fw-bold fs-4 mb-3">Product Name <span class="text-danger">*</span></label>
+                            <input type="text" name="name" required placeholder="e.g. Aviation Gloss White" class="form-control bg-white/20 border-white/30 text-white fs-6 p-4 rounded-2xl" style="font-size:1.25rem;">
                         </div>
-                    </div>
-                {% endfor %}
-            {% endif %}
-        {% endwith %}
-
-        <!-- Add New Product Form -->
-        <div class="bg-white/10 backdrop-blur-xl rounded-3xl p-10 border border-white/20 shadow-2xl mb-12">
-            <h2 class="text-4xl font-bold text-white mb-10 text-center">➕ Add New Product</h2>
-            <form method="POST" action="{{ url_for('admin_add_product') }}" class="space-y-8">
-                <div class="grid md:grid-cols-2 gap-8">
-                    <div>
-                        <label class="block text-white font-bold text-xl mb-4">Product Name <span class="text-red-400">*</span></label>
-                        <input type="text" name="name" required placeholder="e.g. Aviation Gloss White" 
-                               class="w-full p-6 rounded-2xl bg-white/20 border-2 border-white/30 text-white placeholder-gray-400 text-xl focus:outline-none focus:ring-4 focus:ring-emerald-500/50 focus:border-emerald-500/50 transition-all duration-300">
-                    </div>
-                    <div>
-                        <label class="block text-white font-bold text-xl mb-4">SKU <span class="text-red-400">*</span></label>
-                        <input type="text" name="sku" required placeholder="e.g. PNT-77-W" 
-                               class="w-full p-6 rounded-2xl bg-white/20 border-2 border-white/30 text-white placeholder-gray-400 text-xl focus:outline-none focus:ring-4 focus:ring-emerald-500/50 focus:border-emerald-500/50 transition-all duration-300">
-                    </div>
+                        <div class="col-md-6">
+                            <label class="form-label text-white fw-bold fs-4 mb-3">SKU <span class="text-danger">*</span></label>
+                            <input type="text" name="sku" required placeholder="e.g. PNT-77-W" class="form-control bg-white/20 border-white/30 text-white fs-6 p-4 rounded-2xl" style="font-size:1.25rem;">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label text-white fw-bold fs-4 mb-3">Unit of Measure <span class="text-danger">*</span></label>
+                            <select name="unit_of_measure" required class="form-select bg-white/20 border-white/30 text-white fs-6 p-4 rounded-2xl" style="font-size:1.25rem;">
+                                <option value="">Select Unit</option>
+                                <option value="ml">Milliliters (ml)</option>
+                                <option value="liters">Liters</option>
+                                <option value="kg">Kilograms (kg)</option>
+                                <option value="sq_ft">Square Feet (sq_ft)</option>
+                                <option value="m2">Square Meters (m²)</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label text-white fw-bold fs-4 mb-3">Min Stock Level</label>
+                            <input type="number" name="min_stock_level" step="0.01" min="0" placeholder="0" value="0" class="form-control bg-white/20 border-white/30 text-white fs-6 p-4 rounded-2xl" style="font-size:1.25rem;">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label text-white fw-bold fs-4 mb-3">Initial Stock Quantity</label>
+                            <input type="number" name="current_stock" step="0.01" min="0" placeholder="0" value="0" class="form-control bg-white/20 border-white/30 text-white fs-6 p-4 rounded-2xl" style="font-size:1.25rem;">
+                        </div>
+                        <div class="col-12">
+                            <button type="submit" class="btn w-100 btn-lg py-4 text-2xl fw-black rounded-2xl shadow-2xl" style="background: linear-gradient(135deg, #10b981, #059669); border: none;">
+                                🚀 Save Product to Supabase
+                            </button>
+                        </div>
+                    </form>
                 </div>
-                
-                <div class="grid md:grid-cols-2 gap-8">
-                    <div>
-                        <label class="block text-white font-bold text-xl mb-4">Unit of Measure <span class="text-red-400">*</span></label>
-                        <select name="unit_of_measure" required class="w-full p-6 rounded-2xl bg-white/20 border-2 border-white/30 text-white text-xl focus:outline-none focus:ring-4 focus:ring-emerald-500/50 focus:border-emerald-500/50 transition-all duration-300">
-                            <option value="">Select Unit</option>
-                            <option value="ml">Milliliters (ml)</option>
-                            <option value="liters">Liters</option>
-                            <option value="kg">Kilograms (kg)</option>
-                            <option value="sq_ft">Square Feet (sq_ft)</option>
-                            <option value="m2">Square Meters (m²)</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-white font-bold text-xl mb-4">Min Stock Level</label>
-                        <input type="number" name="min_stock_level" step="0.01" min="0" placeholder="0" value="0"
-                               class="w-full p-6 rounded-2xl bg-white/20 border-2 border-white/30 text-white placeholder-gray-400 text-xl focus:outline-none focus:ring-4 focus:ring-emerald-500/50 focus:border-emerald-500/50 transition-all duration-300">
-                    </div>
-                </div>
-
-                <div>
-                    <label class="block text-white font-bold text-xl mb-4">Initial Stock Quantity</label>
-                    <input type="number" name="current_stock" step="0.01" min="0" placeholder="0" value="0"
-                           class="w-full p-6 rounded-2xl bg-white/20 border-2 border-white/30 text-white placeholder-gray-400 text-xl focus:outline-none focus:ring-4 focus:ring-emerald-500/50 focus:border-emerald-500/50 transition-all duration-300">
-                </div>
-
-                <button type="submit" class="w-full bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 hover:from-emerald-600 hover:via-teal-600 hover:to-emerald-700 text-white font-black py-8 px-12 rounded-2xl text-2xl shadow-2xl hover:shadow-3xl transform hover:-translate-y-1 transition-all duration-500 block mx-auto">
-                    🚀 Save Product to Supabase
-                </button>
-            </form>
-        </div>
-
-        <!-- Products List with Restock -->
-        <div class="bg-white/10 backdrop-blur-xl rounded-3xl p-10 border border-white/20 shadow-2xl">
-            <h2 class="text-4xl font-bold text-white mb-10 text-center">📊 Current Inventory ({{ products|length if products else 0 }})</h2>
-            {% if products %}
-                <div class="overflow-x-auto">
-                    <table class="w-full text-left text-gray-200">
-                        <thead>
-                            <tr class="border-b border-white/20">
-                                <th class="pb-4 pr-6 text-left font-semibold text-white">SKU</th>
-                                <th class="pb-4 pr-6 text-left font-semibold text-white">Name</th>
-                                <th class="pb-4 pr-6 text-left font-semibold text-white">Unit</th>
-                                <th class="pb-4 text-right font-semibold text-white">Stock</th>
-                                <th class="pb-4 text-right font-semibold text-white">Min Level</th>
-                                <th class="pb-4 pr-8 font-semibold text-white">Restock</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for product in products %}
-                            <tr class="border-b border-white/10 hover:bg-white/10 transition-colors">
-                                <td class="py-4 pr-6 font-mono text-sm font-bold text-emerald-300">{{ product.sku }}</td>
-                                <td class="py-4 pr-6 font-semibold text-xl">{{ product.name }}</td>
-                                <td class="py-4">
-                                    <span class="px-4 py-2 rounded-full text-sm font-semibold bg-blue-500/30 text-blue-100 border border-blue-400/50">{{ product.unit_of_measure }}</span>
-                                </td>
-                                <td class="py-4 pr-6 text-right font-mono text-2xl {{ 'text-red-400 font-bold' if product.current_stock <= product.min_stock_level else 'text-emerald-400' }}">
-                                    {{ product.current_stock|round(2) }}
-                                </td>
-                                <td class="py-4 text-right font-mono text-lg opacity-75">{{ product.min_stock_level|round(2) }}</td>
-                                <td class="py-4 pr-8">
-                                    <form method="POST" action="{{ url_for('restock_item') }}" class="inline-flex gap-2">
-                                        <input type="hidden" name="product_id" value="{{ product.id }}">
-                                        <input type="number" name="amount_to_add" min="0.01" step="0.01" placeholder="Qty" required 
-                                               class="w-24 p-2 rounded-lg bg-white/20 border border-white/30 text-white text-center focus:outline-none focus:ring-2 focus:ring-green-500">
-                                        <button type="submit" class="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white px-6 py-2 rounded-lg font-bold shadow-lg hover:shadow-xl transition-all whitespace-nowrap">
-                                            ➕ Restock
-                                        </button>
-                                    </form>
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            {% else %}
-                <div class="text-center py-24">
-                    <div class="text-6xl mb-4 text-gray-500">📦</div>
-                    <h3 class="text-2xl font-bold text-white mb-2">No products yet</h3>
-                    <p class="text-gray-400 text-lg mb-6">Add your first product using the form above</p>
-                </div>
-            {% endif %}
-        </div>
-
-        <div class="mt-12 text-center">
-            <p class="text-gray-400 text-lg">UUIDs auto-generated • Supabase PostgreSQL • <span class="text-red-400 font-bold">* Required fields</span></p>
+            </div>
         </div>
     </div>
-</body>
-</html>
+
+    <!-- Products List with Restock -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body p-5">
+                    <h2 class="text-4xl font-bold text-white mb-5 text-center">📊 Current Inventory ({{ products|length if products else 0 }})</h2>
+                    {% if products %}
+                        <div class="table-responsive">
+                            <table class="table table-hover table-sm table-dark">
+                                <thead>
+                                    <tr>
+                                        <th>SKU</th>
+                                        <th>Name</th>
+                                        <th>Unit</th>
+                                        <th class="text-end">Stock</th>
+                                        <th class="text-end">Min Level</th>
+                                        <th class="text-end">Restock</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for product in products %}
+                                    <tr>
+                                        <td class="fw-bold text-emerald-300">{{ product.sku }}</td>
+                                        <td class="fw-semibold">{{ product.name }}</td>
+                                        <td>
+                                            <span class="badge bg-primary rounded-pill">{{ product.unit_of_measure }}</span>
+                                        </td>
+                                        <td class="fw-semibold fs-5 {{ 'text-danger' if product.current_stock <= product.min_stock_level else 'text-success' }}">
+                                            {{ product.current_stock|round(2) }}
+                                            {% if (product.current_stock or 0) < 5 %}
+                                                <span class="badge bg-danger ms-1">Low Stock</span>
+                                            {% else %}
+                                                <span class="badge bg-success ms-1">In Stock</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ product.min_stock_level|round(2) }}</td>
+                                        <td>
+                                            <form method="POST" action="{{ url_for('restock_item') }}" class="d-inline">
+                                                <input type="hidden" name="product_id" value="{{ product.id }}">
+                                                <div class="input-group input-group-sm">
+                                                    <input type="number" name="amount_to_add" min="0.01" step="0.01" placeholder="Qty" required class="form-control bg-dark text-white border-secondary">
+                                                    <button type="submit" class="btn btn-success btn-sm">
+                                                        ➕ Restock
+                                                    </button>
+                                                </div>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="text-center py-5">
+                            <i class="fas fa-boxes fa-3x text-muted mb-3"></i>
+                            <h3 class="text-white fw-bold mb-2">No products yet</h3>
+                            <p class="text-muted mb-0">Add your first product using the form above</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-4">
+        <div class="col-12 text-center">
+            <small class="text-muted">UUIDs auto-generated • Supabase PostgreSQL • <span class="text-danger fw-bold">* Required fields</span></small>
+        </div>
+    </div>
+</div>
+{% endblock %}
