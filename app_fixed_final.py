@@ -15,16 +15,18 @@ from sqlalchemy import desc, or_, case, func
 
 app = Flask(__name__)
 
-# Using the Direct Connection String for maximum stability
+# This is the most bulletproof way to connect to Supabase from Render
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get(
     'DATABASE_URL', 
-    'postgresql://postgres:tgdED4gKqc3C3Znm@db.ujwzbldcbczbuqernzjy.supabase.co:5432/postgres'
+    'postgresql://"postgres.ujwzbldcbczbuqernzjy":tgdED4gKqc3C3Znm@aws-0-eu-west-3.pooler.supabase.com:5432/postgres'
 )
 
-# Keeps the connection alive and healthy
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
     "pool_pre_ping": True,
     "pool_recycle": 300,
+    "connect_args": {
+        "options": "-c search_path=public"
+    }
 }
 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
