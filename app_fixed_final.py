@@ -20,6 +20,11 @@ app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get(
     'DATABASE_URL', 
     'postgresql://postgres.ujwzbldcbczbuqernzjy:4yhT9of2uqx6m8HI@aws-1-eu-west-3.pooler.supabase.com:6543/postgres'
 )
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+    "pool_pre_ping": True,
+    "pool_recycle": 300,
+    "pool_timeout": 20
+}
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'default_key_for_dev')
 
