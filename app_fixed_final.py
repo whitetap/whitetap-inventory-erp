@@ -9,15 +9,15 @@ from flask import Flask, render_template, request, redirect, url_for, flash, Res
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy import desc, or_, case, func, text
-from models_fixed import Product, UsageLog
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import desc, text
+from datetime import datetime
 
 app = Flask(__name__)
 
-# This is the most bulletproof way to connect to Supabase from Render
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get(
     'DATABASE_URL', 
-    'postgresql://postgres.ujwzbldcbczbuqernzjy:tgdED4gKqc3C3Znm@aws-0-eu-west-3.pooler.supabase.com:5432/postgres'
+    'postgresql://postgres.ujwzbldcbcbcuqernzjy:tgdED4gKqc3C3Znm@aws-0-eu-west-3.pooler.supabase.com:5432/postgres'
 )
 
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
@@ -34,13 +34,29 @@ app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'aviation-admin-secure-2
 db = SQLAlchemy(app)
 CORS(app)
 
-# Debug connection
-with app.app_context():
-    try:
-        db.session.execute(text('SELECT 1'))
-        print('✅ DB Connection OK')
-    except Exception as e:
-        print(f'❌ DB Connection FAILED: {e}')
+class Product(db.Model):
+    __tablename__ = 'products'
+
+    id = db.Column(UUID(as_uuid=True), primary_key=True)
+    sku = db.Column(db.String(50))
+    name = db.Column(db.String(100))
+    unit_of_measure = db.Column(db.String(20))
+    category_id = db.Column(UUID(as_uuid=True))
+    current_stock = db.Column(db.Float, default=0.0)
+    min_stock_level = db.Column(db.Float, default=0.0)
+
+    def __repr__(self):
+        return f'<Product {self.name} ({self.sku})>'
+
+class UsageLog(db.Model):
+    __tablename__ = 'usage_logs'
+
+    id = db.Column(db.Integer, primary_key=True)
+    product_id = db.Column(UUID(as_uuid=True), db.ForeignKey('products.id'), nullable=False)
+    quantity_used = db.Column(db.Float, nullable=False)
+    technician_name = db.Column(db.String(100), nullable=False)
+    project_ref = db.Column(db.String(100))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 @app.route('/')
 def index():
@@ -283,7 +299,6 @@ def issue_item():
     
     return redirect(url_for('staff_inventory'))
 
-# Change the dash (-) to an underscore (_) right here:
 @app.route('/delete_product/<int:id>', methods=['POST']) 
 def delete_product(id):
     product = Product.query.get_or_404(id)
@@ -297,3 +312,4 @@ if __name__ == '__main__':
     print("SUCCESS: Connected to Supabase Cloud")
     port = int(os.environ.get('PORT', 5005))
     app.run(host='0.0.0.0', debug=True, port=port)
+
