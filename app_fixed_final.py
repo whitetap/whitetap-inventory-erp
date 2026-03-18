@@ -14,7 +14,7 @@ from sqlalchemy.dialects.postgresql import UUID
 from datetime import datetime
 
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'postgresql://postgres.ujwzbldcbczbuqernzjy:tgdED4gKqc3C3Znm@aws-0-eu-west-3.pooler.supabase.com:5432/postgres')
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'postgresql://postgres:tgdED4gKqc3C3Znm@db.ujwzbldcbczbuqernzjy.supabase.co:5432/postgres')
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {"pool_pre_ping": True, "pool_recycle": 300, "connect_args": {"gssencmode": "disable"}}
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'aviation-admin-secure-2026')
@@ -24,7 +24,7 @@ db = SQLAlchemy(app)
 class Product(db.Model):
     __tablename__ = 'products'
 
-    id = db.Column(UUID(as_uuid=True), primary_key=True)
+    id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid4)
     sku = db.Column(db.String(50))
     name = db.Column(db.String(100))
     unit_of_measure = db.Column(db.String(20))
@@ -204,9 +204,8 @@ def admin_add_product():
     min_stock_level = float(request.form.get('min_stock_level', 0))
     
     new_product = Product(
-        id=str(uuid4()),
-        name=name,
         sku=sku,
+        name=name,
         unit_of_measure=unit_of_measure,
         current_stock=current_stock,
         min_stock_level=min_stock_level
