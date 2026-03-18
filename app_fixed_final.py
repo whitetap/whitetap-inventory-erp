@@ -262,7 +262,8 @@ def issue_item():
     
     return redirect(url_for('staff_inventory'))
 
-@app.route('/delete-product/<int:id>', methods=['POST'])
+# Change the dash (-) to an underscore (_) right here:
+@app.route('/delete_product/<int:id>', methods=['POST']) 
 def delete_product(id):
     product = Product.query.get_or_404(id)
     db.session.delete(product)

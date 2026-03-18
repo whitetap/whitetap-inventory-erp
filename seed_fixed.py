@@ -12,20 +12,20 @@ def seed_data():
         
         # 1. BASE PAINTS
         bases = [
-            Product(name='White Base Paint', category='base_paint', unit_type='volume_ml', current_stock=50000, min_stock_level=5000),
-            Product(name='Clear Base', category='base_paint', unit_type='volume_ml', current_stock=30000, min_stock_level=3000),
+            Product(name='White Base Paint', category='base_paint', unit_type='volume_ml', current_stock=50000, min_stock_level=5000), # type: ignore
+            Product(name='Clear Base', category='base_paint', unit_type='volume_ml', current_stock=30000, min_stock_level=3000), # type: ignore
         ]
         
         # 2. PIGMENTS (12+ for test)
         pigments = [
-            Product(name='Red Oxide Pigment', category='pigment', unit_type='volume_ml', current_stock=8000, min_stock_level=1000),
-            Product(name='Yellow Ochre Pigment', category='pigment', unit_type='volume_ml', current_stock=7500, min_stock_level=1000),
-            Product(name='Black Carbon Pigment', category='pigment', unit_type='volume_ml', current_stock=6000, min_stock_level=500),
-            Product(name='Titanium White Pigment', category='pigment', unit_type='volume_ml', current_stock=12000, min_stock_level=2000),
-            Product(name='Phthalo Blue Pigment', category='pigment', unit_type='volume_ml', current_stock=4500, min_stock_level=500),
-            Product(name='Isoindolinone Yellow', category='pigment', unit_type='volume_ml', current_stock=3800, min_stock_level=400),
+            Product(name='Red Oxide Pigment', category='pigment', unit_type='volume_ml', current_stock=8000, min_stock_level=1000), # type: ignore
+            Product(name='Yellow Ochre Pigment', category='pigment', unit_type='volume_ml', current_stock=7500, min_stock_level=1000), # type: ignore
+            Product(name='Black Carbon Pigment', category='pigment', unit_type='volume_ml', current_stock=6000, min_stock_level=500), # type: ignore
+            Product(name='Titanium White Pigment', category='pigment', unit_type='volume_ml', current_stock=12000, min_stock_level=2000), # type: ignore
+            Product(name='Phthalo Blue Pigment', category='pigment', unit_type='volume_ml', current_stock=4500, min_stock_level=500), # type: ignore
+            Product(name='Isoindolinone Yellow', category='pigment', unit_type='volume_ml', current_stock=3800, min_stock_level=400), # type: ignore
             Product(name='Quinacridone Magenta', category='pigment', unit_type='volume_ml', current_stock=3200, min_stock_level=300),
-            Product(name='Hansa Yellow Pigment', category='pigment', unit_type='volume_ml', current_stock=4100, min_stock_level=400),
+            Product(name='Hansa Yellow Pigment', category='pigment', unit_type='volume_ml', current_stock=4100, min_stock_level=400), # type: ignore
             Product(name='Ultramarine Blue', category='pigment', unit_type='volume_ml', current_stock=2900, min_stock_level=300),
             Product(name='Chrome Oxide Green', category='pigment', unit_type='volume_ml', current_stock=2700, min_stock_level=200),
             Product(name='Burnt Umber Pigment', category='pigment', unit_type='volume_ml', current_stock=3500, min_stock_level=350),

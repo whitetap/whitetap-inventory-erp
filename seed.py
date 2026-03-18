@@ -16,12 +16,12 @@ def seed_data():
             Product(name='Black Carbon Pigment', category='pigment', unit_type='volume_ml', current_stock=6000, min_stock_level=500),
             Product(name='Titanium White Pigment', category='pigment', unit_type='volume_ml', current_stock=12000, min_stock_level=2000),
             Product(name='Phthalo Blue Pigment', category='pigment', unit_type='volume_ml', current_stock=4500, min_stock_level=500),
-            Product(name='Isoindolinone Yellow', category='pigment', unit_type='volume_ml', current_stock=3800, min_stock_level=400),
-            Product(name='Quinacridone Magenta', category='pigment', unit_type='volume_ml', current_stock=3200, min_stock_level=300),
-            Product(name='Hansa Yellow Pigment', category='pigment', unit_type='volume_ml', current_stock=4100, min_stock_level=400),
+            Product(name='Isoindolinone Yellow', category='pigment', unit_type='volume_ml', current_stock=3800, min_stock_level=400), # type: ignore
+            Product(name='Quinacridone Magenta', category='pigment', unit_type='volume_ml', current_stock=3200, min_stock_level=300), # type: ignore
+            Product(name='Hansa Yellow Pigment', category='pigment', unit_type='volume_ml', current_stock=4100, min_stock_level=400), # type: ignore
             Product(name='Ultramarine Blue', category='pigment', unit_type='volume_ml', current_stock=2900, min_stock_level=300),
-            Product(name='Chrome Oxide Green', category='pigment', unit_type='volume_ml', current_stock=2700, min_stock_level=200),
-            Product(name='Burnt Umber Pigment', category='pigment', unit_type='volume_ml', current_stock=3500, min_stock_level=350),
+            Product(name='Chrome Oxide Green', category='pigment', unit_type='volume_ml', current_stock=2700, min_stock_level=200), # type: ignore
+            Product(name='Burnt Umber Pigment', category='pigment', unit_type='volume_ml', current_stock=3500, min_stock_level=350), # type: ignore
             Product(name='Transparent Iron Oxide Red', category='pigment', unit_type='volume_ml', current_stock=2200, min_stock_level=200),
         ]
         additives = [
