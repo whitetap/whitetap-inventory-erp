@@ -14,7 +14,11 @@ from models_fixed import db, Product, UsageLog
 from sqlalchemy import desc, or_, case, func
 
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'postgresql://postgres.ujwzbldcbczbuqernzjy:zSL2m9sHFWlyuW1u@aws-1-eu-west-3.pooler.supabase.com:6543/postgres')
+[# Updated with Project ID in the username for Supabase Pooler
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get(
+    'DATABASE_URL', 
+    'postgresql://postgres.ujwzbldcbczbuqernzjy:zSL2m9sHFWlyuW1u@aws-1-eu-west-3.pooler.supabase.com:6543/postgres?options=-c%20search_path%3Dpublic'
+)
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'default_key_for_dev')
 
