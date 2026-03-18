@@ -14,11 +14,11 @@ from sqlalchemy.dialects.postgresql import UUID
 from datetime import datetime
 
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'postgresql://postgres.ujwzbldcbczbuqernzjy:tgdED4gKqc3C3Znm@aws-0-eu-west-3.pooler.supabase.com:6543/postgres')
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'postgresql://postgres.ujwzbldcbczbuqernzjy:tgdED4gKqc3C3Znm@aws-1-eu-west-3.pooler.supabase.com:6543/postgres')
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-    "pool_mode": "transaction", 
-    "pool_pre_ping": True,
-    "connect_args": {"sslmode": "require"}
+    "pool_pre_ping": True, 
+    "pool_recycle": 300, 
+    "connect_args": {"sslmode": "require", "gssencmode": "disable"}
 }
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'aviation-admin-secure-2026')
