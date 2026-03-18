@@ -9,30 +9,38 @@ from flask import Flask, render_template, request, redirect, url_for, flash, Res
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
-from models_fixed import db, Product, UsageLog
 from sqlalchemy import desc, or_, case, func, text
+from models_fixed import Product, UsageLog
 
 app = Flask(__name__)
 
 # This is the most bulletproof way to connect to Supabase from Render
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get(
     'DATABASE_URL', 
-'postgresql://postgres.ujwzbldcbczbuqernzjy:tgdED4gKqc3C3Znm@aws-0-eu-west-3.pooler.supabase.com:5432/postgres'
+    'postgresql://postgres.ujwzbldcbczbuqernzjy:tgdED4gKqc3C3Znm@aws-0-eu-west-3.pooler.supabase.com:5432/postgres'
 )
 
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
     "pool_pre_ping": True,
     "pool_recycle": 300,
     "connect_args": {
-"gssencmode": "disable"
+        "gssencmode": "disable"
     }
 }
 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'aviation-admin-secure-2026')
 
-db.init_app(app)\nCORS(app)\n\n# Debug connection\ntry:\n    with app.app_context():\n        db.session.execute(text('SELECT 1'))\n        print('✅ DB Connection OK - SELECT 1 succeeded')\nexcept Exception as e:\n    print(f'❌ DB Connection FAILED: {e}')
+db = SQLAlchemy(app)
+CORS(app)
+
+# Debug connection
+with app.app_context():
+    try:
+        db.session.execute(text('SELECT 1'))
+        print('✅ DB Connection OK')
+    except Exception as e:
+        print(f'❌ DB Connection FAILED: {e}')
 
 @app.route('/')
 def index():
@@ -289,4 +297,3 @@ if __name__ == '__main__':
     print("SUCCESS: Connected to Supabase Cloud")
     port = int(os.environ.get('PORT', 5005))
     app.run(host='0.0.0.0', debug=True, port=port)
-
