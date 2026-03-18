@@ -14,8 +14,12 @@ from sqlalchemy.dialects.postgresql import UUID
 from datetime import datetime
 
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', '').replace('postgresql://', 'postgresql://postgres:tgdED4gKqc3C3Znm@db.ujwzbldcbczbuqernzjy.supabase.co:5432/postgres?')
-app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {"pool_pre_ping": True, "pool_recycle": 300}
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'postgresql://postgres.ujwzbldcbczbuqernzjy:tgdED4gKqc3C3Znm@aws-0-eu-west-3.pooler.supabase.com:6543/postgres')
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+    "pool_mode": "transaction", 
+    "pool_pre_ping": True,
+    "connect_args": {"sslmode": "require"}
+}
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'aviation-admin-secure-2026')
 
@@ -287,15 +291,14 @@ def issue_item():
     
     return redirect(url_for('staff_inventory'))
 
-@app.route('/delete_product/<int:id>', methods=['POST']) 
-def delete_product(id):
-    product = Product.query.get_or_404(id)
+@app.route('/delete_product/<product_id>', methods=['POST'])
+def delete_product(product_id):
+    product = Product.query.get_or_404(product_id)
     db.session.delete(product)
     db.session.commit()
     flash('Product deleted successfully!', 'success')
     return redirect(url_for('admin_dashboard'))
 
-# Debug connection block at the bottom
 with app.app_context():
     try:
         db.session.execute(text('SELECT 1'))
@@ -305,6 +308,6 @@ with app.app_context():
 
 if __name__ == '__main__':
     print(f'Connecting to: {app.config["SQLALCHEMY_DATABASE_URI"][:20]}...')
-    print("SUCCESS: Connected to Supabase Cloud")
-    port = int(os.environ.get('PORT', 5005))
+    port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', debug=True, port=port)
+
