@@ -15,18 +15,20 @@ from sqlalchemy import desc, or_, case, func
 
 app = Flask(__name__)
 
-# This pulls the new password from Render's environment variables
+# Using the Direct Connection String for maximum stability
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get(
     'DATABASE_URL', 
-    'postgresql://postgres.ujwzbldcbczbuqernzjy:tgdED4gKqc3C3Znm@aws-1-eu-west-3.pooler.supabase.com:6543/postgres'
+    'postgresql://postgres:tgdED4gKqc3C3Znm@db.ujwzbldcbczbuqernzjy.supabase.co:5432/postgres'
 )
+
+# Keeps the connection alive and healthy
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
     "pool_pre_ping": True,
     "pool_recycle": 300,
-    "pool_timeout": 20
 }
+
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'default_key_for_dev')
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'aviation-admin-secure-2026')
 
 db.init_app(app)
 CORS(app)
