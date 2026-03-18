@@ -18,7 +18,7 @@ app = Flask(__name__)
 # This is the most bulletproof way to connect to Supabase from Render
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get(
     'DATABASE_URL', 
-    'postgresql://"postgres.ujwzbldcbczbuqernzjy":tgdED4gKqc3C3Znm@aws-0-eu-west-3.pooler.supabase.com:5432/postgres'
+    'postgresql://postgres:tgdED4gKqc3C3Znm@db.ujwzbldcbczbuqernzjy.supabase.co:5432/postgres'
 )
 
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
