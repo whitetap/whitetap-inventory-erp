@@ -14,7 +14,7 @@ from sqlalchemy.dialects.postgresql import UUID
 from datetime import datetime
 
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'postgresql://postgres.ujwzbldcbczbuqernzjy:tgdED4gKqc3C3Znm@aws-1-eu-west-3.pooler.supabase.com:6543/postgres?sslmode=require&prepare_threshold=0')
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'postgresql://postgres.ujwzbldcbczbuqernzjy:tgdED4gKqc3C3Znm@aws-1-eu-west-3.pooler.supabase.com:6543/postgres?prepare_threshold=0')
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
     "pool_pre_ping": True, 
     "pool_recycle": 300, 
@@ -304,6 +304,7 @@ with app.app_context():
         db.session.execute(text('SELECT 1'))
         print('✅ DB Connection OK')
     except Exception as e:
+        db.session.rollback()
         print(f'❌ DB Connection FAILED: {e}')
 
 if __name__ == '__main__':
