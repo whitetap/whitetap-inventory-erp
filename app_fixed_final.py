@@ -15,10 +15,10 @@ from sqlalchemy import desc, or_, case, func
 
 app = Flask(__name__)
 
-# Updated with the NEW password and Project ID for the Supabase Pooler
+# This pulls the new password from Render's environment variables
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get(
     'DATABASE_URL', 
-    'postgresql://postgres.ujwzbldcbczbuqernzjy:4yhT9of2uqx6m8HI@aws-1-eu-west-3.pooler.supabase.com:6543/postgres'
+    'postgresql://postgres.ujwzbldcbczbuqernzjy:tgdED4gKqc3C3Znm@aws-1-eu-west-3.pooler.supabase.com:6543/postgres'
 )
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
     "pool_pre_ping": True,
