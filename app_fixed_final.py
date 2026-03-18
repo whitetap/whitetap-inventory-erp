@@ -11,14 +11,14 @@ from flask_cors import CORS
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from models_fixed import db, Product, UsageLog
-from sqlalchemy import desc, or_, case, func
+from sqlalchemy import desc, or_, case, func, text
 
 app = Flask(__name__)
 
 # This is the most bulletproof way to connect to Supabase from Render
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get(
     'DATABASE_URL', 
-    'postgresql://postgres:tgdED4gKqc3C3Znm@aws-0-eu-west-3.pooler.supabase.com:5432/postgres'
+'postgresql://postgres.ujwzbldcbczbuqernzjy:tgdED4gKqc3C3Znm@aws-0-eu-west-3.pooler.supabase.com:5432/postgres'
 )
 
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
@@ -32,8 +32,7 @@ app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'aviation-admin-secure-2026')
 
-db.init_app(app)
-CORS(app)
+db.init_app(app)\nCORS(app)\n\n# Debug connection\ntry:\n    with app.app_context():\n        db.session.execute(text('SELECT 1'))\n        print('✅ DB Connection OK - SELECT 1 succeeded')\nexcept Exception as e:\n    print(f'❌ DB Connection FAILED: {e}')
 
 @app.route('/')
 def index():
