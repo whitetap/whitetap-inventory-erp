@@ -12,20 +12,18 @@ from datetime import datetime
 
 app = Flask(__name__)
 
-# 1. THE CLEAN URL (No extra options here)
-# Format: postgresql://[USER].[PROJECT_ID]:[PASSWORD]@[HOST]:[PORT]/[DB]
+# Final hardcoded URI for Supabase pooler port 6543 (Project Ref in username required)
 DATABASE_URL = "postgresql://postgres.ujwzbldcbczbuqernzjy:fjeAbMBqJSPcYf3m@aws-1-eu-west-3.pooler.supabase.com:6543/postgres?sslmode=require"
 
 app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'aviation-admin-secure-2026')
 
-# 2. THE ENGINE OPTIONS (The proper place for settings)
+# Safe Engine Config - NO driver conflicts
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
     "pool_pre_ping": True,
-    "pool_recycle": 300,
     "connect_args": {
-        "sslmode": "require"
+        "prepare_threshold": 0
     }
 }
 
@@ -308,9 +306,10 @@ def delete_product(product_id):
 with app.app_context():
     try:
         db.session.execute(text('SELECT 1'))
-        print('✅ DATABASE CONNECTED SUCCESSFULLY!')
+        print('✅ DATABASE CONNECTED')
     except Exception as e:
-        print(f'❌ DB Connection STILL FAILED: {e}')
+        db.session.rollback()
+        print(f'❌ DB Connection FAILED: {e}')
 
 if __name__ == '__main__':
     print(f'Connecting to: {app.config["SQLALCHEMY_DATABASE_URI"][:50]}...')
