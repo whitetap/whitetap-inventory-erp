@@ -3,7 +3,8 @@ from dotenv import load_dotenv
 from uuid import uuid4
 import csv
 from io import StringIO
-load_dotenv()
+# load_dotenv()  # DISABLED - HARDCODED OVERRIDE for Render testing
+
 
 from flask import Flask, render_template, request, redirect, url_for, flash, Response, make_response
 from flask_sqlalchemy import SQLAlchemy
@@ -14,12 +15,8 @@ from sqlalchemy.dialects.postgresql import UUID
 from datetime import datetime
 
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://postgres.ujwzbldcbczbuqernzjy:fjeAbMBqJSPcYf3m@aws-1-eu-west-3.pooler.supabase.com:6543/postgres?sslmode=require'
-app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-    "pool_pre_ping": True, 
-    "pool_recycle": 300, 
-    "connect_args": {"sslmode": "require"}
-}
+app.config['SQLALCHEMY_DATABASE_URI'] = "postgresql://postgres.ujwzbldcbczbuqernzjy:fjeAbMBqJSPcYf3m@aws-1-eu-west-3.pooler.supabase.com:6543/postgres?sslmode=require"  # HARDCODED - Ignores all Render env vars
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {"connect_args": {"sslmode": "require", "prepare_threshold": 0}}
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'aviation-admin-secure-2026')
 
