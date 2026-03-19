@@ -1,11 +1,7 @@
 import os
-from dotenv import load_dotenv
 from uuid import uuid4
 import csv
 from io import StringIO
-# load_dotenv()  # DISABLED - HARDCODED OVERRIDE for Render testing
-
-
 from flask import Flask, render_template, request, redirect, url_for, flash, Response, make_response
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
@@ -15,10 +11,24 @@ from sqlalchemy.dialects.postgresql import UUID
 from datetime import datetime
 
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = "postgresql://postgres.ujwzbldcbczbuqernzjy:fjeAbMBqJSPcYf3m@aws-1-eu-west-3.pooler.supabase.com:6543/postgres?sslmode=require"  # HARDCODED - Ignores all Render env vars
-app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {"connect_args": {"sslmode": "require", "prepare_threshold": 0}}
+
+# 1. THE CLEAN URL (No extra options here)
+# Format: postgresql://[USER].[PROJECT_ID]:[PASSWORD]@[HOST]:[PORT]/[DB]
+DATABASE_URL = "postgresql://postgres.ujwzbldcbczbuqernzjy:fjeAbMBqJSPcYf3m@aws-1-eu-west-3.pooler.supabase.com:6543/postgres"
+
+app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'aviation-admin-secure-2026')
+
+# 2. THE ENGINE OPTIONS (The proper place for settings)
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+    "pool_pre_ping": True,
+    "pool_recycle": 300,
+    "connect_args": {
+        "sslmode": "require",
+        "prepare_threshold": 0  # Fixed: This goes here, NOT in the URL string
+    }
+}
 
 db = SQLAlchemy(app)
 
@@ -299,10 +309,9 @@ def delete_product(product_id):
 with app.app_context():
     try:
         db.session.execute(text('SELECT 1'))
-        print('✅ DATABASE CONNECTED')
+        print('✅ DATABASE CONNECTED SUCCESSFULLY!')
     except Exception as e:
-        db.session.rollback()
-        print(f'❌ DB Connection FAILED: {e}')
+        print(f'❌ DB Connection STILL FAILED: {e}')
 
 if __name__ == '__main__':
     print(f'Connecting to: {app.config["SQLALCHEMY_DATABASE_URI"][:50]}...')
