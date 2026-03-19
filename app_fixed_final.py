@@ -14,7 +14,7 @@ from sqlalchemy.dialects.postgresql import UUID
 from datetime import datetime
 
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'postgresql://postgres.ujwzbldcbczbuqernzjy:tgdED4gKqc3C3Znm@aws-1-eu-west-3.pooler.supabase.com:6543/postgres?prepare_threshold=0')
+app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://postgres.ujwzbldcbczbuqernzjy:fjeAbMBqJSPcYf3m@aws-1-eu-west-3.pooler.supabase.com:6543/postgres?sslmode=require'
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
     "pool_pre_ping": True, 
     "pool_recycle": 300, 
@@ -302,7 +302,7 @@ def delete_product(product_id):
 with app.app_context():
     try:
         db.session.execute(text('SELECT 1'))
-        print('✅ DB Connection OK')
+        print('✅ DATABASE CONNECTED')
     except Exception as e:
         db.session.rollback()
         print(f'❌ DB Connection FAILED: {e}')
@@ -311,4 +311,3 @@ if __name__ == '__main__':
     print(f'Connecting to: {app.config["SQLALCHEMY_DATABASE_URI"][:50]}...')
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', debug=True, port=port)
-
