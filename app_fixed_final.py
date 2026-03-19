@@ -23,8 +23,9 @@ app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'aviation-admin-secure-2
 # 2. THE ENGINE OPTIONS (The proper place for settings)
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
     "pool_pre_ping": True,
+    "pool_recycle": 300,
     "connect_args": {
-        "prepare_threshold": 0
+        "sslmode": "require"
     }
 }
 
