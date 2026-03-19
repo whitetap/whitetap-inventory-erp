@@ -12,17 +12,14 @@ from datetime import datetime
 
 app = Flask(__name__)
 
-# Supabase Transaction Pooler Port 6543 - Project Ref in Username (Tenant ID)
+# CLEAN URL for Supabase Pooler - Exact as specified (no prepare_threshold in DSN)
 DATABASE_URL = "postgresql://postgres.ujwzbldcbczbuqernzjy:fjeAbMBqJSPcYf3m@aws-1-eu-west-3.pooler.supabase.com:6543/postgres?sslmode=require"
 
 app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'aviation-admin-secure-2026')
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-"pool_pre_ping": True,
-"connect_args": {
-"prepare_threshold": 0
-}
+    "pool_pre_ping": True
 }
 
 db = SQLAlchemy(app)
