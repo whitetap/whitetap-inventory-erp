@@ -364,6 +364,8 @@ def edit_product(id):
     
     return render_template('edit_product.html', product=product)
 
+port = int(os.environ.get('PORT', 10000))
+
 if __name__ == '__main__':
     with app.app_context():
         try:
@@ -372,7 +374,7 @@ if __name__ == '__main__':
         except Exception as e:
             print(f'❌ Startup FAILED: {e}')
     
-    port = int(os.environ.get('PORT', 5000))
     print(f'🚀 Aviation ERP running on port {port}')
     app.run(host='0.0.0.0', debug=True, port=port)
+
 
