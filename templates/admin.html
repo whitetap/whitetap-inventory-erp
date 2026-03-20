@@ -104,7 +104,9 @@
                             <div class="card-body p-4">
                                 <h4 class="card-title text-success mb-3 fw-bold">💰 Value Summary</h4>
                                 <p class="text-light lh-lg">Total inventory valued at {{ "%.2f"|format(total_inventory_value) }} units.</p>
-                                <a href="{{ url_for('export_products') }}" class="btn btn-success fw-bold text-white">Export Report</a>
+
+                                <a href="{{ url_for('export_inventory') }}" class="btn btn-success fw-bold text-white">Export Report</a>
+
                             </div>
                         </div>
                     </div>

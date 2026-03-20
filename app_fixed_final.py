@@ -191,6 +191,32 @@ def export_carpets():
     
     return response
 
+@app.route('/export-inventory')
+def export_inventory():
+    products = Product.query.order_by(Product.name).all()
+    
+    output = StringIO()
+    writer = csv.writer(output)
+    
+    writer.writerow(['SKU', 'Name', 'Price', 'Quantity', 'Min Level'])
+    
+    for product in products:
+        writer.writerow([
+            product.sku or '',
+            product.name or '',
+            'N/A',  # Price field (not in model)
+            float(product.current_stock or 0),
+            float(product.min_stock_level or 0)
+        ])
+    
+    output.seek(0)
+    
+    response = make_response(output.getvalue())
+    response.headers['Content-Disposition'] = 'attachment; filename=inventory_report.csv'
+    response.headers['Content-type'] = 'text/csv'
+    
+    return response
+
 @app.route('/admin-dashboard')
 def admin_dashboard():
     view = request.args.get('view', 'summary')
