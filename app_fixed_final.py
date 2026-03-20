@@ -349,9 +349,9 @@ def delete_product(product_id):
         flash(f'Delete failed: {str(e)}', 'error')
     return redirect(url_for('admin_dashboard'))
 
-@app.route('/edit-product/<int:id>', methods=['GET', 'POST'])
-def edit_product(id):
-    product = Product.query.get_or_404(id)
+@app.route('/edit-product/<string:product_id>', methods=['GET', 'POST'])
+def edit_product(product_id):
+    product = Product.query.get_or_404(product_id)
     
     if request.method == 'POST':
         product.sku = request.form['sku'].strip()
