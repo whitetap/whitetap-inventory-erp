@@ -48,6 +48,9 @@
 
     <!-- Main Content -->
     <div class="flex-grow-1" style="margin-left: 250px; padding: 2rem;">
+        <!-- Dynamic Greeting -->
+        <h3 id="dynamic-greeting" class="text-white fw-bold mb-4 text-center" style="font-size: 2rem; text-shadow: 0 2px 4px rgba(0,0,0,0.5);">Welcome</h3>
+        
         <div class="container-fluid bg-gradient position-relative" style="min-height: 100vh; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
             
             {% if view == 'summary' %}
@@ -403,19 +406,29 @@ function safeRefresh() {
     location.reload();
 }
 
-// Update timestamp on load
+// Dynamic Greeting + Timestamp + Search
 document.addEventListener('DOMContentLoaded', function() {
+    // Greeting
+    const greetingEl = document.getElementById('dynamic-greeting');
+    if (greetingEl) {
+        const hour = new Date().getHours();
+        let greeting = 'Good Morning';
+        if (hour >= 12 && hour < 17) greeting = 'Good Afternoon';
+        else if (hour >= 17 || hour < 5) greeting = 'Good Evening';
+        greetingEl.textContent = `${greeting}!`;
+    }
+    
+    // Timestamp
     const timeSpan = document.getElementById('lastUpdateTime');
     if (timeSpan) {
         timeSpan.textContent = new Date().toLocaleString();
     }
     
+    // Search filter
     const searchInput = document.getElementById('tableSearch');
     const productsTable = document.getElementById('productsTable');
-    
     if (searchInput && productsTable) {
         const rows = document.querySelectorAll('.product-row');
-        
         function filterTable(term) {
             const lowerTerm = term.toLowerCase();
             rows.forEach(row => {
@@ -423,7 +436,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 row.style.display = text.includes(lowerTerm) ? '' : 'none';
             });
         }
-        
         searchInput.addEventListener('keyup', function() {
             filterTable(this.value);
         });
