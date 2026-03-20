@@ -41,12 +41,12 @@
     </div>
 
     <!-- Main Content with Offset -->
-    <div class="flex-grow-1 ms-0 ms-md-0 ms-lg-250" style="margin-left: 250px; padding: 2rem;">
+    <div class="flex-grow-1" style="margin-left: 250px; padding: 2rem;">
         <div class="container-fluid">
             <!-- Summary Cards -->
             <div class="row g-4 mb-5">
                 <div class="col-xl-3 col-lg-6 col-md-6 col-sm-12">
-                    <div class="card h-100 border-0 shadow-lg hover-lift">
+                    <div class="card h-100 border-0 shadow-lg">
                         <div class="card-body p-4 text-center">
                             <i class="fas fa-boxes fa-3x text-primary mb-3"></i>
                             <h3 class="card-title fw-bold text-primary mb-1 fs-1">{{ total_items }}</h3>
@@ -55,7 +55,7 @@
                     </div>
                 </div>
                 <div class="col-xl-3 col-lg-6 col-md-6 col-sm-12">
-                    <div class="card h-100 border-0 shadow-lg hover-lift {% if low_stock_count > 0 %}animate-pulse{% endif %}">
+                    <div class="card h-100 border-0 shadow-lg {% if low_stock_count > 0 %}border-warning{% endif %}">
                         <div class="card-body p-4 text-center">
                             <i class="fas fa-exclamation-triangle fa-3x text-warning mb-3"></i>
                             <h3 class="card-title fw-bold text-warning mb-1 fs-1">{{ low_stock_count }}</h3>
@@ -64,16 +64,16 @@
                     </div>
                 </div>
                 <div class="col-xl-3 col-lg-6 col-md-6 col-sm-12">
-                    <div class="card h-100 border-0 shadow-lg hover-lift">
+                    <div class="card h-100 border-0 shadow-lg">
                         <div class="card-body p-4 text-center">
                             <i class="fas fa-coins fa-3x text-success mb-3"></i>
                             <h3 class="card-title fw-bold text-success mb-1 fs-1">{{ "%.2f"|format(total_inventory_value) }}</h3>
-                            <p class="card-text text-muted fs-6 fw-semibold mb-0">Total Value</p>
+                            <p class="card-text text-muted fs-6 fw-semibold mb-0">Inventory Value</p>
                         </div>
                     </div>
                 </div>
                 <div class="col-xl-3 col-lg-6 col-md-6 col-sm-12">
-                    <div class="card h-100 border-0 shadow-lg hover-lift">
+                    <div class="card h-100 border-0 shadow-lg">
                         <div class="card-body p-4 text-center">
                             <i class="fas fa-history fa-3x text-info mb-3"></i>
                             <h3 class="card-title fw-bold text-info mb-1 fs-1">{{ today_logs }}</h3>
@@ -86,38 +86,162 @@
             <!-- Add New Product Button -->
             <div class="row mb-4">
                 <div class="col-12">
-                    <button class="btn btn-success btn-lg w-100 rounded-2xl py-4 text-2xl fw-bold shadow-lg mb-4" type="button" data-bs-toggle="collapse" data-bs-target="#addProductForm" style="background: linear-gradient(135deg, #10b981, #059669); border: none;">
+                    <button class="btn btn-success btn-lg w-100 py-3 fs-4 fw-bold shadow-lg mb-4" type="button" data-bs-toggle="collapse" data-bs-target="#addProductForm">
                         ➕ Add New Product
                     </button>
                 </div>
             </div>
 
-            <!-- Add New Product Form (Collapsible) -->
-            <div class="row g-4 mb-5">
-                <div class="col-12">
-                    <div class="collapse" id="addProductForm">
-                        <div class="card">
-                            <div class="card-body p-5">
-                                <h2 class="card-title text-3xl font-bold text-white mb-5 text-center">➕ Add New Product</h2>
-                                <form method="POST" action="{{ url_for('admin_add_product') }}" class="row g-4">
-                                    <div class="col-md-6">
-                                        <label class="form-label text-white fw-bold fs-4 mb-3">Product Name <span class="text-danger">*</span></label>
-                                        <input type="text" name="name" required placeholder="e.g. Aviation Gloss White" class="form-control" style="background-color: #f8f9fa !important; color: #333 !important; font-size:1.25rem; padding: 1rem; border-radius: 1rem; border: 1px solid #dee2e6;">
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label class="form-label text-white fw-bold fs-4 mb-3">SKU <span class="text-danger">*</span></label>
-                                        <input type="text" name="sku" required placeholder="e.g. PNT-77-W" class="form-control" style="background-color: #f8f9fa !important; color: #333 !important; font-size:1.25rem; padding: 1rem; border-radius: 1rem; border: 1px solid #dee2e6;">
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label class="form-label text-white fw-bold fs-4 mb-3">Unit of Measure <span class="text-danger">*</span></label>
-                                        < Ascending (p.name).all()
+            <!-- Add New Product Form -->
+            <div class="collapse" id="addProductForm">
+                <div class="card mb-5 shadow-lg">
+                    <div class="card-header bg-primary text-white">
+                        <h3 class="mb-0">➕ New Product Details</h3>
+                    </div>
+                    <div class="card-body p-5 bg-light">
+                        <form method="POST" action="{{ url_for('admin_add_product') }}">
+                            <div class="row g-4">
+                                <div class="col-md-3">
+                                    <label class="form-label fw-bold">SKU <span class="text-danger">*</span></label>
+                                    <input type="text" class="form-control form-control-lg" name="sku" required>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label fw-bold">Name <span class="text-danger">*</span></label>
+                                    <input type="text" class="form-control form-control-lg" name="name" required>
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label fw-bold">Unit <span class="text-danger">*</span></label>
+                                    <input type="text" class="form-control form-control-lg" name="unit_of_measure" required placeholder="L, KG">
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label fw-bold">Current Stock</label>
+                                    <input type="number" step="0.01" class="form-control form-control-lg" name="current_stock" value="0">
+                                </div>
+                                <div class="col-md-1">
+                                    <label class="form-label fw-bold">Min Level</label>
+                                    <input type="number" step="0.01" class="form-control form-control-lg" name="min_stock_level" value="0">
+                                </div>
+                            </div>
+                            <div class="text-end mt-4">
+                                <button type="submit" class="btn btn-primary btn-lg px-5 py-2">Add Product</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Products Table -->
+            <div class="card shadow-lg border-0">
+                <div class="card-header bg-dark text-white">
+                    <div class="row align-items-center">
+                        <div class="col">
+                            <h2 class="mb-0 fw-bold">📦 Inventory Management</h2>
+                        </div>
+                        <div class="col-auto">
+                            <input type="text" id="tableSearch" class="form-control form-control-lg" placeholder="Search SKU or Name...">
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>SKU</th>
+                                    <th>Name</th>
+                                    <th>Unit</th>
+                                    <th>Stock</th>
+                                    <th>Min Level</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="productsTable">
+                                {% for product in products %}
+                                <tr class="product-row align-middle">
+                                    <td class="fw-bold">{{ product.sku or '-' }}</td>
+                                    <td>{{ product.name or '-' }}</td>
+                                    <td>{{ product.unit_of_measure or '-' }}</td>
+                                    <td>
+                                        <span class="badge {% if product.current_stock < product.min_stock_level %}bg-danger{% else %}bg-success{% endif %} fs-6 px-3 py-2">
+                                            {{ "%.2f"|format(product.current_stock or 0) }}
+                                        </span>
+                                    </td>
+                                    <td class="fw-semibold">{{ "%.2f"|format(product.min_stock_level or 0) }}</td>
+                                    <td>
+                                        {% if (product.current_stock or 0) < (product.min_stock_level or 0) %}
+                                            <span class="badge bg-warning text-dark px-3 py-2">⚠️ Low</span>
+                                        {% else %}
+                                            <span class="badge bg-success px-3 py-2">✅ OK</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="btn-group" role="group">
+                                            <a href="{{ url_for('edit_product', id=product.id) }}" class="btn btn-outline-primary btn-sm">
+                                                <i class="fas fa-edit"></i>
+                                            </a>
+                                            <form method="POST" action="{{ url_for('delete_product', id=product.id) }}" style="display: inline;" onsubmit="return confirm('Delete {{ product.name }}?');">
+                                                <button type="submit" class="btn btn-outline-danger btn-sm">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Custom Styles -->
+<style>
+.sidebar-link:hover {
+    background: rgba(255,255,255,0.1) !important;
+    transform: translateX(5px);
+    transition: all 0.2s;
+}
+.hover-lift:hover {
+    transform: translateY(-5px);
+    transition: all 0.3s;
+}
+.card {
+    transition: all 0.3s ease;
+}
+.product-row:hover {
+    background-color: #fff3cd !important;
+    transform: scale(1.01);
+}
+#tableSearch {
+    min-width: 300px;
+}
+.btn {
+    transition: all 0.2s;
+}
+.container-fluid {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+}
+</style>
+
+<!-- Live Search Script -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('tableSearch');
+    const rows = document.querySelectorAll('.product-row');
     
-    # Calculate summary stats
-    total_items = len(products)
-    low_stock_count = len([p for p in products if (p.current_stock or 0) < (p.min_stock_level or 0)])
-    total_inventory_value = sum((p.current_stock or 0) for p in products)
-    
-    # Today's usage logs count
-    today_logs = UsageLog.query.filter(db.func.date(UsageLog.created_at) == datetime.now().date()).count()
-    
-    return render_template('admin.html', products=products, total_items=total_items, low_stock_count=low_stock_count, total_inventory_value=total_inventory_value, today_logs=today_logs)
+    searchInput.addEventListener('keyup', function() {
+        const term = this.value.toLowerCase();
+        rows.forEach(row => {
+            const text = row.textContent.toLowerCase();
+            row.style.display = text.includes(term) ? '' : 'none';
+        });
+    });
+});
+</script>
+{% endblock %}
+
