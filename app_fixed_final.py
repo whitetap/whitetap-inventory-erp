@@ -193,6 +193,8 @@ def export_carpets():
 
 @app.route('/admin-dashboard')
 def admin_dashboard():
+    view = request.args.get('view', 'summary')
+    
     products = Product.query.order_by(Product.name).all()
     
     # Calculate summary stats
@@ -203,7 +205,7 @@ def admin_dashboard():
     # Today's usage logs count
     today_logs = UsageLog.query.filter(db.func.date(UsageLog.created_at) == datetime.now().date()).count()
     
-    return render_template('admin.html', products=products, total_items=total_items, low_stock_count=low_stock_count, total_inventory_value=total_inventory_value, today_logs=today_logs)
+    return render_template('admin.html', view=view, products=products, total_items=total_items, low_stock_count=low_stock_count, total_inventory_value=total_inventory_value, today_logs=today_logs)
 
 @app.route('/admin/add-product', methods=['POST'])
 def admin_add_product():

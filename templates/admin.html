@@ -16,11 +16,14 @@
         </div>
         
         <nav class="nav nav-pills flex-column sidebar-nav mb-auto">
-            <a class="nav-link active text-white px-4 py-3 mb-2 rounded-3 sidebar-link" href="{{ url_for('admin_dashboard') }}" style="background: linear-gradient(135deg, #0d6efd, #0b5ed7);">
-                <i class="fas fa-tachometer-alt me-3"></i>Dashboard
+            <a class="nav-link px-4 py-3 mb-2 rounded-3 sidebar-link {% if view == 'summary' %}active text-white bg-primary{% else %}text-white{% endif %}" href="{{ url_for('admin_dashboard', view='summary') }}">
+                <i class="fas fa-chart-bar me-3"></i>Summary
+            </a>
+            <a class="nav-link px-4 py-3 mb-2 rounded-3 sidebar-link {% if view == 'inventory' %}active text-white bg-primary{% else %}text-white{% endif %}" href="{{ url_for('admin_dashboard', view='inventory') }}">
+                <i class="fas fa-boxes me-3"></i>Inventory
             </a>
             <a class="nav-link text-white px-4 py-3 mb-2 rounded-3 sidebar-link" href="{{ url_for('staff_inventory') }}">
-                <i class="fas fa-boxes me-3"></i>Inventory
+                <i class="fas fa-users me-3"></i>Staff View
             </a>
             <a class="nav-link text-white px-4 py-3 mb-2 rounded-3 sidebar-link" href="{{ url_for('export_logs') }}">
                 <i class="fas fa-file-export me-3"></i>Usage Logs
@@ -40,176 +43,218 @@
         </div>
     </div>
 
-    <!-- Main Content with Offset -->
+    <!-- Main Content -->
     <div class="flex-grow-1" style="margin-left: 250px; padding: 2rem;">
-        <div class="container-fluid">
-            <!-- Summary Cards -->
-            <div class="row g-4 mb-5">
-                <div class="col-xl-3 col-lg-6 col-md-6 col-sm-12">
-                    <div class="card h-100 border-0 shadow-lg">
-                        <div class="card-body p-4 text-center">
-                            <i class="fas fa-boxes fa-3x text-primary mb-3"></i>
-                            <h3 class="card-title fw-bold text-primary mb-1 fs-1">{{ total_items }}</h3>
-                            <p class="card-text text-muted fs-6 fw-semibold mb-0">Total Items</p>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-xl-3 col-lg-6 col-md-6 col-sm-12">
-                    <div class="card h-100 border-0 shadow-lg {% if low_stock_count > 0 %}border-warning{% endif %}">
-                        <div class="card-body p-4 text-center">
-                            <i class="fas fa-exclamation-triangle fa-3x text-warning mb-3"></i>
-                            <h3 class="card-title fw-bold text-warning mb-1 fs-1">{{ low_stock_count }}</h3>
-                            <p class="card-text text-muted fs-6 fw-semibold mb-0">Low Stock Alert</p>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-xl-3 col-lg-6 col-md-6 col-sm-12">
-                    <div class="card h-100 border-0 shadow-lg">
-                        <div class="card-body p-4 text-center">
-                            <i class="fas fa-coins fa-3x text-success mb-3"></i>
-                            <h3 class="card-title fw-bold text-success mb-1 fs-1">{{ "%.2f"|format(total_inventory_value) }}</h3>
-                            <p class="card-text text-muted fs-6 fw-semibold mb-0">Inventory Value</p>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-xl-3 col-lg-6 col-md-6 col-sm-12">
-                    <div class="card h-100 border-0 shadow-lg">
-                        <div class="card-body p-4 text-center">
-                            <i class="fas fa-history fa-3x text-info mb-3"></i>
-                            <h3 class="card-title fw-bold text-info mb-1 fs-1">{{ today_logs }}</h3>
-                            <p class="card-text text-muted fs-6 fw-semibold mb-0">Today's Requests</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Add New Product Button -->
-            <div class="row mb-4">
-                <div class="col-12">
-                    <button class="btn btn-success btn-lg w-100 py-3 fs-4 fw-bold shadow-lg mb-4" type="button" data-bs-toggle="collapse" data-bs-target="#addProductForm">
-                        ➕ Add New Product
-                    </button>
-                </div>
-            </div>
-
-            <!-- Add New Product Form -->
-            <div class="collapse" id="addProductForm">
-                <div class="card mb-5 shadow-lg">
-                    <div class="card-header bg-primary text-white">
-                        <h3 class="mb-0">➕ New Product Details</h3>
-                    </div>
-                    <div class="card-body p-5 bg-light">
-                        <form method="POST" action="{{ url_for('admin_add_product') }}">
-                            <div class="row g-4">
-                                <div class="col-md-3">
-                                    <label class="form-label fw-bold">SKU <span class="text-danger">*</span></label>
-                                    <input type="text" class="form-control form-control-lg" name="sku" required>
-                                </div>
-                                <div class="col-md-4">
-                                    <label class="form-label fw-bold">Name <span class="text-danger">*</span></label>
-                                    <input type="text" class="form-control form-control-lg" name="name" required>
-                                </div>
-                                <div class="col-md-2">
-                                    <label class="form-label fw-bold">Unit <span class="text-danger">*</span></label>
-                                    <input type="text" class="form-control form-control-lg" name="unit_of_measure" required placeholder="L, KG">
-                                </div>
-                                <div class="col-md-2">
-                                    <label class="form-label fw-bold">Current Stock</label>
-                                    <input type="number" step="0.01" class="form-control form-control-lg" name="current_stock" value="0">
-                                </div>
-                                <div class="col-md-1">
-                                    <label class="form-label fw-bold">Min Level</label>
-                                    <input type="number" step="0.01" class="form-control form-control-lg" name="min_stock_level" value="0">
-                                </div>
+        <div class="container-fluid bg-gradient position-relative" style="min-height: 100vh; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+            
+            {% if view == 'summary' %}
+                <!-- Summary View - Large Cards -->
+                <div class="row g-4 mb-5 justify-content-center">
+                    <div class="col-xl-3 col-lg-6 col-md-6">
+                        <div class="card h-100 border-0 shadow-lg glass-effect">
+                            <div class="card-body p-5 text-center">
+                                <i class="fas fa-boxes fa-4x text-primary mb-4"></i>
+                                <h1 class="fw-bold text-primary mb-2 fs-1">{{ total_items }}</h1>
+                                <p class="lead text-muted mb-0">Total Items</p>
                             </div>
-                            <div class="text-end mt-4">
-                                <button type="submit" class="btn btn-primary btn-lg px-5 py-2">Add Product</button>
+                        </div>
+                    </div>
+                    <div class="col-xl-3 col-lg-6 col-md-6">
+                        <div class="card h-100 border-0 shadow-lg glass-effect {% if low_stock_count > 0 %}border-warning shadow-warning{% endif %}">
+                            <div class="card-body p-5 text-center">
+                                <i class="fas fa-exclamation-triangle fa-4x text-warning mb-4"></i>
+                                <h1 class="fw-bold text-warning mb-2 fs-1">{{ low_stock_count }}</h1>
+                                <p class="lead text-muted mb-0">Low Stock Alert</p>
                             </div>
-                        </form>
+                        </div>
+                    </div>
+                    <div class="col-xl-3 col-lg-6 col-md-6">
+                        <div class="card h-100 border-0 shadow-lg glass-effect">
+                            <div class="card-body p-5 text-center">
+                                <i class="fas fa-coins fa-4x text-success mb-4"></i>
+                                <h1 class="fw-bold text-success mb-2 fs-display-4">{{ "%.2f"|format(total_inventory_value) }}</h1>
+                                <p class="lead text-muted mb-0">Inventory Value</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-xl-3 col-lg-6 col-md-6">
+                        <div class="card h-100 border-0 shadow-lg glass-effect">
+                            <div class="card-body p-5 text-center">
+                                <i class="fas fa-history fa-4x text-info mb-4"></i>
+                                <h1 class="fw-bold text-info mb-2 fs-1">{{ today_logs }}</h1>
+                                <p class="lead text-muted mb-0">Today's Requests</p>
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            <!-- Products Table -->
-            <div class="card shadow-lg border-0">
-                <div class="card-header bg-dark text-white">
-                    <div class="row align-items-center">
-                        <div class="col">
-                            <h2 class="mb-0 fw-bold">📦 Inventory Management</h2>
+                <!-- Quick Actions -->
+                <div class="row g-4">
+                    <div class="col-lg-4">
+                        <div class="card h-100 border-0 shadow-lg">
+                            <div class="card-body p-4">
+                                <h4 class="card-title text-primary mb-3">📊 Recent Trends</h4>
+                                <p class="text-muted">Low stock items need attention. Check inventory for restock opportunities.</p>
+                                <a href="{{ url_for('admin_dashboard', view='inventory') }}" class="btn btn-primary">View Inventory</a>
+                            </div>
                         </div>
-                        <div class="col-auto">
-                            <input type="text" id="tableSearch" class="form-control form-control-lg" placeholder="Search SKU or Name...">
+                    </div>
+                    <div class="col-lg-4">
+                        <div class="card h-100 border-0 shadow-lg">
+                            <div class="card-body p-4">
+                                <h4 class="card-title text-success mb-3">💰 Value Summary</h4>
+                                <p class="text-muted">Total inventory valued at {{ "%.2f"|format(total_inventory_value) }} units.</p>
+                                <a href="{{ url_for('export_products') }}" class="btn btn-success">Export Report</a>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-lg-4">
+                        <div class="card h-100 border-0 shadow-lg">
+                            <div class="card-body p-4">
+                                <h4 class="card-title text-info mb-3">📈 Activity Today</h4>
+                                <p class="text-muted">{{ today_logs }} requests processed today.</p>
+                                <a href="{{ url_for('export_logs') }}" class="btn btn-info text-white">View Logs</a>
+                            </div>
                         </div>
                     </div>
                 </div>
-                <div class="card-body p-0">
-                    <div class="table-responsive">
-                        <table class="table table-hover mb-0">
-                            <thead class="table-dark">
-                                <tr>
-                                    <th>SKU</th>
-                                    <th>Name</th>
-                                    <th>Unit</th>
-                                    <th>Stock</th>
-                                    <th>Min Level</th>
-                                    <th>Status</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody id="productsTable">
-                                {% for product in products %}
-                                <tr class="product-row align-middle">
-                                    <td class="fw-bold">{{ product.sku or '-' }}</td>
-                                    <td>{{ product.name or '-' }}</td>
-                                    <td>{{ product.unit_of_measure or '-' }}</td>
-                                    <td>
-                                        <span class="badge {% if product.current_stock < product.min_stock_level %}bg-danger{% else %}bg-success{% endif %} fs-6 px-3 py-2">
-                                            {{ "%.2f"|format(product.current_stock or 0) }}
-                                        </span>
-                                    </td>
-                                    <td class="fw-semibold">{{ "%.2f"|format(product.min_stock_level or 0) }}</td>
-                                    <td>
-                                        {% if (product.current_stock or 0) < (product.min_stock_level or 0) %}
-                                            <span class="badge bg-warning text-dark px-3 py-2">⚠️ Low</span>
-                                        {% else %}
-                                            <span class="badge bg-success px-3 py-2">✅ OK</span>
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        <div class="btn-group" role="group">
-                                            <a href="{{ url_for('edit_product', id=product.id) }}" class="btn btn-outline-primary btn-sm">
-                                                <i class="fas fa-edit"></i>
-                                            </a>
-                                            <form method="POST" action="{{ url_for('delete_product', id=product.id) }}" style="display: inline;" onsubmit="return confirm('Delete {{ product.name }}?');">
-                                                <button type="submit" class="btn btn-outline-danger btn-sm">
-                                                    <i class="fas fa-trash"></i>
-                                                </button>
-                                            </form>
-                                        </div>
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
+                
+            {% elif view == 'inventory' %}
+                <!-- Add New Product Button -->
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <button class="btn btn-success btn-lg w-100 py-3 fs-4 fw-bold shadow-lg mb-4" type="button" data-bs-toggle="collapse" data-bs-target="#addProductForm">
+                            ➕ Add New Product
+                        </button>
                     </div>
                 </div>
-            </div>
+
+                <!-- Add New Product Form -->
+                <div class="collapse" id="addProductForm">
+                    <div class="card mb-5 shadow-lg">
+                        <div class="card-header bg-primary text-white">
+                            <h3 class="mb-0">➕ New Product Details</h3>
+                        </div>
+                        <div class="card-body p-5 bg-light">
+                            <form method="POST" action="{{ url_for('admin_add_product') }}">
+                                <div class="row g-4">
+                                    <div class="col-md-3">
+                                        <label class="form-label fw-bold">SKU <span class="text-danger">*</span></label>
+                                        <input type="text" class="form-control form-control-lg" name="sku" required>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label fw-bold">Name <span class="text-danger">*</span></label>
+                                        <input type="text" class="form-control form-control-lg" name="name" required>
+                                    </div>
+                                    <div class="col-md-2">
+                                        <label class="form-label fw-bold">Unit <span class="text-danger">*</span></label>
+                                        <input type="text" class="form-control form-control-lg" name="unit_of_measure" required placeholder="L, KG">
+                                    </div>
+                                    <div class="col-md-2">
+                                        <label class="form-label fw-bold">Current Stock</label>
+                                        <input type="number" step="0.01" class="form-control form-control-lg" name="current_stock" value="0">
+                                    </div>
+                                    <div class="col-md-1">
+                                        <label class="form-label fw-bold">Min Level</label>
+                                        <input type="number" step="0.01" class="form-control form-control-lg" name="min_stock_level" value="0">
+                                    </div>
+                                </div>
+                                <div class="text-end mt-4">
+                                    <button type="submit" class="btn btn-primary btn-lg px-5 py-2">Add Product</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Products Table -->
+                <div class="card shadow-lg border-0">
+                    <div class="card-header bg-dark text-white">
+                        <div class="row align-items-center">
+                            <div class="col">
+                                <h2 class="mb-0 fw-bold">📦 Inventory Management</h2>
+                            </div>
+                            <div class="col-auto">
+                                <input type="text" id="tableSearch" class="form-control form-control-lg" placeholder="Search SKU or Name...">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead class="table-dark">
+                                    <tr>
+                                        <th>SKU</th>
+                                        <th>Name</th>
+                                        <th>Unit</th>
+                                        <th>Stock</th>
+                                        <th>Min Level</th>
+                                        <th>Status</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="productsTable">
+                                    {% for product in products %}
+                                    <tr class="product-row align-middle">
+                                        <td class="fw-bold">{{ product.sku or '-' }}</td>
+                                        <td>{{ product.name or '-' }}</td>
+                                        <td>{{ product.unit_of_measure or '-' }}</td>
+                                        <td>
+                                            <span class="badge {% if product.current_stock < product.min_stock_level %}bg-danger{% else %}bg-success{% endif %} fs-6 px-3 py-2">
+                                                {{ "%.2f"|format(product.current_stock or 0) }}
+                                            </span>
+                                        </td>
+                                        <td class="fw-semibold">{{ "%.2f"|format(product.min_stock_level or 0) }}</td>
+                                        <td>
+                                            {% if (product.current_stock or 0) < (product.min_stock_level or 0) %}
+                                                <span class="badge bg-warning text-dark px-3 py-2">⚠️ Low</span>
+                                            {% else %}
+                                                <span class="badge bg-success px-3 py-2">✅ OK</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <div class="btn-group" role="group">
+                                                <a href="{{ url_for('edit_product', id=product.id) }}" class="btn btn-outline-primary btn-sm">
+                                                    <i class="fas fa-edit"></i>
+                                                </a>
+                                                <form method="POST" action="{{ url_for('delete_product', id=product.id) }}" style="display: inline;" onsubmit="return confirm('Delete {{ product.name }}?');">
+                                                    <button type="submit" class="btn btn-outline-danger btn-sm">
+                                                        <i class="fas fa-trash"></i>
+                                                    </button>
+                                                </form>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                
+            {% else %}
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>Welcome to the Dashboard. Use navigation to view Summary or Inventory.
+                </div>
+            {% endif %}
         </div>
     </div>
 </div>
 
-<!-- Custom Styles -->
+<!-- Styles -->
 <style>
 .sidebar-link:hover {
     background: rgba(255,255,255,0.1) !important;
     transform: translateX(5px);
-    transition: all 0.2s;
+    transition: all 0.2s ease;
 }
-.hover-lift:hover {
+.glass-effect {
+    backdrop-filter: blur(10px);
+    background: rgba(255,255,255,0.25);
+    border: 1px solid rgba(255,255,255,0.18);
+}
+.card:hover {
     transform: translateY(-5px);
-    transition: all 0.3s;
-}
-.card {
     transition: all 0.3s ease;
 }
 .product-row:hover {
@@ -220,28 +265,27 @@
     min-width: 300px;
 }
 .btn {
-    transition: all 0.2s;
+    transition: all 0.2s ease;
 }
-.container-fluid {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    min-height: 100vh;
-}
+.fs-display-4 { font-size: 3rem !important; }
 </style>
 
-<!-- Live Search Script -->
+<!-- Search Script -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const searchInput = document.getElementById('tableSearch');
-    const rows = document.querySelectorAll('.product-row');
-    
-    searchInput.addEventListener('keyup', function() {
-        const term = this.value.toLowerCase();
-        rows.forEach(row => {
-            const text = row.textContent.toLowerCase();
-            row.style.display = text.includes(term) ? '' : 'none';
+    if (searchInput) {
+        const rows = document.querySelectorAll('.product-row');
+        searchInput.addEventListener('keyup', function() {
+            const term = this.value.toLowerCase();
+            rows.forEach(row => {
+                const text = row.textContent.toLowerCase();
+                row.style.display = text.includes(term) ? '' : 'none';
+            });
         });
-    });
+    }
 });
 </script>
+
 {% endblock %}
 
