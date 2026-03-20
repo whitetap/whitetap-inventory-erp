@@ -7,220 +7,117 @@
 {% block page_title %}Admin Dashboard{% endblock %}
 
 {% block content %}
-<div class="container-fluid">
-    <!-- Add New Product Button -->
-    <div class="row mb-4">
-        <div class="col-12">
-            <button class="btn btn-success btn-lg w-100 rounded-2xl py-4 text-2xl fw-bold shadow-lg" type="button" data-bs-toggle="collapse" data-bs-target="#addProductForm" style="background: linear-gradient(135deg, #10b981, #059669); border: none;">
-                ➕ Add New Product
-            </button>
+<div class="d-flex min-vh-100">
+    <!-- Fixed Sidebar -->
+    <div class="sidebar bg-dark text-white p-4 d-flex flex-column" style="width: 250px; position: fixed; height: 100vh; top: 0; left: 0; z-index: 1000; box-shadow: 2px 0 10px rgba(0,0,0,0.3);">
+        <div class="sidebar-header text-center mb-5 py-4 border-bottom border-secondary">
+            <h3 class="fw-bold text-warning mb-0">🛩️ Aviation ERP</h3>
+            <small class="text-muted">Admin Panel</small>
         </div>
-    </div>
-
-    <!-- Add New Product Form (Collapsible) -->
-    <div class="row g-4 mb-5">
-        <div class="col-12">
-            <div class="collapse" id="addProductForm">
-                <div class="card">
-                    <div class="card-body p-5">
-                        <h2 class="card-title text-3xl font-bold text-white mb-5 text-center">➕ Add New Product</h2>
-                        <form method="POST" action="{{ url_for('admin_add_product') }}" class="row g-4">
-                            <div class="col-md-6">
-                                <label class="form-label text-white fw-bold fs-4 mb-3">Product Name <span class="text-danger">*</span></label>
-                                <input type="text" name="name" required placeholder="e.g. Aviation Gloss White" class="form-control" style="background-color: #f8f9fa !important; color: #333 !important; font-size:1.25rem; padding: 1rem; border-radius: 1rem; border: 1px solid #dee2e6;">
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label text-white fw-bold fs-4 mb-3">SKU <span class="text-danger">*</span></label>
-                                <input type="text" name="sku" required placeholder="e.g. PNT-77-W" class="form-control" style="background-color: #f8f9fa !important; color: #333 !important; font-size:1.25rem; padding: 1rem; border-radius: 1rem; border: 1px solid #dee2e6;">
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label text-white fw-bold fs-4 mb-3">Unit of Measure <span class="text-danger">*</span></label>
-                                <select name="unit_of_measure" required class="form-select" style="background-color: #f8f9fa !important; color: #333 !important; font-size:1.25rem; padding: 1rem; border-radius: 1rem; border: 1px solid #dee2e6;">
-                                    <option value="">Select Unit</option>
-                                    <option value="ml">Milliliters (ml)</option>
-                                    <option value="liters">Liters</option>
-                                    <option value="kg">Kilograms (kg)</option>
-                                    <option value="sq_ft">Square Feet (sq_ft)</option>
-                                    <option value="m2">Square Meters (m²)</option>
-                                </select>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label text-white fw-bold fs-4 mb-3">Min Stock Level</label>
-                                <input type="number" name="min_stock_level" step="0.01" min="0" placeholder="0" value="0" class="form-control" style="background-color: #f8f9fa !important; color: #333 !important; font-size:1.25rem; padding: 1rem; border-radius: 1rem; border: 1px solid #dee2e6;">
-                            </div>
-                            <div class="col-12">
-                                <label class="form-label text-white fw-bold fs-4 mb-3">Initial Stock Quantity</label>
-                                <input type="number" name="current_stock" step="0.01" min="0" placeholder="0" value="0" class="form-control" style="background-color: #f8f9fa !important; color: #333 !important; font-size:1.25rem; padding: 1rem; border-radius: 1rem; border: 1px solid #dee2e6;">
-                            </div>
-                            <div class="col-12">
-                                <button type="submit" class="btn w-100 btn-lg py-4 text-2xl fw-black rounded-2xl shadow-2xl mb-3" style="background: linear-gradient(135deg, #10b981, #059669); border: none;">
-                                    🚀 Save Product to Supabase
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Products List with Restock & Delete -->
-    <div class="row">
-        <div class="col-12">
-            <div class="card">
-                <div class="card-body p-4">
-                    <h2 class="text-3xl font-bold text-white mb-4 text-center">📊 Current Inventory ({{ products|length if products else 0 }})</h2>
-                    
-                    <!-- Search Bar -->
-                    <div class="mb-4">
-                        <input type="text" id="searchInput" class="form-control form-control-lg" placeholder="🔍 Search by SKU or Name..." style="background-color: #f8f9fa; color: #333; font-size:1.1rem; padding: 0.75rem 1rem; border-radius: 0.5rem; border: 2px solid #dee2e6;">
-                    </div>
-
-                    {% if products %}
-                        <div class="table-responsive" style="height: 70vh; overflow-y: auto;">
-                            <table class="table table-hover table-dark table-sm" id="productsTable">
-                                <thead id="tableHead" class="sticky-top bg-dark border-bottom border-light">
-                                    <tr>
-                                        <th class="border-end border-light p-2 fs-6 fw-bold text-nowrap">SKU</th>
-                                        <th class="border-end border-light p-2 fs-6 fw-bold text-nowrap">Name</th>
-                                        <th class="border-end border-light p-2 fs-6 fw-bold text-nowrap">Unit</th>
-                                        <th class="border-end border-light p-2 fs-6 fw-bold text-end text-nowrap">Stock</th>
-                                        <th class="border-end border-light p-2 fs-6 fw-bold text-end text-nowrap">Min Level</th>
-                                        <th class="border-end border-light p-2 fs-6 fw-bold text-end text-nowrap">Restock</th>
-                                        <th class="p-2 fs-6 fw-bold text-end text-nowrap">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="tableBody">
-                                    {% for product in products %}
-                                    <tr class="product-row" data-sku="{{ product.sku|lower }}" data-name="{{ product.name|lower }}">
-                                        <td class="border-end p-2 fw-semibold text-emerald-300">{{ product.sku }}</td>
-                                        <td class="border-end p-2 fw-medium text-light">{{ product.name }}</td>
-                                        <td class="border-end p-2">
-                                            <span class="badge bg-primary bg-opacity-75 rounded-pill px-2 py-1 fs-6">{{ product.unit_of_measure }}</span>
-                                        </td>
-                                        <td class="border-end p-2 fs-5 fw-bold {{ 'text-danger' if product.current_stock <= product.min_stock_level else 'text-success' }}">
-                                            {{ product.current_stock|round(2) }}
-                                            {% if (product.current_stock or 0) < 5 %}
-                                                <span class="badge bg-danger bg-opacity-90 ms-1 px-2 py-1">LOW</span>
-                                            {% endif %}
-                                        </td>
-                                        <td class="border-end p-2 text-muted">{{ product.min_stock_level|round(2) }}</td>
-                                        <td class="border-end p-2">
-                                            <form method="POST" action="{{ url_for('restock_item') }}" class="d-inline">
-                                                <input type="hidden" name="product_id" value="{{ product.id }}">
-                                                <div class="input-group input-group-sm">
-                                                    <input type="number" name="amount_to_add" min="0.01" step="0.01" placeholder="Qty" required class="form-control bg-dark text-white border-secondary form-control-sm">
-                                                    <button type="submit" class="btn btn-success btn-sm px-3">
-                                                        ➕
-                                                    </button>
-                                                </div>
-                                            </form>
-                                        </td>
-                                        <td class="p-2">
-                                            <div class="btn-group btn-group-sm" role="group">
-                                                <a href="{{ url_for('edit_product', id=product.id) }}" class="btn btn-outline-warning btn-sm px-3">
-                                                    ✏️ Edit
-                                                </a>
-                                                <form action="{{ url_for('delete_product', id=product.id) }}" method="POST" style="display:inline;" onsubmit="return confirm('Delete {{ product.name }}?')">
-                                                    <button type="submit" class="btn btn-outline-danger btn-sm px-3">
-                                                        🗑️ Delete
-                                                    </button>
-                                                </form>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-
-                    {% else %}
-                        <div class="text-center py-8">
-                            <i class="fas fa-box-open fa-4x text-muted mb-4"></i>
-                            <h3 class="text-white fw-bold mb-3 fs-2">No Products Yet</h3>
-                            <p class="text-muted fs-5 mb-0">Add your first aviation product using the form above</p>
-                        </div>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Footer -->
-    <div class="row mt-5">
-        <div class="col-12 text-center">
-            <small class="text-muted">Supabase PostgreSQL • UUID Auto • Real-time Search • Sticky Header</small>
-        </div>
-    </div>
-</div>
-
-<style>
-/* Sticky Header */
-.table-responsive {
-    position: relative;
-}
-
-.sticky-top {
-    position: sticky;
-    top: 0;
-    z-index: 10;
-}
-
-/* Row Hover Effect */
-.product-row:hover {
-    background-color: rgba(255, 193, 7, 0.1) !important;
-    transform: scale(1.01);
-    transition: all 0.2s ease;
-}
-
-/* Compact Padding */
-.product-row td {
-    padding: 0.5rem 0.75rem !important;
-    vertical-align: middle;
-}
-
-.table th {
-    padding: 0.5rem 0.75rem !important;
-}
-
-/* Search Animation */
-#searchInput {
-    transition: all 0.3s ease;
-    box-shadow: 0 4px 6px -1px rgba(0, 0,0,0.1);
-}
-
-#searchInput:focus {
-    box-shadow: 0 10px 15px -3px rgba(0, 0,0,0.2);
-    border-color: #10b981;
-    transform: translateY(-1px);
-}
-
-/* Hide rows when filtering */
-.product-row.hidden {
-    display: none !important;
-}
-</style>
-
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const searchInput = document.getElementById('searchInput');
-    const rows = document.querySelectorAll('.product-row');
-    
-    searchInput.addEventListener('input', function() {
-        const query = this.value.toLowerCase().trim();
         
-        rows.forEach(row => {
-            const sku = row.dataset.sku || '';
-            const name = row.dataset.name || '';
-            
-            if (query === '' || sku.includes(query) || name.includes(query)) {
-                row.classList.remove('hidden');
-            } else {
-                row.classList.add('hidden');
-            }
-        });
-    });
-});
-</script>
-{% endblock %}
+        <nav class="nav nav-pills flex-column sidebar-nav mb-auto">
+            <a class="nav-link active text-white px-4 py-3 mb-2 rounded-3 sidebar-link" href="{{ url_for('admin_dashboard') }}" style="background: linear-gradient(135deg, #0d6efd, #0b5ed7);">
+                <i class="fas fa-tachometer-alt me-3"></i>Dashboard
+            </a>
+            <a class="nav-link text-white px-4 py-3 mb-2 rounded-3 sidebar-link" href="{{ url_for('staff_inventory') }}">
+                <i class="fas fa-boxes me-3"></i>Inventory
+            </a>
+            <a class="nav-link text-white px-4 py-3 mb-2 rounded-3 sidebar-link" href="{{ url_for('export_logs') }}">
+                <i class="fas fa-file-export me-3"></i>Usage Logs
+            </a>
+        </nav>
+        
+        <div class="mt-auto pt-4">
+            <div class="dropdown">
+                <button class="btn btn-outline-light w-100 dropdown-toggle rounded-3 py-2" type="button" data-bs-toggle="dropdown">
+                    <i class="fas fa-user-circle me-2"></i>Admin
+                </button>
+                <ul class="dropdown-menu dropdown-menu-dark w-100">
+                    <li><a class="dropdown-item" href="#">Settings</a></li>
+                    <li><a class="dropdown-item" href="#">Logout</a></li>
+                </ul>
+            </div>
+        </div>
+    </div>
 
+    <!-- Main Content with Offset -->
+    <div class="flex-grow-1 ms-0 ms-md-0 ms-lg-250" style="margin-left: 250px; padding: 2rem;">
+        <div class="container-fluid">
+            <!-- Summary Cards -->
+            <div class="row g-4 mb-5">
+                <div class="col-xl-3 col-lg-6 col-md-6 col-sm-12">
+                    <div class="card h-100 border-0 shadow-lg hover-lift">
+                        <div class="card-body p-4 text-center">
+                            <i class="fas fa-boxes fa-3x text-primary mb-3"></i>
+                            <h3 class="card-title fw-bold text-primary mb-1 fs-1">{{ total_items }}</h3>
+                            <p class="card-text text-muted fs-6 fw-semibold mb-0">Total Items</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-xl-3 col-lg-6 col-md-6 col-sm-12">
+                    <div class="card h-100 border-0 shadow-lg hover-lift {% if low_stock_count > 0 %}animate-pulse{% endif %}">
+                        <div class="card-body p-4 text-center">
+                            <i class="fas fa-exclamation-triangle fa-3x text-warning mb-3"></i>
+                            <h3 class="card-title fw-bold text-warning mb-1 fs-1">{{ low_stock_count }}</h3>
+                            <p class="card-text text-muted fs-6 fw-semibold mb-0">Low Stock Alert</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-xl-3 col-lg-6 col-md-6 col-sm-12">
+                    <div class="card h-100 border-0 shadow-lg hover-lift">
+                        <div class="card-body p-4 text-center">
+                            <i class="fas fa-coins fa-3x text-success mb-3"></i>
+                            <h3 class="card-title fw-bold text-success mb-1 fs-1">{{ "%.2f"|format(total_inventory_value) }}</h3>
+                            <p class="card-text text-muted fs-6 fw-semibold mb-0">Total Value</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-xl-3 col-lg-6 col-md-6 col-sm-12">
+                    <div class="card h-100 border-0 shadow-lg hover-lift">
+                        <div class="card-body p-4 text-center">
+                            <i class="fas fa-history fa-3x text-info mb-3"></i>
+                            <h3 class="card-title fw-bold text-info mb-1 fs-1">{{ today_logs }}</h3>
+                            <p class="card-text text-muted fs-6 fw-semibold mb-0">Today's Requests</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Add New Product Button -->
+            <div class="row mb-4">
+                <div class="col-12">
+                    <button class="btn btn-success btn-lg w-100 rounded-2xl py-4 text-2xl fw-bold shadow-lg mb-4" type="button" data-bs-toggle="collapse" data-bs-target="#addProductForm" style="background: linear-gradient(135deg, #10b981, #059669); border: none;">
+                        ➕ Add New Product
+                    </button>
+                </div>
+            </div>
+
+            <!-- Add New Product Form (Collapsible) -->
+            <div class="row g-4 mb-5">
+                <div class="col-12">
+                    <div class="collapse" id="addProductForm">
+                        <div class="card">
+                            <div class="card-body p-5">
+                                <h2 class="card-title text-3xl font-bold text-white mb-5 text-center">➕ Add New Product</h2>
+                                <form method="POST" action="{{ url_for('admin_add_product') }}" class="row g-4">
+                                    <div class="col-md-6">
+                                        <label class="form-label text-white fw-bold fs-4 mb-3">Product Name <span class="text-danger">*</span></label>
+                                        <input type="text" name="name" required placeholder="e.g. Aviation Gloss White" class="form-control" style="background-color: #f8f9fa !important; color: #333 !important; font-size:1.25rem; padding: 1rem; border-radius: 1rem; border: 1px solid #dee2e6;">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label text-white fw-bold fs-4 mb-3">SKU <span class="text-danger">*</span></label>
+                                        <input type="text" name="sku" required placeholder="e.g. PNT-77-W" class="form-control" style="background-color: #f8f9fa !important; color: #333 !important; font-size:1.25rem; padding: 1rem; border-radius: 1rem; border: 1px solid #dee2e6;">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label text-white fw-bold fs-4 mb-3">Unit of Measure <span class="text-danger">*</span></label>
+                                        < Ascending (p.name).all()
+    
+    # Calculate summary stats
+    total_items = len(products)
+    low_stock_count = len([p for p in products if (p.current_stock or 0) < (p.min_stock_level or 0)])
+    total_inventory_value = sum((p.current_stock or 0) for p in products)
+    
+    # Today's usage logs count
+    today_logs = UsageLog.query.filter(db.func.date(UsageLog.created_at) == datetime.now().date()).count()
+    
+    return render_template('admin.html', products=products, total_items=total_items, low_stock_count=low_stock_count, total_inventory_value=total_inventory_value, today_logs=today_logs)
