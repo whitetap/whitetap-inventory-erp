@@ -14,22 +14,12 @@ from datetime import datetime
 # Force Environment Overwrite (Render priority)
 load_dotenv(override=True)
 
-# Hard-Validation of DB URL for Render/Supabase
-db_url = os.getenv('DATABASE_URL')
-if not db_url or 'sqlite' in db_url.lower():
-    db_url = "postgresql://postgres.ujwzbldcbczbuqernzjy:AviationSecure2026@aws-1-eu-west-3.pooler.supabase.com:6543/postgres?sslmode=require"
-    print("⚠️ Forced Supabase PostgreSQL URL")
-
-app = Flask(__name__)
-
-app.config['SQLALCHEMY_DATABASE_URI'] = db_url
+app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'Aviation-ERP-Secret-2026-Secure')
-app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-    "pool_pre_ping": True,
-    "pool_recycle": 300,
-    "connect_args": {"options": "-c statement_timeout=30000"}
-}
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {"connect_args": {"prepare_threshold": 0}}
+
+app = Flask(__name__)
 
 db = SQLAlchemy(app)
 
@@ -311,7 +301,7 @@ def delete_product(id):
 def edit_product(id):
     product = Product.query.get_or_404(id)
     
-    if request.method == 'POST':
+    if request.method = 'POST':
         product.sku = request.form['sku'].strip()
         product.name = request.form['name'].strip()
         product.unit_of_measure = request.form['unit_of_measure'].strip()
@@ -339,3 +329,4 @@ if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     print(f'🚀 Aviation ERP running on port {port}')
     app.run(host='0.0.0.0', debug=True, port=port)
+
