@@ -1,4 +1,5 @@
 import os
+import psycopg2
 from dotenv import load_dotenv
 from uuid import uuid4
 import csv
@@ -11,6 +12,9 @@ from sqlalchemy import desc, text
 from sqlalchemy.dialects.postgresql import UUID
 from datetime import datetime
 
+def get_conn():
+    return psycopg2.connect(os.getenv('DATABASE_URL'))
+
 # Force Environment Overwrite (Render priority)
 load_dotenv(override=True)
 
@@ -19,7 +23,7 @@ app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'Aviation-ERP-Secret-2026-Secure')
-app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {"connect_args": {"prepare_threshold": 0}}
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {'creator': get_conn}
 
 db = SQLAlchemy(app)
 
