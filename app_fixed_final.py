@@ -335,7 +335,7 @@ def issue_item():
     
     return redirect(url_for('staff_inventory'))
 
-@app.route('/delete-product/<uuid:product_id>', methods=['POST'])
+@app.route('/delete-product/<product_id>', methods=['POST'])
 def delete_product(product_id):
     product = Product.query.filter_by(id=product_id).first_or_404()
     db.session.delete(product)
