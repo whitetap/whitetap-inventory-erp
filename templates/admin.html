@@ -330,19 +330,17 @@
 }
 
 @media print {
-    .sidebar { display: none !important; }
-    body { margin-left: 0 !important; padding: 1rem !important; background: white !important; }
-    #printReportBtn { display: none !important; }
-    .sidebar-link[href*='logout'] { display: none !important; }
-    #tableSearch { display: none !important; }
-    #exportFilteredBtnInventory { display: none !important; }
-    #addProductForm { display: none !important; }
+    * { color: #000 !important; }
+    .sidebar, #printReportBtn, #tableSearch, #exportFilteredBtnInventory, #addProductForm, .sidebar-link[href*='logout'] { display: none !important; }
     th:last-child, td:last-child { display: none !important; }
-    .container-fluid { background: white !important; }
-    .card-header { background: #f8f9fa !important; color: black !important; }
-    .table-dark { background: white !important; color: black !important; }
-    .badge { color: black !important; }
-    h1 { page-break-after: avoid; }
+    body { margin-left: 0 !important; padding: 1rem !important; background: white !important; font-size: 12pt !important; }
+    .container-fluid, .table-responsive { width: 100% !important; background: white !important; }
+    .table { width: 100% !important; font-size: 11pt !important; }
+    .card-header { background: #f8f9fa !important; color: #000 !important; border-bottom: 2px solid #dee2e6 !important; }
+    .table-dark { background: white !important; color: #000 !important; }
+    .badge { -webkit-print-color-adjust: exact !important; color: black !important; border: 1px solid #000 !important; }
+    h1 { page-break-after: avoid; font-size: 18pt !important; }
+    h2, h3 { page-break-after: avoid; }
 }
 
 #dynamic-greeting { 
