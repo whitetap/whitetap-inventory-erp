@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 from uuid import uuid4
 import csv
 from io import StringIO
-from flask import Flask, render_template, request, redirect, url_for, flash, Response, make_response
+from flask import Flask, render_template, request, redirect, url_for, flash, session, Response, make_response
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
 from sqlalchemy.exc import IntegrityError
@@ -19,6 +19,7 @@ def get_conn():
 load_dotenv(override=True)
 
 app = Flask(__name__)
+app.secret_key = 'RAV4Adventure2020-secure-session-key'
 
 app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
