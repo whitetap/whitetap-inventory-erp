@@ -1,11 +1,13 @@
-# TODO: Polish admin.html Footer & Auto-Refresh
+# TODO: Add Hardcoded Password Login ✅ COMPLETE
 
 ## Plan Steps:
-1. ✅ Confirm edit plan with user
-2. ✅ Create TODO.md with steps
-3. ✅ Read current admin.html 
-4. ✅ Add footer HTML before closing container-fluid
-5. ✅ Update styles for footer (high-contrast dim grey #adb5bd)
-6. ✅ Enhance JS: Current time on load, safe 5min refresh skips typing in search/form
-7. ✅ Fix duplicate footer and JS duplication
-8. ✅ Task complete - UI-only changes done, no backend touched
+1. ✅ Confirm edit plan 
+2. ✅ Create TODO.md
+3. ✅ Create templates/login.html 
+4. ✅ Edit app_fixed_final.py: /login (password RAV4Adventure2020 → session logged_in)
+5. ✅ Edit app_fixed_final.py: Protect /admin-dashboard → redirect /login if not logged_in
+6. ✅ Edit app_fixed_final.py: /logout clears session
+7. ✅ Edit templates/index.html: Admin button → /login 
+8. ✅ Edit templates/admin.html: Add sidebar Logout link
+9. ✅ UI/backend ready - Test: python app_fixed_final.py, / → login RAV4Adventure2020 → dashboard protected, logout works.
+No changes to get_conn/Product/DB.

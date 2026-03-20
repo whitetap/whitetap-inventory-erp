@@ -217,8 +217,28 @@ def export_inventory():
     
     return response
 
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        password = request.form.get('password')
+        if password == 'RAV4Adventure2020':
+            session['logged_in'] = True
+            return redirect(url_for('admin_dashboard'))
+        else:
+            flash('Incorrect password', 'error')
+    return render_template('login.html')
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    flash('Logged out successfully', 'success')
+    return redirect(url_for('login'))
+
 @app.route('/admin-dashboard')
 def admin_dashboard():
+    if not session.get('logged_in'):
+        return redirect(url_for('login'))
+        
     view = request.args.get('view', 'summary')
     
     all_products = Product.query.order_by(Product.name).all()
