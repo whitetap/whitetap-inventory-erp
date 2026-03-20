@@ -337,10 +337,16 @@ def issue_item():
 
 @app.route('/delete-product/<product_id>', methods=['POST'])
 def delete_product(product_id):
-    product = Product.query.filter_by(id=product_id).first_or_404()
-    db.session.delete(product)
-    db.session.commit()
-    flash('Product deleted successfully!', 'success')
+    try:
+        product = Product.query.filter_by(id=product_id).first_or_404()
+        # Delete related logs first to avoid FK constraint
+        UsageLog.query.filter_by(product_id=product.id).delete()
+        db.session.delete(product)
+        db.session.commit()
+        flash('Product and related logs deleted successfully!', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Delete failed: {str(e)}', 'error')
     return redirect(url_for('admin_dashboard'))
 
 @app.route('/edit-product/<int:id>', methods=['GET', 'POST'])
