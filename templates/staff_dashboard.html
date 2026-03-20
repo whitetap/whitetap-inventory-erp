@@ -22,6 +22,16 @@
     background: linear-gradient(145deg, #2c3e50 0%, #34495e 100%);
     color: #ecf0f1;
 }
+html {
+    scroll-behavior: smooth;
+}
+.sidebar-sub-link {
+    font-size: 0.875rem;
+    padding-left: 1.5rem !important;
+}
+#inventory-submenu.show {
+    display: block !important;
+}
 #staffSearch {
     min-width: 400px;
 }
@@ -38,9 +48,15 @@
         </div>
         
         <nav class="nav nav-pills flex-column sidebar-nav mb-auto">
-            <a class="nav-link px-4 py-3 mb-2 rounded-3 sidebar-link active text-white bg-primary" href="{{ url_for('staff_inventory') }}">
-                <i class="fas fa-boxes me-3"></i>Inventory
+            <a class="nav-link px-4 py-3 mb-2 rounded-3 sidebar-link active text-white bg-primary" href="#" onclick="toggleSubmenu('inventory-submenu')">
+                <i class="fas fa-boxes me-3"></i>Inventory <i class="fas fa-chevron-down ms-auto"></i>
             </a>
+            <ul class="nav flex-column ms-4" id="inventory-submenu" style="display: none;">
+                <li><a class="nav-link small px-3 py-2 rounded sidebar-sub-link text-white-75" href="#paints-section">🎨 Aviation Paints & Pigments</a></li>
+                <li><a class="nav-link small px-3 py-2 rounded sidebar-sub-link text-white-75" href="#carpets-section">🧵 Aviation Carpets & Textiles</a></li>
+                <li><a class="nav-link small px-3 py-2 rounded sidebar-sub-link text-white-75" href="#others-section">⚙️ Other Supplies</a></li>
+                <li><a class="nav-link small px-3 py-2 rounded sidebar-sub-link text-white-75" href="#activity-section">📋 Recent Activity</a></li>
+            </ul>
             <a class="nav-link text-white px-4 py-3 mb-2 rounded-3 sidebar-link" href="{{ url_for('export_logs') }}">
                 <i class="fas fa-clipboard-list me-3"></i>Activity Logs
             </a>
@@ -79,7 +95,7 @@
             </div>
 
             <!-- Aviation Paints Card -->
-            <div class="card staff-card shadow-lg mb-5">
+            <div id="paints-section" class="card staff-card shadow-lg mb-5">
                 <div class="card-header category-header p-4">
                     <h2 class="mb-0 fw-bold fs-3">
                         <i class="fas fa-palette me-3"></i>🎨 Aviation Paints & Pigments
@@ -144,7 +160,7 @@
             </div>
 
             <!-- Aviation Carpets Card -->
-            <div class="card staff-card shadow-lg mb-5">
+            <div id="carpets-section" class="card staff-card shadow-lg mb-5">
                 <div class="card-header category-header p-4">
                     <h2 class="mb-0 fw-bold fs-3">
                         <i class="fas fa-couch me-3"></i>🧵 Aviation Carpets & Textiles
@@ -209,7 +225,7 @@
             </div>
 
             <!-- Other Supplies Card -->
-            <div class="card staff-card shadow-lg mb-5">
+            <div id="others-section" class="card staff-card shadow-lg mb-5">
                 <div class="card-header category-header p-4">
                     <h2 class="mb-0 fw-bold fs-3">
                         <i class="fas fa-cogs me-3"></i>⚙️ Other Supplies
@@ -274,7 +290,7 @@
             </div>
 
             <!-- Recent Activity Card -->
-            <div class="card staff-card shadow-lg">
+            <div id="activity-section" class="card staff-card shadow-lg">
                 <div class="card-header category-header p-4">
                     <h2 class="mb-0 fw-bold fs-3">
                         <i class="fas fa-history me-3"></i>📋 Recent Activity
@@ -380,6 +396,11 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
+function toggleSubmenu(id) {
+    const submenu = document.getElementById(id);
+    submenu.style.display = submenu.style.display === 'none' ? 'block' : 'none';
+}
+
 function openIssueModal(id, name, stock, unit) {
     document.getElementById('modal_product_id').value = id;
     document.getElementById('modal_display_name').value = name;
