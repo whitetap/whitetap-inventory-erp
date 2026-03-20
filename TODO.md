@@ -1,14 +1,31 @@
-# Protocol Fixes for app_fixed_final.py - Progress Tracker
+# Inventory Smart Filtering Upgrade
 
-## Plan Breakdown
-- [x] **Step 1**: Understand current file contents (read_file completed)
-- [x] **Step 2**: Create detailed edit plan and get user approval (confirmed)
-- [x] **Step 3**: Update DATABASE_URL with `&prepare_threshold=0`
-- [x] **Step 4**: Add SQLALCHEMY_ENGINE_OPTIONS configuration  
-- [x] **Step 5**: Verify Product model uses UUID (confirmed correct)
-- [x] **Step 6**: Provide full updated file via create_file (completed)
-- [x] **Step 7**: Test connection and complete task
+**Status:** Planning
 
-## Status
-✅ All protocol fixes implemented! File ready for testing.
+**Information Gathered:**
+- Current: Python sends 6 low-stock items → JS search fails on hidden items
+- Goal: Send `display_products` (6 low-stock) + `all_products` (full list)
+- HTML: Loop `all_products`, hide non-display via CSS/JS initially
+- Search: Reveal matching rows from full dataset
+
+**Plan:**
+1. **app_fixed_final.py:** 
+   ```
+   if view == 'inventory':
+       display_products = Product.query.filter(...).limit(6)
+       all_products = Product.query.all()
+   ```
+2. **templates/admin.html:**
+   ```
+   {% for product in all_products %}
+     <tr class="{% if product not in display_products %}hidden-row{% endif %}">
+   {% endfor %}
+   ```
+3. **CSS:** `.hidden-row { display: none; }`
+4. **JS:** Search reveals from all rows
+
+**Dependent Files:** app_fixed_final.py, templates/admin.html
+**Follow-up:** Test search, git commit/push
+
+Ready to implement?
 
