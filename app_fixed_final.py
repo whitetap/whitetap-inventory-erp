@@ -11,14 +11,14 @@ from sqlalchemy import desc, text
 from sqlalchemy.dialects.postgresql import UUID
 from datetime import datetime
 
-# Force Environment Overwrite
+# Force Environment Overwrite (Render priority)
 load_dotenv(override=True)
 
-# Hard-Validation of DB URL
+# Hard-Validation of DB URL for Render/Supabase
 db_url = os.getenv('DATABASE_URL')
-if not db_url or 'sqlite' in db_url:
+if not db_url or 'sqlite' in db_url.lower():
     db_url = "postgresql://postgres.ujwzbldcbczbuqernzjy:AviationSecure2026@aws-1-eu-west-3.pooler.supabase.com:6543/postgres?sslmode=require"
-    print("⚠️ Forced Supabase PostgreSQL URL (ignored .env/sqlite)")
+    print("⚠️ Forced Supabase PostgreSQL URL")
 
 app = Flask(__name__)
 
@@ -27,7 +27,8 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'Aviation-ERP-Secret-2026-Secure')
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
     "pool_pre_ping": True,
-    "pool_recycle": 300
+    "pool_recycle": 300,
+    "connect_args": {"prepare_threshold": 0}
 }
 
 db = SQLAlchemy(app)
@@ -146,7 +147,7 @@ def export_products():
 
 @app.route('/export-paints')
 def export_paints():
-    products = Product.query.filter(Product.sku.ilike('%PNT%')).order_by(Product.name).all()
+    products = Product.query.filter(Product.sku.ilike('%PNT%')).order_by(Product.name Ascending().all()
     
     output = StringIO()
     writer = csv.writer(output)
@@ -298,13 +299,34 @@ def issue_item():
     
     return redirect(url_for('staff_inventory'))
 
-@app.route('/delete_product/<product_id>', methods=['POST'])
-def delete_product(product_id):
-    product = Product.query.get_or_404(product_id)
+@app.route('/delete-product/<int:id>', methods=['POST'])
+def delete_product(id):
+    product = Product.query.get_or_404(id)
     db.session.delete(product)
     db.session.commit()
     flash('Product deleted successfully!', 'success')
     return redirect(url_for('admin_dashboard'))
+
+@app.route('/edit-product/<int:id>', methods=['GET', 'POST'])
+def edit_product(id):
+    product = Product.query.get_or_404(id)
+    
+    if request.method == 'POST':
+        product.sku = request.form['sku'].strip()
+        product.name = request.form['name'].strip()
+        product.unit_of_measure = request.form['unit_of_measure'].strip()
+        product.current_stock = float(request.form.get('current_stock', product.current_stock))
+        product.min_stock_level = float(request.form.get('min_stock_level', product.min_stock_level))
+        
+        try:
+            db.session.commit()
+            flash('Product updated successfully!', 'success')
+            return redirect(url_for('admin_dashboard'))
+        except IntegrityError:
+            db.session.rollback()
+            flash('SKU already exists. Please choose a unique SKU.', 'error')
+    
+    return render_template('edit_product.html', product=product)
 
 if __name__ == '__main__':
     with app.app_context():

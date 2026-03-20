@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+{% extends "base.html" %}
+
+{% block title %}Edit Product - Aviation ERP{% endblock %}
+
+{% block page_title %}Edit Product{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="card bg-dark">
+                <div class="card-header bg-primary text-white">
+                    <h2 class="mb-0">✏️ Edit {{ product.name }}</h2>
+                </div>
+                <div class="card-body">
+                    <form method="POST">
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">SKU</label>
+                            <input type="text" name="sku" class="form-control" value="{{ product.sku }}" required>
+                        </div>
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">Name</label>
+                            <input type="text" name="name" class="form-control" value="{{ product.name }}" required>
+                        </div>
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">Unit of Measure</label>
+                            <select name="unit_of_measure" class="form-control" required>
+                                <option value="ml" {% if product.unit_of_measure == 'ml' %}selected{% endif %}>Milliliters (ml)</option>
+                                <option value="liters" {% if product.unit_of_measure == 'liters' %}selected{% endif %}>Liters</option>
+                                <option value="kg" {% if product.unit_of_measure == 'kg' %}selected{% endif %}>Kilograms (kg)</option>
+                                <option value="sq_ft" {% if product.unit_of_measure == 'sq_ft' %}selected{% endif %}>Square Feet (sq_ft)</option>
+                                <option value="m2" {% if product.unit_of_measure == 'm2' %}selected{% endif %}>Square Meters (m2)</option>
+                            </select>
+                        </div>
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">Current Stock</label>
+                            <input type="number" name="current_stock" step="0.01" class="form-control" value="{{ product.current_stock }}" min="0">
+                        </div>
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">Min Stock Level</label>
+                            <input type="number" name="min_stock_level" step="0.01" class="form-control" value="{{ product.min_stock_level }}" min="0">
+                        </div>
+                        <div class="d-flex gap-3">
+                            <button type="submit" class="btn btn-success flex-fill">💾 Update Product</button>
+                            <a href="{{ url_for('admin_dashboard') }}" class="btn btn-secondary">❌ Cancel</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
