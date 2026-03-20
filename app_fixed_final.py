@@ -14,12 +14,12 @@ from datetime import datetime
 # Force Environment Overwrite (Render priority)
 load_dotenv(override=True)
 
+app = Flask(__name__)
+
 app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'Aviation-ERP-Secret-2026-Secure')
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {"connect_args": {"prepare_threshold": 0}}
-
-app = Flask(__name__)
 
 db = SQLAlchemy(app)
 
