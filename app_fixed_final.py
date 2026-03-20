@@ -147,7 +147,7 @@ def export_products():
 
 @app.route('/export-paints')
 def export_paints():
-products = Product.query.filter(Product.sku.ilike('%PNT%')).order_by(Product.name.asc()).all()
+    products = Product.query.filter(Product.sku.ilike('%PNT%')).order_by(Product.name.asc()).all()
     
     output = StringIO()
     writer = csv.writer(output)
