@@ -221,12 +221,16 @@ def export_inventory():
 def admin_dashboard():
     view = request.args.get('view', 'summary')
     
-    products = Product.query.order_by(Product.name).all()
+    if view == 'inventory':
+        products = Product.query.filter(Product.current_stock <= Product.min_stock_level).limit(6).all()
+    else:
+        products = Product.query.order_by(Product.name).all()
     
-    # Calculate summary stats
-    total_items = len(products)
-    low_stock_count = len([p for p in products if (p.current_stock or 0) < (p.min_stock_level or 0)])
-    total_inventory_value = sum((p.current_stock or 0) for p in products)
+    # Calculate summary stats (always use full dataset)
+    all_products = Product.query.all()
+    total_items = len(all_products)
+    low_stock_count = len([p for p in all_products if (p.current_stock or 0) < (p.min_stock_level or 0)])
+    total_inventory_value = sum((p.current_stock or 0) for p in all_products)
     
     # Today's usage logs count
     today_logs = UsageLog.query.filter(db.func.date(UsageLog.created_at) == datetime.now().date()).count()
