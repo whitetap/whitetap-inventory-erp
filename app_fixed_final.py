@@ -301,7 +301,7 @@ def delete_product(id):
 def edit_product(id):
     product = Product.query.get_or_404(id)
     
-    if request.method = 'POST':
+    if request.method == 'POST':
         product.sku = request.form['sku'].strip()
         product.name = request.form['name'].strip()
         product.unit_of_measure = request.form['unit_of_measure'].strip()
