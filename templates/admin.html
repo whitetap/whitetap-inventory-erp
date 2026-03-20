@@ -54,7 +54,7 @@
                         <div class="card h-100 border-0 shadow-lg summary-card">
                             <div class="card-body p-5 text-center text-white">
                                 <i class="fas fa-boxes fa-4x text-primary mb-4"></i>
-                                <h1 class="fw-bold mb-2 fs-1"> {{ total_items }}</h1>
+                                <h1 class="fw-bold mb-2 fs-1">{{ total_items }}</h1>
                                 <p class="lead mb-0 summary-label">Total Items</p>
                             </div>
                         </div>
@@ -104,9 +104,7 @@
                             <div class="card-body p-4">
                                 <h4 class="card-title text-success mb-3 fw-bold">💰 Value Summary</h4>
                                 <p class="text-light lh-lg">Total inventory valued at {{ "%.2f"|format(total_inventory_value) }} units.</p>
-
-                                <a href="{{ url_for('export_inventory') }}" class="btn btn-success fw-bold text-white">Export Report</a>
-
+                                <button id="exportFilteredBtn" class="btn btn-success fw-bold text-white" onclick="exportFilteredCSV()">📥 Export Filtered Results</button>
                             </div>
                         </div>
                     </div>
@@ -177,6 +175,7 @@
                             </div>
                             <div class="col-auto">
                                 <input type="text" id="tableSearch" class="form-control form-control-lg" placeholder="Search SKU or Name...">
+                                <button id="exportFilteredBtnInventory" class="btn btn-success ms-2 fw-bold" onclick="exportFilteredCSV()">📥 Export Filtered</button>
                             </div>
                         </div>
                     </div>
@@ -294,22 +293,70 @@
 }
 .text-white { color: #ffffff !important; }
 .text-light { color: #f8f9fa !important; }
+#exportFilteredBtn {
+    font-weight: 700;
+}
 </style>
 
-<!-- Search Script -->
+<!-- Smart Filtered Export Script -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const searchInput = document.getElementById('tableSearch');
-    if (searchInput) {
+    const productsTable = document.getElementById('productsTable');
+    
+    if (searchInput && productsTable) {
         const rows = document.querySelectorAll('.product-row');
-        searchInput.addEventListener('keyup', function() {
-            const term = this.value.toLowerCase();
+        
+        function filterTable(term) {
+            const lowerTerm = term.toLowerCase();
             rows.forEach(row => {
                 const text = row.textContent.toLowerCase();
-                row.style.display = text.includes(term) ? '' : 'none';
+                row.style.display = text.includes(lowerTerm) ? '' : 'none';
             });
+        }
+        
+        searchInput.addEventListener('keyup', function() {
+            filterTable(this.value);
         });
     }
+    
+    // Universal Filtered CSV Export
+    window.exportFilteredCSV = function() {
+        const rows = document.querySelectorAll('#productsTable .product-row');
+        const visibleRows = Array.from(rows).filter(row => row.style.display !== 'none');
+        
+        if (visibleRows.length === 0) {
+            alert('No matching results to export. Try a different search term.');
+            return;
+        }
+        
+        let csvContent = 'SKU,Name,Unit,Stock,Min Level,Status\n';
+        
+        visibleRows.forEach(row => {
+            const cells = row.querySelectorAll('td');
+            if (cells.length >= 6) {
+                const sku = cells[0].textContent.trim().replace(/"/g, '""');
+                const name = cells[1].textContent.trim().replace(/"/g, '""');
+                const unit = cells[2].textContent.trim().replace(/"/g, '""');
+                const stock = cells[3].textContent.trim();
+                const minLevel = cells[4].textContent.trim();
+                const status = cells[5].textContent.trim().replace(/"/g, '""');
+                
+                csvContent += `"${sku}","${name}","${unit}","${stock}","${minLevel}","${status}"\n`;
+            }
+        });
+        
+        // Create and trigger download
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', `filtered_inventory_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
 });
 </script>
 
