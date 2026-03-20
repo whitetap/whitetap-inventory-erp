@@ -221,13 +221,14 @@ def export_inventory():
 def admin_dashboard():
     view = request.args.get('view', 'summary')
     
-    if view == 'inventory':
-        products = Product.query.filter(Product.current_stock <= Product.min_stock_level).limit(6).all()
-    else:
-        products = Product.query.order_by(Product.name).all()
+    all_products = Product.query.order_by(Product.name).all()
     
+    if view == 'inventory':
+        display_products = Product.query.filter(Product.current_stock <= Product.min_stock_level).limit(6).all()
+    else:
+        display_products = all_products
+        
     # Calculate summary stats (always use full dataset)
-    all_products = Product.query.all()
     total_items = len(all_products)
     low_stock_count = len([p for p in all_products if (p.current_stock or 0) < (p.min_stock_level or 0)])
     total_inventory_value = sum((p.current_stock or 0) for p in all_products)
@@ -235,7 +236,7 @@ def admin_dashboard():
     # Today's usage logs count
     today_logs = UsageLog.query.filter(db.func.date(UsageLog.created_at) == datetime.now().date()).count()
     
-    return render_template('admin.html', view=view, products=products, total_items=total_items, low_stock_count=low_stock_count, total_inventory_value=total_inventory_value, today_logs=today_logs)
+    return render_template('admin.html', view=view, display_products=display_products, all_products=all_products, total_items=total_items, low_stock_count=low_stock_count, total_inventory_value=total_inventory_value, today_logs=today_logs)
 
 @app.route('/admin/add-product', methods=['POST'])
 def admin_add_product():

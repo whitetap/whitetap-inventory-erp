@@ -194,8 +194,8 @@
                                     </tr>
                                 </thead>
                                 <tbody id="productsTable">
-                                    {% for product in products %}
-                                    <tr class="product-row align-middle">
+                                    {% for product in all_products %}
+                                    <tr class="product-row align-middle {% if view == 'inventory' and (product.current_stock or 0) > (product.min_stock_level or 0) %}hide-by-default{% endif %} low-stock-{{ (product.current_stock or 0) <= (product.min_stock_level or 0) }}">
                                         <td class="fw-bold">{{ product.sku or '-' }}</td>
                                         <td>{{ product.name or '-' }}</td>
                                         <td>{{ product.unit_of_measure or '-' }}</td>
@@ -280,6 +280,18 @@
     background-color: #fff3cd !important;
     transform: scale(1.01);
 }
+
+/* Inventory view filtering */
+.inventory-view .hide-by-default {
+    display: none;
+}
+.inventory-view tr.low-stock-true {
+    display: table-row;
+}
+.inventory-view.search-active .hide-by-default {
+    display: table-row;
+}
+
 #tableSearch {
     min-width: 300px;
 }
@@ -296,6 +308,7 @@
 #exportFilteredBtn {
     font-weight: 700;
 }
+
 </style>
 
 <!-- Smart Filtered Export Script -->
