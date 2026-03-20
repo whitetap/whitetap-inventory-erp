@@ -28,7 +28,7 @@ app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'Aviation-ERP-Secret-202
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
     "pool_pre_ping": True,
     "pool_recycle": 300,
-    "connect_args": {"prepare_threshold": 0}
+    "connect_args": {"options": "-c statement_timeout=30000"}
 }
 
 db = SQLAlchemy(app)
