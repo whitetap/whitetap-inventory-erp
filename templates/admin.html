@@ -237,6 +237,11 @@
                     <i class="fas fa-info-circle me-2"></i>Select Summary or Inventory from the sidebar.
                 </div>
             {% endif %}
+            
+            <!-- Footer -->
+            <footer id="pageFooter" class="mt-5 pt-4 pb-3 border-top" style="color: #adb5bd; font-size: 0.875rem; text-align: center;">
+                System Live | Refreshes every 5 minutes | Last updated: <span id="lastUpdateTime"></span>
+            </footer>
         </div>
     </div>
 </div>
@@ -299,6 +304,11 @@
     transition: all 0.2s ease;
 }
 .fs-display-4 { font-size: 3rem !important; }
+
+#pageFooter {
+    color: #adb5bd !important;
+    background: rgba(0,0,0,0.2);
+}
 .alert-info {
     background: rgba(13, 202, 240, 0.2) !important;
     border: 1px solid rgba(13, 202, 240, 0.5) !important;
@@ -372,16 +382,50 @@ document.addEventListener('DOMContentLoaded', function() {
     };
 });
 
-// 5-minute auto-refresh with input focus check (300,000ms)
+// Enhanced 5-minute auto-refresh: Skip if typing in search bar or Add Product form
 let refreshInterval = 300000; // 5 minutes
-let refreshTimer = setTimeout(function() {
-    if (document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
-        location.reload();
-    } else {
-        // Input active, wait for next cycle
-        refreshTimer = setTimeout(arguments.callee, refreshInterval);
+let refreshTimer = setTimeout(safeRefresh, refreshInterval);
+
+function safeRefresh() {
+    const searchInput = document.getElementById('tableSearch');
+    const formInputs = document.querySelectorAll('#addProductForm .form-control');
+    const activeElement = document.activeElement;
+    
+    // Skip if focused on search or any form input
+    if (activeElement === searchInput || Array.from(formInputs).includes(activeElement)) {
+        refreshTimer = setTimeout(safeRefresh, refreshInterval);
+        return;
     }
-}, refreshInterval);
+    
+    location.reload();
+}
+
+// Update timestamp on load
+document.addEventListener('DOMContentLoaded', function() {
+    const timeSpan = document.getElementById('lastUpdateTime');
+    if (timeSpan) {
+        timeSpan.textContent = new Date().toLocaleString();
+    }
+    
+    const searchInput = document.getElementById('tableSearch');
+    const productsTable = document.getElementById('productsTable');
+    
+    if (searchInput && productsTable) {
+        const rows = document.querySelectorAll('.product-row');
+        
+        function filterTable(term) {
+            const lowerTerm = term.toLowerCase();
+            rows.forEach(row => {
+                const text = row.textContent.toLowerCase();
+                row.style.display = text.includes(lowerTerm) ? '' : 'none';
+            });
+        }
+        
+        searchInput.addEventListener('keyup', function() {
+            filterTable(this.value);
+        });
+    }
+});
 </script>
 
 {% endblock %}
