@@ -48,8 +48,12 @@
 
     <!-- Main Content -->
     <div class="flex-grow-1" style="margin-left: 250px; padding: 2rem;">
-        <!-- Dynamic Greeting -->
-        <h3 id="dynamic-greeting" class="text-white fw-bold mb-4 text-center" style="font-size: 2rem; text-shadow: 0 2px 4px rgba(0,0,0,0.5);">Welcome</h3>
+        <div class="d-flex justify-content-center align-items-center mb-4 gap-3">
+            <h3 id="dynamic-greeting" class="text-white fw-bold mb-0 text-center" style="font-size: 2rem; text-shadow: 0 2px 4px rgba(0,0,0,0.5);">Welcome</h3>
+<button id="printReportBtn" class="btn btn-outline-light btn-lg px-4 py-2 fw-bold shadow-sm" style="border-color: #adb5bd; color: #adb5bd;" onclick="window.print()" title="Print Daily Report">
+                <i class="fas fa-print me-2"></i>Print Report
+            </button>
+        </div>
         
         <div class="container-fluid bg-gradient position-relative" style="min-height: 100vh; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
             
@@ -325,6 +329,27 @@
     font-weight: 700;
 }
 
+@media print {
+    .sidebar { display: none !important; }
+    body { margin-left: 0 !important; padding: 1rem !important; background: white !important; }
+    #printReportBtn { display: none !important; }
+    .sidebar-link[href*='logout'] { display: none !important; }
+    #tableSearch { display: none !important; }
+    #exportFilteredBtnInventory { display: none !important; }
+    #addProductForm { display: none !important; }
+    th:last-child, td:last-child { display: none !important; }
+    .container-fluid { background: white !important; }
+    .card-header { background: #f8f9fa !important; color: black !important; }
+    .table-dark { background: white !important; color: black !important; }
+    .badge { color: black !important; }
+    h1 { page-break-after: avoid; }
+}
+
+#dynamic-greeting { 
+    display: block !important; 
+    font-size: 24pt !important; 
+    text-align: center !important; 
+}
 </style>
 
 <!-- Smart Filtered Export Script -->
