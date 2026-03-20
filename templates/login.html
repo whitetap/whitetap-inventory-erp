@@ -4,30 +4,42 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Login - Aviation ERP</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
 </head>
-<body class="bg-gradient" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; display: flex; align-items: center; justify-content: center;">
+<body style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); min-height: 100vh; display: flex; align-items: center; justify-content: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
     <div class="container">
         <div class="row justify-content-center">
-            <div class="col-md-6 col-lg-4">
-                <div class="card shadow-lg border-0" style="backdrop-filter: blur(20px); background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);">
+            <div class="col-md-5 col-lg-4">
+                <div class="card border-0 shadow-lg" style="background: linear-gradient(145deg, #1e293b 0%, #334155 100%); border-radius: 20px; backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1);">
                     <div class="card-body p-5 text-center">
-                        <i class="fas fa-lock fa-4x text-white mb-4"></i>
-                        <h2 class="text-white fw-bold mb-4">Admin Login</h2>
+                        <div class="mb-4">
+                            <i class="fas fa-shield-alt fa-4x text-white mb-3" style="text-shadow: 0 2px 4px rgba(0,0,0,0.5);"></i>
+                        </div>
+                        <h2 class="text-white fw-bold mb-4" style="font-size: 2rem; text-shadow: 0 1px 3px rgba(0,0,0,0.5);">Admin Access</h2>
+                        <p class="text-white-50 mb-4">Enter your secure password to access the dashboard</p>
+                        
                         {% with messages = get_flashed_messages(with_categories=true) %}
                             {% if messages %}
                                 {% for category, message in messages %}
-                                    <div class="alert alert-{{ 'danger' if category == 'error' else category }} mb-4">{{ message }}</div>
+                                    <div class="alert {% if category == 'error' %}alert-danger{% elif category == 'success' %}alert-success{% else %}alert-info{% endif %} mb-4 border-0" role="alert" style="background: rgba(255,255,255,0.1); color: #f8fafc; border: 1px solid rgba(255,255,255,0.2);">
+                                        <i class="fas {% if category == 'error' %}fa-exclamation-triangle text-warning{% elif category == 'success' %}fa-check-circle text-success{% else %}fa-info-circle{% endif %} me-2"></i>
+                                        {{ message }}
+                                    </div>
                                 {% endfor %}
                             {% endif %}
                         {% endwith %}
+                        
                         <form method="POST">
                             <div class="mb-4">
-                                <input type="password" class="form-control form-control-lg rounded-4 shadow-none" name="password" placeholder="Enter password" required style="background: rgba(255,255,255,0.9); border: none; padding: 1rem;">
+                                <input type="password" class="form-control form-control-lg rounded-4" name="password" placeholder="Password" required 
+                                       style="background: rgba(30, 41, 59, 0.8); color: #f8fafc; border: 2px solid rgba(59, 130, 246, 0.3); padding: 1rem 1.5rem; transition: all 0.3s ease; font-size: 1.1rem;"
+                                       onfocus="this.style.borderColor='#3b82f6'; this.style.boxShadow='0 0 0 0.2rem rgba(59, 130, 246, 0.25)'"
+                                       onblur="this.style.borderColor='rgba(59, 130, 246, 0.3)'; this.style.boxShadow='none'">
+                                <div class="form-text text-white-50 small mt-1">Type your password carefully</div>
                             </div>
-                            <button type="submit" class="btn btn-primary btn-lg w-100 fw-bold rounded-4 py-3" style="background: linear-gradient(135deg, #667eea, #764ba2); border: none;">
-                                <i class="fas fa-sign-in-alt me-2"></i>Login
+                            <button type="submit" class="btn btn-primary btn-lg w-100 fw-bold rounded-4 py-3 shadow-lg" style="background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); border: none; font-size: 1.1rem; transition: all 0.3s ease;">
+                                <i class="fas fa-sign-in-alt me-2"></i>Enter Dashboard
                             </button>
                         </form>
                     </div>
@@ -35,6 +47,6 @@
             </div>
         </div>
     </div>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
