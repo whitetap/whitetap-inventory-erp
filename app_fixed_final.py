@@ -1,29 +1,41 @@
 import os
+import psycopg2
 from uuid import uuid4
 import csv
 from io import StringIO
 from flask import Flask, render_template, request, redirect, url_for, flash, Response, make_response
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy import desc, text
+from sqlalchemy import create_engine, text
 from sqlalchemy.dialects.postgresql import UUID
-from datetime import datetime
 
 app = Flask(__name__)
 
-# CLEAN URL for Supabase Pooler - Exact as specified (no prepare_threshold in DSN)
-DATABASE_URL = "postgresql://postgres.ujwzbldcbczbuqernzjy:fjeAbMBqJSPcYf3m@aws-1-eu-west-3.pooler.supabase.com:6543/postgres?sslmode=require"
-
-app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
+# 1. THE DUMMY URL (Satisfies the RuntimeError, but isn't actually used)
+app.config['SQLALCHEMY_DATABASE_URI'] = "postgresql://"
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'aviation-admin-secure-2026')
+
+# 2. THE MANUAL CREATOR (The "One-Time" Fix for Auth and DSN errors)
+def get_conn():
+    return psycopg2.connect(
+        user="postgres.ujwzbldcbczbuqernzjy",
+        password="fjeAbMBqJSPcYf3m",
+        host="aws-1-eu-west-3.pooler.supabase.com",
+        port="6543",
+        database="postgres",
+        sslmode="require"
+    )
+
+# 3. ATTACH THE CREATOR TO THE ENGINE
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+    "creator": get_conn,
     "pool_pre_ping": True
 }
 
 db = SQLAlchemy(app)
 
+# Product model with UUID
 class Product(db.Model):
     __tablename__ = 'products'
 
@@ -38,6 +50,7 @@ class Product(db.Model):
     def __repr__(self):
         return f'<Product {self.name} ({self.sku})>'
 
+# UsageLog model
 class UsageLog(db.Model):
     __tablename__ = 'usage_logs'
 
@@ -46,7 +59,7 @@ class UsageLog(db.Model):
     quantity_used = db.Column(db.Float, nullable=False)
     technician_name = db.Column(db.String(100), nullable=False)
     project_ref = db.Column(db.String(100))
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, server_default=text('CURRENT_TIMESTAMP'))
 
 CORS(app)
 
@@ -298,16 +311,17 @@ def delete_product(product_id):
     flash('Product deleted successfully!', 'success')
     return redirect(url_for('admin_dashboard'))
 
+# 4. TEST THE CONNECTION IMMEDIATELY
 with app.app_context():
     try:
-        db.session.execute(text('SELECT 1'))
-        print('✅ DATABASE CONNECTED')
+        # This bypasses the URI and uses the get_conn() function above
+        db.session.execute(text("SELECT 1"))
+        print("✅ DATABASE CONNECTED SUCCESSFULLY (Manual Creator)!")
     except Exception as e:
-        db.session.rollback()
-        print(f'❌ DB Connection FAILED: {e}')
+        print(f"❌ DB Connection STILL FAILED: {e}")
 
 if __name__ == '__main__':
-    print(f'Connecting to: {app.config["SQLALCHEMY_DATABASE_URI"][:50]}...')
+    print('Supabase Pooler - Manual Creator (Port 6543)')
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', debug=True, port=port)
 
