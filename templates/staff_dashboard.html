@@ -320,6 +320,28 @@ html {
                 {% endif %}
             {% endwith %}
 
+            <!-- Summary Hub -->
+            <div class="row g-4 mb-5" style="background-color: #0f172a !important; color: white !important;">
+                <div class="col-md-4">
+                    <div class="card" style="background: rgba(255,255,255,0.05); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.1); color: white; border-radius: 15px; padding: 1.5rem; text-align: center;">
+                        <h3 class="fs-1 fw-bold text-blue-400 mb-1">{{ (paints|length + carpets|length + others|length) }}</h3>
+                        <p class="text-white-50 mb-0">Total Fleet SKUs</p>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card" style="background: rgba(255,255,255,0.05); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.1); color: white; border-radius: 15px; padding: 1.5rem; text-align: center; box-shadow: 0 0 20px rgba(239,68,68,0.3);">
+                        <h3 class="fs-1 fw-bold text-red-400 mb-1">{{ [p for p in (paints + carpets + others) if (p.current_stock or 0) < (p.min_stock_level or 0)]|length }}</h3>
+                        <p class="text-white-50 mb-0">Action Required</p>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card" style="background: rgba(255,255,255,0.05); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.1); color: white; border-radius: 15px; padding: 1.5rem; text-align: center;">
+                        <h3 class="fs-1 fw-bold text-green-400 mb-1">{{ recent_logs|length }}</h3>
+                        <p class="text-white-50 mb-0">Issued Today</p>
+                    </div>
+                </div>
+            </div>
+
             <!-- Search Bar -->
             <div class="card shadow-lg border-0 mb-5">
                 <div class="card-header bg-dark text-white p-3">
