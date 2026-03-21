@@ -419,9 +419,9 @@ html {
 <!-- Issue Modal (Bootstrap) -->
 <div class="modal fade" id="issueModal" tabindex="-1" aria-labelledby="issueModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-centered">
-        <div class="modal-content bg-gradient-to-b from-slate-800 to-slate-900 text-white border-0 shadow-2xl">
+        <div class="modal-content" style="background-color: #1e293b !important; color: white !important;">
             <div class="modal-header border-0">
-                <h5 class="modal-title font-bold text-2xl" id="issueModalLabel">Issue Product</h5>
+                <h5 class="modal-title font-bold text-2xl" style="color: #f1f5f9 !important;" id="issueModalLabel">Issue Product</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form method="POST" action="{{ url_for('issue_item') }}">
@@ -429,16 +429,16 @@ html {
                     <input type="hidden" name="product_id" id="modal_product_id">
                     <div class="row g-4">
                         <div class="col-12">
-                            <label class="form-label fw-bold">Product Name</label>
-                            <input type="text" id="modal_display_name" class="form-control bg-dark text-white" readonly>
+                            <label class="form-label fw-bold" style="color: #ffffff !important;">Product Name</label>
+                            <input type="text" id="modal_display_name" style="background-color: #0f172a !important; color: #f1f5f9 !important; border: 1px solid #3b82f6 !important;" readonly>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-bold">Available Stock</label>
-                            <input type="text" id="modal_display_stock" class="form-control bg-dark text-white" readonly>
+                            <label class="form-label fw-bold" style="color: #ffffff !important;">Available Stock</label>
+                            <input type="text" id="modal_display_stock" style="background-color: #0f172a !important; color: white !important; border: 1px solid #3b82f6 !important;" readonly>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-bold">Unit</label>
-                            <input type="text" id="modal_display_unit" class="form-control bg-dark text-white" readonly>
+                            <label class="form-label fw-bold" style="color: #ffffff !important;">Unit</label>
+                            <input type="text" id="modal_display_unit" style="background-color: #0f172a !important; color: white !important; border: 1px solid #3b82f6 !important;" readonly>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label fw-bold">Quantity <span class="text-danger">*</span></label>
