@@ -356,17 +356,43 @@ html {
                             </h2>
                             <div id="paintsCollapse" class="accordion-collapse collapse" data-bs-parent="#paintsAccordion">
                                 <div class="accordion-body">
-                                    {% for product in paints %}
-                                    <div class="item-row">
-                                        <span>{{ product.sku or '-' }} - {{ product.name }}</span>
-                                        <div>
-                                            <span class="status-badge {% if (product.current_stock or 0) < (product.min_stock_level or 0) %}bg-warning text-dark{% else %}bg-success{% endif %} me-2">{{ "%.1f"|format(product.current_stock or 0) }}{{ product.unit_of_measure or '' }}</span>
-                                            <button type='button' class='btn btn-sm text-warning' onclick='openIssueModal("{{ product.id }}", "{{ product.name }}", "{{ product.current_stock }}", "{{ product.unit_of_measure or "" }}")' title="Issue">
-                                                📤
-                                            </button>
-                                        </div>
-                                    </div>
-                                    {% endfor %}
+                                    <table style="width: 100%; background-color: #1e293b !important; color: #ffffff !important; border-collapse: collapse;">
+                                        <thead style="background-color: #1e293b !important; color: #ffffff !important;">
+                                            <tr>
+                                                <th style="border-color: #334155 !important; color: white !important; padding: 0.5rem;">SKU</th>
+                                                <th style="border-color: #334155 !important; color: white !important; padding: 0.5rem;">Name</th>
+                                                <th style="border-color: #334155 !important; color: white !important; padding: 0.5rem;">Unit</th>
+                                                <th style="border-color: #334155 !important; color: white !important; padding: 0.5rem; text-align: right;">Stock</th>
+                                                <th style="border-color: #334155 !important; color: white !important; padding: 0.5rem; text-align: right;">Min</th>
+                                                <th style="border-color: #334155 !important; color: white !important; padding: 0.5rem;">Status</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for product in paints %}
+                                            <tr style="background-color: #1e293b !important; color: #ffffff !important;">
+                                                <td style="border-color: #334155 !important; padding: 0.5rem;">{{ product.sku or '-' }}</td>
+                                                <td style="border-color: #334155 !important; padding: 0.5rem;">{{ product.name or '-' }}</td>
+                                                <td style="border-color: #334155 !important; padding: 0.5rem;">{{ product.unit_of_measure or '-' }}</td>
+                                                <td style="border-color: #334155 !important; padding: 0.5rem; text-align: right;">
+                                                    <span class="badge {% if (product.current_stock or 0) < (product.min_stock_level or 0) %}bg-danger{% else %}bg-success{% endif %}">
+                                                        {{ "%.2f"|format(product.current_stock or 0) }}
+                                                    </span>
+                                                </td>
+                                                <td style="border-color: #334155 !important; padding: 0.5rem; text-align: right;">{{ "%.2f"|format(product.min_stock_level or 0) }}</td>
+                                                <td style="border-color: #334155 !important; padding: 0.5rem;">
+                                                    {% if (product.current_stock or 0) < (product.min_stock_level or 0) %}
+                                                        <span class="badge bg-warning text-dark">⚠️ Low</span>
+                                                    {% else %}
+                                                        <span class="badge bg-success">✅ OK</span>
+                                                    {% endif %}
+                                                    <button type='button' class='btn btn-warning btn-sm ms-1' onclick='openIssueModal("{{ product.id }}", "{{ product.name }}", "{{ product.current_stock }}", "{{ product.unit_of_measure or "" }}")'>
+                                                        📤
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
                                 </div>
                             </div>
                         </div>
