@@ -341,12 +341,14 @@ def issue_item():
         
         product.current_stock -= quantity_used
         
+        product_name = product.name  # Snapshot for display
         usage_log = UsageLog(
             product_id=product_id,
-            quantity_used=quantity_used,
+            quantity_used=-quantity_used,
             technician_name=technician_name,
             project_ref=project_ref
         )
+        usage_log.product_name = product_name  # Assign after init if model supports
         db.session.add(usage_log)
         db.session.commit()
         flash('Successfully issued item', 'success')
