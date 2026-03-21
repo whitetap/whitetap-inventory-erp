@@ -378,8 +378,26 @@ html {
                                 </button>
                             </h2>
                             <div id="paintsCollapse" class="accordion-collapse collapse" data-bs-parent="#paintsAccordion">
-                                <div class="accordion-body">
-                                    <table style="width: 100%; background-color: #1e293b !important; color: #ffffff !important; border-collapse: collapse;">
+                            <div class="accordion-body">
+                                <!-- Carpet Converter -->
+                                <div class="carpet-converter mb-4" style="background: rgba(59, 130, 246, 0.1); border: 1px solid #3b82f6; backdrop-filter: blur(10px); padding: 15px; border-radius: 12px;">
+                                    <h6 class="text-white mb-3 fw-bold">🧵 Carpet Conversion Tool</h6>
+                                    <div class="row g-3">
+                                        <div class="col-md-5">
+                                            <label class="form-label text-white small fw-bold">Enter Yards²</label>
+                                            <input type="number" id="carpetYards" class="form-control bg-dark text-white border-blue-500" step="0.01" placeholder="0.00">
+                                        </div>
+                                        <div class="col-md-5">
+                                            <label class="form-label text-white small fw-bold">Meters²</label>
+                                            <input type="number" id="carpetMeters" class="form-control bg-dark text-white border-blue-500" readonly placeholder="0.00">
+                                        </div>
+                                        <div class="col-md-2 d-flex align-items-end">
+                                            <button type="button" class="btn btn-primary w-100" onclick="copyToIssue()">Copy to Issue</button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <table style="width: 100%; background-color: #1e293b !important; color: #ffffff !important; border-collapse: collapse;">
                                         <thead style="background-color: #1e293b !important; color: #ffffff !important;">
                                             <tr>
                                                 <th style="border-color: #334155 !important; color: white !important; padding: 0.5rem;">SKU</th>
@@ -673,6 +691,23 @@ function openIssueModal(id, name, stock, unit) {
     var myModal = new bootstrap.Modal(document.getElementById('issueModal'));
     myModal.show();
 }
+
+function updateCarpetConverter() {
+    const yards = parseFloat(document.getElementById('carpetYards').value) || 0;
+    const meters = (yards * yards / 1.196).toFixed(2);
+    document.getElementById('carpetMeters').value = meters;
+}
+
+function copyToIssue() {
+    const meters = document.getElementById('carpetMeters').value;
+    if (meters && meters > 0) {
+        // Open first carpet issue modal or focus quantity field
+        openIssueModal(); // Trigger first available
+        document.querySelector('input[name="quantity_used"]').value = meters;
+    }
+}
+
+document.getElementById('carpetYards').addEventListener('input', updateCarpetConverter);
 
 document.addEventListener('DOMContentLoaded', function() {
     const searchInput = document.getElementById('staffSearch');
