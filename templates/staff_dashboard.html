@@ -633,16 +633,36 @@ document.addEventListener('DOMContentLoaded', function() {
             clearTimeout(timeout);
             timeout = setTimeout(function() {
                 const query = searchInput.value.toLowerCase().trim();
-                const rows = document.querySelectorAll('.staff-card tbody tr');
-                rows.forEach(row => {
-                    const skuCell = row.cells[0] ? row.cells[0].textContent.toLowerCase() : '';
-                    const nameCell = row.cells[1] ? row.cells[1].textContent.toLowerCase() : '';
-                    if (query === '' || skuCell.includes(query) || nameCell.includes(query)) {
+                // Target item-rows and table rows
+                const allRows = document.querySelectorAll('.item-row, .staff-card tbody tr');
+                let hasMatches = {paints: false, carpets: false, others: false};
+                
+                allRows.forEach(row => {
+                    const text = row.textContent.toLowerCase();
+                    if (query === '' || text.includes(query)) {
                         row.style.display = '';
+                        // Auto-expand parent accordion if match
+                        const collapse = row.closest('.accordion-collapse');
+                        if (collapse) {
+                            collapse.classList.add('show');
+                            const id = collapse.id;
+                            if (id === 'paintsCollapse') hasMatches.paints = true;
+                            if (id === 'carpetsCollapse') hasMatches.carpets = true;
+                            if (id === 'othersCollapse') hasMatches.others = true;
+                        }
                     } else {
                         row.style.display = 'none';
                     }
                 });
+                
+                // Collapse non-matching accordions
+                ['paintsCollapse', 'carpetsCollapse', 'othersCollapse'].forEach(id => {
+                    const collapse = document.getElementById(id);
+                    if (collapse && !hasMatches[id.replace('Collapse', '')]) {
+                        collapse.classList.remove('show');
+                    }
+                });
+                
             }, 300);
         });
     }
