@@ -412,59 +412,59 @@ html {
                         📥 Export CSV
                     </a>
                 </div>
-                <div class="card-body p-0">
-                    {% if carpets %}
-                        <div class="table-responsive">
-                            <table class="table table-hover mb-0">
-                                <thead class="table-dark">
-                                    <tr>
-                                        <th>SKU</th>
-                                        <th>Name</th>
-                                        <th>Unit</th>
-                                        <th class="text-end">Stock</th>
-                                        <th class="text-end">Min Level</th>
-                                        <th>Status</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for product in carpets %}
-                                    <tr>
-                                        <td class="fw-bold">{{ product.sku or '-' }}</td>
-                                        <td>{{ product.name or '-' }}</td>
-                                        <td>{{ product.unit_of_measure or '-' }}</td>
-                                        <td class="text-end">
-                                            <span class="badge {% if (product.current_stock or 0) < (product.min_stock_level or 0) %}bg-danger{% else %}bg-success{% endif %} fs-6 px-3 py-2">
-                                                {{ "%.2f"|format(product.current_stock or 0) }}
-                                            </span>
-                                        </td>
-                                        <td class="fw-semibold text-end">{{ "%.2f"|format(product.min_stock_level or 0) }}</td>
-                                        <td>
-                                            {% if (product.current_stock or 0) < (product.min_stock_level or 0) %}
-                                                <span class="badge bg-warning text-dark px-3 py-2">⚠️ Low</span>
-                                            {% else %}
-                                                <span class="badge bg-success px-3 py-2">✅ OK</span>
-                                            {% endif %}
-                                            <br><small>
-                                                <button type='button' class='btn btn-warning btn-sm mt-1' onclick='openIssueModal("{{ product.id }}", "{{ product.name }}", "{{ product.current_stock }}", "{{ product.unit_of_measure or "" }}")'>
+                <div class="accordion" id="carpetsAccordion">
+                    <div class="accordion-item">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#carpetsCollapse">
+                                🧵 Aviation Carpets & Textiles ({{ carpets|length }} items)
+                            </button>
+                        </h2>
+                        <div id="carpetsCollapse" class="accordion-collapse collapse" data-bs-parent="#carpetsAccordion">
+                            <div class="accordion-body">
+                                <table style="width: 100%; background-color: #1e293b !important; color: #ffffff !important; border-collapse: collapse;">
+                                    <thead style="background-color: #1e293b !important; color: #ffffff !important;">
+                                        <tr>
+                                            <th style="border-color: #334155 !important; color: white !important; padding: 0.5rem;">SKU</th>
+                                            <th style="border-color: #334155 !important; color: white !important; padding: 0.5rem;">Name</th>
+                                            <th style="border-color: #334155 !important; color: white !important; padding: 0.5rem;">Unit</th>
+                                            <th style="border-color: #334155 !important; color: white !important; padding: 0.5rem; text-align: right;">Stock</th>
+                                            <th style="border-color: #334155 !important; color: white !important; padding: 0.5rem; text-align: right;">Min</th>
+                                            <th style="border-color: #334155 !important; color: white !important; padding: 0.5rem;">Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for product in carpets %}
+                                        <tr style="background-color: #1e293b !important; color: #ffffff !important;">
+                                            <td style="border-color: #334155 !important; padding: 0.5rem;">{{ product.sku or '-' }}</td>
+                                            <td style="border-color: #334155 !important; padding: 0.5rem;">{{ product.name or '-' }}</td>
+                                            <td style="border-color: #334155 !important; padding: 0.5rem;">{{ product.unit_of_measure or '-' }}</td>
+                                            <td style="border-color: #334155 !important; padding: 0.5rem; text-align: right;">
+                                                <span class="badge {% if (product.current_stock or 0) < (product.min_stock_level or 0) %}bg-danger{% else %}bg-success{% endif %}">
+                                                    {{ "%.2f"|format(product.current_stock or 0) }}
+                                                </span>
+                                            </td>
+                                            <td style="border-color: #334155 !important; padding: 0.5rem; text-align: right;">{{ "%.2f"|format(product.min_stock_level or 0) }}</td>
+                                            <td style="border-color: #334155 !important; padding: 0.5rem;">
+                                                {% if (product.current_stock or 0) < (product.min_stock_level or 0) %}
+                                                    <span class="badge bg-warning text-dark">⚠️ Low</span>
+                                                {% else %}
+                                                    <span class="badge bg-success">✅ OK</span>
+                                                {% endif %}
+                                                <button type='button' class='btn btn-warning btn-sm ms-1' onclick='openIssueModal("{{ product.id }}", "{{ product.name }}", "{{ product.current_stock }}", "{{ product.unit_of_measure or "" }}")'>
                                                     📤 Issue
                                                 </button>
-                                            </small>
-                                        </td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
-                        <div class="card-footer bg-transparent text-white-50">
-                            {{ carpets|length }} items
-                        </div>
-                    {% else %}
-                        <div class="card-body text-center py-5">
-                            <i class="fas fa-couch fa-3x text-muted mb-3"></i>
-                            <p class="text-muted">No carpets available</p>
-                        </div>
-                    {% endif %}
+                    </div>
                 </div>
+                <a href="{{ url_for('export_carpets') }}" class="btn btn-primary mt-2">
+                    📥 Export CSV
+                </a>
             </div>
 
             <!-- Other Supplies Card -->
