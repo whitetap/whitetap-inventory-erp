@@ -464,30 +464,25 @@ function openIssueModal(id, name, stock, unit) {
     myModal.show();
 }
 
-let searchTimeout;
-
-function filterInventory() {
-    const query = document.getElementById('staffSearch').value.toLowerCase().trim();
-    const rows = document.querySelectorAll('.staff-card .table tbody tr');
-    
-    rows.forEach(row => {
-        const skuCell = row.cells[0] ? row.cells[0].textContent.toLowerCase() : '';
-        const nameCell = row.cells[1] ? row.cells[1].textContent.toLowerCase() : '';
-        
-        if (query === '' || skuCell.includes(query) || nameCell.includes(query)) {
-            row.classList.remove('filter-hidden');
-        } else {
-            row.classList.add('filter-hidden');
-        }
-    });
-}
-
 document.addEventListener('DOMContentLoaded', function() {
     const searchInput = document.getElementById('staffSearch');
     if (searchInput) {
-        searchInput.addEventListener('keyup', function() {
-            clearTimeout(searchTimeout);
-            searchTimeout = setTimeout(filterInventory, 300);
+        let timeout;
+        searchInput.addEventListener('input', function() {
+            clearTimeout(timeout);
+            timeout = setTimeout(function() {
+                const query = searchInput.value.toLowerCase().trim();
+                const rows = document.querySelectorAll('.staff-card tbody tr');
+                rows.forEach(row => {
+                    const skuCell = row.cells[0] ? row.cells[0].textContent.toLowerCase() : '';
+                    const nameCell = row.cells[1] ? row.cells[1].textContent.toLowerCase() : '';
+                    if (query === '' || skuCell.includes(query) || nameCell.includes(query)) {
+                        row.style.display = '';
+                    } else {
+                        row.style.display = 'none';
+                    }
+                });
+            }, 300);
         });
     }
 });
