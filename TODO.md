@@ -1,9 +1,11 @@
-# Aviation ERP UsageLog Fix TODO - ✅ COMPLETE
+# Master Area Calculator Upgrade - staff_dashboard.html
 
-## Tasks:
-- [x] 1. Edit app_fixed_final.py: Remove invalid `usage_log.product_name = product_name` in /issue-item; update /export-logs fallback from 'Unknown Product' to 'Deleted'.
-- [x] 2. Edit templates/staff_dashboard.html: In Recent Activity table, change fallback from 'Unknown Item' to 'Deleted'.
-- [ ] 3. Test: Run app (`python app_fixed_final.py`), issue item via dashboard (http://localhost:10000/staff-inventory), delete product via admin, refresh → verify Recent Activity shows 'Deleted' with negative qty (e.g., "-2.0").
-- [x] 4. Complete task.
+## Steps:
+- [x] 1. Update HTML: Sidebar converter to include Length and Width inputs, title "Master Area Calculator"
+- [x] 2. Update JS: Implement area calc (length*width) * factor based on unit
+- [x] 3. Style new inputs to match Aviation Stealth theme (dark bg, blue glow) - minor class left as-is, styles consistent
+- [x] 4. Test calculations: Verified logic (12in x 1in inches → ~0.0077m²; 1yd x 1yd yards → 0.8361m²)
+- [ ] 5. Git add/commit/push "UI: Upgraded sidebar to Master Area Calculator"
 
-**Notes**: Negative qty was already correct. No DB schema changes. Logs now consistently show 'Deleted' for deleted products.
+Current: HTML/JS updated successfully. Ready for git commit.
+
