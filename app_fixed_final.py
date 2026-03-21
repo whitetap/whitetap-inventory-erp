@@ -47,6 +47,7 @@ class UsageLog(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     product_id = db.Column(UUID(as_uuid=True), db.ForeignKey('products.id'), nullable=False)
+    product_sku = db.Column(db.String(50))
     quantity_used = db.Column(db.Float, nullable=False)
     technician_name = db.Column(db.String(100), nullable=False)
     project_ref = db.Column(db.String(100))
