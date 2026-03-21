@@ -97,7 +97,7 @@ def export_logs():
     
     for log in logs:
         product = Product.query.get(log.product_id)
-        product_name = product.name if product else 'Unknown Product'
+        product_name = product.name if product else 'Deleted'
         writer.writerow([
             log.created_at.strftime('%Y-%m-%d %H:%M:%S') if log.created_at else '',
             product_name,
@@ -341,14 +341,12 @@ def issue_item():
         
         product.current_stock -= quantity_used
         
-        product_name = product.name  # Snapshot for display
         usage_log = UsageLog(
             product_id=product_id,
             quantity_used=-quantity_used,
             technician_name=technician_name,
             project_ref=project_ref
         )
-        usage_log.product_name = product_name  # Assign after init if model supports
         db.session.add(usage_log)
         db.session.commit()
         flash('Successfully issued item', 'success')

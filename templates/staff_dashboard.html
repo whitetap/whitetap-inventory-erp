@@ -371,7 +371,7 @@ html {
                                 <tbody>
                                     {% for log in recent_logs %}
                                     <tr>
-                                        <td>{{ log.product.name if log.product else 'Unknown Item' }}</td>
+                                        <td>{{ log.product.name if log.product else 'Deleted' }}</td>
                                         <td class="fw-bold text-warning">{{ abs(log.quantity_used|float) }} Issued</td>
                                         <td>{{ log.technician_name }}</td>
                                         <td>{{ log.project_ref or '-' }}</td>
