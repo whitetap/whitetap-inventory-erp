@@ -341,11 +341,14 @@ def issue_item():
         
         product.current_stock -= quantity_used
         
+        sku_to_save = product.sku
+        
         usage_log = UsageLog(
             product_id=product_id,
             quantity_used=-quantity_used,
             technician_name=technician_name,
-            project_ref=project_ref
+            project_ref=project_ref,
+            product_sku=sku_to_save
         )
         db.session.add(usage_log)
         db.session.commit()
