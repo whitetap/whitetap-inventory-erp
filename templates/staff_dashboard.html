@@ -191,7 +191,7 @@ body { background: #f8fafc !important; color: #1e293b !important; }
               <td>{{ product.name }}</td>
               <td>{{ product.unit_of_measure or '-' }}</td>
               <td class="fw-bold text-end {{ 'text-danger' if (product.current_stock or 0) < (product.min_stock_level or 0) else 'text-success' }}">
-                {{ "%.2f"|format(product.current_stock or 0) }}
+                {{ "%.3f"|format(product.current_stock or 0) }}
               </td>
               <td class="text-end">{{ "%.2f"|format(product.min_stock_level or 0) }}</td>
               <td>
