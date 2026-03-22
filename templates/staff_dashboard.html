@@ -172,12 +172,7 @@ html {
     color: #e2e8f0 !important;
 }
 
-#issueModal .btn-secondary:hover {
-    background: #4a5568 !important;
-    border-color: #718096 !important;
-    color: white !important;
-}
-</style>
+.btn-secondary:hover {\n    background: #4a5568 !important;\n    border-color: #718096 !important;\n    color: white !important;\n}\n\n/* Floating Glass Summary Cards */\n.summary-hub {\n    background: rgba(30, 41, 59, 0.4);\n    backdrop-filter: blur(20px);\n    border: 1px solid rgba(255,255,255,0.05);\n    border-radius: 20px;\n    padding: 2rem;\n}\n\n.summary-card {\n    background: rgba(30, 41, 59, 0.6);\n    backdrop-filter: blur(15px);\n    border: 1px solid rgba(255,255,255,0.1);\n    border-radius: 16px;\n    padding: 1.5rem;\n    transition: transform 0.3s ease;\n    box-shadow: 0 10px 30px rgba(0,0,0,0.5);\n    cursor: pointer;\n}\n\n.summary-card:hover {\n    transform: translateY(-10px);\n    box-shadow: 0 20px 40px rgba(0,0,0,0.6);\n}\n\n@keyframes pulse {\n    0%, 100% {\n        box-shadow: 0 0 5px #f59e0b, 0 0 10px #f59e0b, inset 0 0 5px rgba(245, 158, 11, 0.3);\n    }\n    50% {\n        box-shadow: 0 0 20px #f59e0b, 0 0 30px #f59e0b, inset 0 0 10px rgba(245, 158, 11, 0.5);\n    }\n}\n\n.at-risk-number {\n    animation: pulse 2s infinite;\n}\n\n/* Responsive */\n@media (max-width: 768px) {\n    .summary-card {\n        margin-bottom: 1rem;\n    }\n}\n</style>
 .sidebar-link:hover {
     background: rgba(255,255,255,0.1) !important;
     transform: translateX(5px);
@@ -350,21 +345,7 @@ html {
               {% endif %}
             {% endfor %}
 
-            <!-- Summary Hub -->
-            <div class="row g-4 mb-5" style="background: rgba(30,41,59,0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.1); border-radius: 15px; padding: 1.5rem;">
-                <div class="col-md-4 text-center">
-                    <h3 class="fs-1 fw-bold text-blue-400 mb-1">{{ (paints|length + carpets|length + others|length) }}</h3>
-                    <p class="text-white-50 mb-0">Inventory SKUs</p>
-                </div>
-                <div class="col-md-4 text-center">
-                    <h3 class="fs-1 fw-bold text-red-400 mb-1" style="text-shadow: 0 0 10px rgba(239,68,68,0.5);">{{ low_stock_count }}</h3>
-                    <p class="text-white-50 mb-0">Alerts</p>
-                </div>
-                <div class="col-md-4 text-center">
-                    <h3 class="fs-1 fw-bold text-green-400 mb-1">{{ recent_logs|length }}</h3>
-                    <p class="text-white-50 mb-0">Today</p>
-                </div>
-            </div>
+            <!-- Summary Hub - Floating Glass Command Cards -->\n            <div class="row g-4 mb-5 summary-hub">\n                <div class="col-md-3 summary-card text-center">\n                    <h3 class="fs-1 fw-bold text-blue-400 mb-1">{{ (paints|length + carpets|length + others|length) }}</h3>\n                    <p class="text-white-50 mb-0">Total SKUs</p>\n                </div>\n                <div class="col-md-3 summary-card text-center">\n                    <h3 class="fs-1 fw-bold text-red-400 mb-1" style="text-shadow: 0 0 10px rgba(239,68,68,0.5);">{{ low_stock_count }}</h3>\n                    <p class="text-white-50 mb-0">Low Stock Alerts</p>\n                </div>\n                <div class="col-md-3 summary-card text-center">\n                    <h3 class="fs-1 fw-bold text-green-400 mb-1">{{ recent_logs|length }}</h3>\n                    <p class="text-white-50 mb-0">Recent Activity</p>\n                </div>\n                <div class="col-md-3 summary-card text-center">\n                    <h3 class="fs-1 fw-bold text-amber-400 mb-1 at-risk-number">{{ at_risk_count }}</h3>\n                    <p class="text-white-50 mb-0">30-Day Forecast<br><small class="text-warning">At Risk Items</small></p>\n                </div>\n            </div>
 
             <!-- Search Bar -->
             <div class="card shadow-lg border-0 mb-5">

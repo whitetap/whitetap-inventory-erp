@@ -85,7 +85,10 @@ def staff_inventory():
         logs_query = logs_query.filter(UsageLog.project_ref.ilike(f'%{activity_filter}%'))
     recent_logs = logs_query.limit(10).all()
     
-    return render_template('staff_dashboard.html', paints=paints, carpets=carpets, others=others, recent_logs=recent_logs, search_query=search_query, activity_filter=activity_filter)
+    all_items = paints + carpets + others
+    at_risk_count = len([p for p in all_items if (p.current_stock or 0) < 2 * (p.min_stock_level or 0)])
+    
+    return render_template('staff_dashboard.html', paints=paints, carpets=carpets, others=others, recent_logs=recent_logs, search_query=search_query, activity_filter=activity_filter, at_risk_count=at_risk_count)
 
 @app.route('/export-logs')
 def export_logs():
