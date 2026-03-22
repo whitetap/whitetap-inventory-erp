@@ -2,416 +2,456 @@
 <html lang="en">
 {% extends "base.html" %}
 
-{% block title %}Aviation ERP - Staff Dashboard{% endblock %}
+{% block title %}Staff Inventory - Aviation ERP{% endblock %}
+
+{% block page_title %}Staff Dashboard{% endblock %}
 
 {% block extra_styles %}
 <style>
-/* High-Contrast Professional Aero SaaS Theme */
-body { background: #f8fafc !important; color: #1e293b !important; font-family: 'Inter', -apple-system, sans-serif; }
+/* High-Contrast Light Theme */
+body { background: #f8fafc !important; color: #1e293b !important; }
 .container-fluid { background: #f8fafc !important; }
 
-.sidebar { background: #0f172a !important; border-right: 1px solid #1a202c; }
-.sidebar-header h3 { color: #f59e0b !important; }
+.sidebar { background: #0f172a !important; color: white !important; }
 
-.card { background: #ffffff !important; border: 1px solid #e2e8f0 !important; box-shadow: 0 1px 3px rgba(0,0,0,0.1), 0 4px 12px rgba(0,0,0,0.08) !important; }
+.card { background: #ffffff !important; border: 1px solid #e2e8f0 !important; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05) !important; }
 .summary-card { 
   background: #ffffff !important; 
-  border: 1px solid #e2e8f0 !important;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.08) !important;
-  transition: all 0.3s ease !important;
-  border-radius: 16px !important;
+  border-radius: 12px !important; 
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08) !important; 
+  transition: transform 0.3s ease, box-shadow 0.3s ease !important;
 }
 .summary-card:hover { transform: translateY(-4px) !important; box-shadow: 0 8px 25px rgba(0,0,0,0.12) !important; }
 
-table { color: #1e293b !important; background: #ffffff !important; }
-th { background: #f8fafc !important; color: #374151 !important; border-color: #e5e7eb !important; font-weight: 600; }
-td { color: #1e293b !important; border-color: #f3f4f6 !important; }
+table { background: #ffffff !important; color: #1e293b !important; }
+th { background: #f8fafc !important; color: #374151 !important; border-bottom: 2px solid #e5e7eb !important; }
+td { border-color: #f3f4f6 !important; color: #1e293b !important; }
 
-.accordion-button { background: #ffffff !important; color: #1e293b !important; border: 1px solid #e2e8f0 !important; }
-.accordion-button:not(.collapsed) { background: #f8fafc !important; box-shadow: inset 0 -1px 0 #e5e7eb !important; }
+.accordion-button { background: #ffffff !important; color: #1e293b !important; border-color: #e2e8f0 !important; }
+.accordion-button:not(.collapsed) { background: #f8fafc !important; }
 .accordion-body { background: #ffffff !important; color: #1e293b !important; }
 
-@keyframes orange-pulse { 0%,100% { box-shadow: 0 0 5px rgba(245,158,11,0.5); } 50% { box-shadow: 0 0 20px rgba(245,158,11,0.8); } }
-.forecast-glow { animation: orange-pulse 2s infinite !important; }
+@keyframes amber-glow { 
+  0%, 100% { box-shadow: 0 0 5px rgba(245,158,11,0.5); }
+  50% { box-shadow: 0 0 20px rgba(245,158,11,0.8); }
+}
+.forecast-glow { animation: amber-glow 2s infinite !important; }
 
-#staffSearch { border: 2px solid #e2e8f0 !important; background: #ffffff !important; }
+.hidden-row { display: none !important; }
 </style>
 {% endblock %}
 
 {% block content %}
-<!-- Live Greeting Header -->
-<div class="mb-4 p-4" style="background: linear-gradient(135deg, #f8fafc 0%, #ffffff 100%); border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
-  <div class="text-center">
-    <h1 id="live-greeting" class="fw-bold mb-1" style="font-size: 2.5rem; color: #1e293b;">Good Morning, AISL STAFF</h1>
-    <p id="live-date" class="mb-0" style="font-size: 1.1rem; color: #6b7280;"></p>
+<!-- Time Greeting Header -->
+<div class="row mb-5">
+  <div class="col-12">
+    <div class="text-center p-4 bg-white rounded-3 shadow-sm">
+      <h1 id="greeting" class="mb-1 fw-bold" style="color: #1e293b; font-size: 2.5rem;">Good Morning, AISL STAFF</h1>
+      <p id="current-date" class="mb-0 fw-medium" style="color: #6b7280; font-size: 1.2rem;"></p>
+    </div>
   </div>
 </div>
 
-<div class="d-flex">
-  <!-- Fixed Navy Sidebar -->
-  <div class="sidebar" style="width: 280px; min-height: 100vh;">
-    <div class="p-4">
-      <h3 class="fw-bold mb-4">🛩️ Aviation ERP</h3>
-      <nav class="nav flex-column">
-        <a class="nav-link p-3 mb-2 rounded" href="#" onclick="toggleNav('inventory')" style="color: #d1d5db; background: rgba(255,255,255,0.1);">
-          📦 Inventory <i class="fas fa-chevron-down float-end"></i>
-        </a>
-        <div id="inventory-sub" style="display: none; padding-left: 20px;">
-          <a class="nav-link p-2 mb-1 small" href="#paints" style="color: #9ca3af;">🎨 Paints</a>
-          <a class="nav-link p-2 mb-1 small" href="#carpets" style="color: #9ca3af;">🧵 Carpets</a>
-          <a class="nav-link p-2 mb-1 small" href="#others" style="color: #9ca3af;">⚙️ Others</a>
-        </div>
-        <a class="nav-link p-3 mb-2 rounded" href="#" style="color: #d1d5db;">📊 Reports</a>
-      </nav>
-      
-      <!-- Carpet Converter -->
-      <div class="mt-4 p-3" style="background: rgba(255,255,255,0.1); border-radius: 12px;">
-        <h6 style="color: #f59e0b;">📐 Carpet Converter</h6>
+<!-- Summary Hub - 4 Floating Cards -->
+<div class="row g-4 mb-5">
+  <div class="col-lg-3 col-md-6">
+    <div class="summary-card p-4 h-100 text-center">
+      <h2 class="display-4 fw-bold mb-1" style="color: #3b82f6;">{{ (paints|length + carpets|length + others|length) }}</h2>
+      <p class="mb-0 fw-semibold" style="color: #6b7280;">Total Items</p>
+    </div>
+  </div>
+  <div class="col-lg-3 col-md-6">
+    <div class="summary-card p-4 h-100 text-center">
+      <h2 class="display-4 fw-bold mb-1" style="color: #ef4444;">{{ low_stock_count }}</h2>
+      <p class="mb-0 fw-semibold" style="color: #6b7280;">Low Stock Alerts</p>
+    </div>
+  </div>
+  <div class="col-lg-3 col-md-6">
+    <div class="summary-card p-4 h-100 text-center">
+      <h2 class="display-4 fw-bold mb-1" style="color: #10b981;">{{ recent_logs|length }}</h2>
+      <p class="mb-0 fw-semibold" style="color: #6b7280;">Recent Activity</p>
+    </div>
+  </div>
+  <div class="col-lg-3 col-md-6">
+    <div class="summary-card p-4 h-100 text-center">
+      <h2 class="display-4 fw-bold mb-1 forecast-glow" style="color: #f59e0b;">{{ at_risk_count }}</h2>
+      <p class="mb-0 fw-semibold" style="color: #6b7280;">30-Day Forecast</p>
+    </div>
+  </div>
+</div>
+
+<!-- Global Search -->
+<div class="mb-4">
+  <div class="input-group shadow-sm">
+    <span class="input-group-text bg-white border-end-0">
+      <i class="fas fa-search text-muted"></i>
+    </span>
+    <input id="staffSearch" type="text" class="form-control border-start-0 ps-0" placeholder="🔍 Search all inventory (SKU/Name)...">
+  </div>
+</div>
+
+<div class="d-flex min-vh-100">
+  <!-- Navy Sidebar -->
+  <div class="sidebar p-4" style="width: 280px; position: fixed; height: 100vh; z-index: 1000;">
+    <div class="sidebar-header mb-4 pb-3">
+      <h3 class="fw-bold mb-1" style="color: #f59e0b;">🛩️ Aviation ERP</h3>
+      <small style="color: #94a3b8;">Staff Dashboard</small>
+    </div>
+
+    <!-- Navigation -->
+    <nav class="nav nav-pills flex-column mb-4">
+      <a class="nav-link active p-3 rounded mb-2" href="#" onclick="scrollTo('paints-section')" style="color: #cbd5e1;">
+        🎨 Paints & Pigments
+      </a>
+      <a class="nav-link p-3 rounded mb-2" href="#" onclick="scrollTo('carpets-section')" style="color: #cbd5e1;">
+        🧵 Carpets & Textiles
+      </a>
+      <a class="nav-link p-3 rounded mb-2" href="#" onclick="scrollTo('others-section')" style="color: #cbd5e1;">
+        ⚙️ Other Supplies
+      </a>
+      <a class="nav-link p-3 rounded" href="#" onclick="scrollTo('activity-section')" style="color: #cbd5e1;">
+        📋 Recent Activity
+      </a>
+    </nav>
+
+    <!-- Carpet Converter -->
+    <div class="card bg-transparent border-0">
+      <div class="card-body p-3">
+        <h6 class="fw-bold mb-3" style="color: #f59e0b;">📐 Carpet Calculator</h6>
         <div class="mb-2">
-          <label class="form-label small" style="color: #cbd5e1;">Length:</label>
-          <input id="carpet-length" type="number" step="0.01" class="form-control form-control-sm" placeholder="0.00">
+          <label class="form-label small fw-medium" style="color: #cbd5e1;">Length (ft):</label>
+          <input id="carpetLen" type="number" step="0.01" class="form-control form-control-sm" placeholder="0.00">
         </div>
-        <div class="mb-2">
-          <label class="form-label small" style="color: #cbd5e1;">Width:</label>
-          <input id="carpet-width" type="number" step="0.01" value="1" class="form-control form-control-sm" placeholder="0.00">
+        <div class="mb-3">
+          <label class="form-label small fw-medium" style="color: #cbd5e1;">Width (ft):</label>
+          <input id="carpetWid" type="number" step="0.01" value="1" class="form-control form-control-sm" placeholder="0.00">
         </div>
-        <div style="font-weight: 600; color: #f59e0b; font-size: 1.1rem;" id="carpet-result">0.00 m²</div>
+        <div class="fw-bold fs-5 mb-0 text-center" id="carpetResult" style="color: #f59e0b;">0.00 sq m</div>
       </div>
     </div>
   </div>
 
-  <!-- Main Content -->
-  <div class="flex-grow-1 p-4">
-    <!-- Flash Messages -->
-    {% with messages = get_flashed_messages(with_categories=true) %}
-      {% if messages %}
-        {% for category, message in messages %}
-          <div class="alert alert-{{ 'success' if category == 'success' else 'danger' }} alert-dismissible fade show mb-4">
-            {{ message }}
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  <!-- Main Content Area -->
+  <div class="flex-grow-1" style="margin-left: 280px; padding: 2rem;">
+    <div class="container-fluid">
+
+      <!-- Paints Section -->
+      <div id="paints-section" class="card shadow-lg mb-5">
+        <div class="card-header bg-white border-bottom">
+          <div class="d-flex justify-content-between align-items-center">
+            <div>
+              <h3 class="mb-0 fw-bold" style="color: #1e293b;">🎨 Aviation Paints & Pigments</h3>
+              <small class="text-muted">({{ paints|length }}) items</small>
+            </div>
+            <a href="{{ url_for('export_paints') }}" class="btn btn-outline-primary">
+              <i class="fas fa-download"></i> CSV
+            </a>
           </div>
-        {% endfor %}
-      {% endif %}
-    {% endwith %}
+        </div>
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th>SKU</th>
+                  <th>Name</th>
+                  <th>Unit</th>
+                  <th class="text-end">Stock</th>
+                  <th class="text-end">Min Level</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for product in paints %}
+                <tr class="inventory-row">
+                  <td class="fw-medium">{{ product.sku or '-' }}</td>
+                  <td>{{ product.name }}</td>
+                  <td>{{ product.unit_of_measure or '-' }}</td>
+                  <td class="fw-bold text-end {{ 'text-danger' if (product.current_stock or 0) < (product.min_stock_level or 0) else 'text-success' }}">
+                    {{ "%.2f"|format(product.current_stock or 0) }}
+                  </td>
+                  <td class="text-end">{{ "%.2f"|format(product.min_stock_level or 0) }}</td>
+                  <td>
+                    {% if (product.current_stock or 0) < (product.min_stock_level or 0) %}
+                      <span class="badge bg-warning">⚠️ Low Stock</span>
+                    {% else %}
+                      <span class="badge bg-success">✅ OK</span>
+                    {% endif %}
+                    <button class="btn btn-sm btn-warning ms-1" onclick="openIssueModal('{{ product.id }}', '{{ product.name }}', {{ product.current_stock }}, '{{ product.unit_of_measure }}')">
+                      📤 Issue
+                    </button>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
 
-    <!-- Summary Hub - 4 Floating Cards -->
-    <div class="row g-4 mb-5">
-      <div class="col-lg-3 col-md-6">
-        <div class="summary-card p-4 h-100 text-center">
-          <h2 class="fs-1 fw-bold mb-1" style="color: #3b82f6;">{{ (paints|length + carpets|length + others|length) }}</h2>
-          <p class="mb-0" style="color: #6b7280; font-weight: 500;">Total SKUs</p>
+      <!-- Carpets Section -->
+      <div id="carpets-section" class="card shadow-lg mb-5">
+        <div class="card-header bg-white border-bottom">
+          <div class="d-flex justify-content-between align-items-center">
+            <div>
+              <h3 class="mb-0 fw-bold" style="color: #1e293b;">🧵 Carpets & Textiles</h3>
+              <small class="text-muted">({{ carpets|length }}) items</small>
+            </div>
+            <a href="{{ url_for('export_carpets') }}" class="btn btn-outline-primary">
+              <i class="fas fa-download"></i> CSV
+            </a>
+          </div>
+        </div>
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th>SKU</th>
+                  <th>Name</th>
+                  <th>Unit</th>
+                  <th class="text-end">Stock</th>
+                  <th class="text-end">Min Level</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for product in carpets %}
+                <tr class="inventory-row">
+                  <td class="fw-medium">{{ product.sku or '-' }}</td>
+                  <td>{{ product.name }}</td>
+                  <td>{{ product.unit_of_measure or '-' }}</td>
+                  <td class="fw-bold text-end {{ 'text-danger' if (product.current_stock or 0) < (product.min_stock_level or 0) else 'text-success' }}">
+                    {{ "%.2f"|format(product.current_stock or 0) }}
+                  </td>
+                  <td class="text-end">{{ "%.2f"|format(product.min_stock_level or 0) }}</td>
+                  <td>
+                    {% if (product.current_stock or 0) < (product.min_stock_level or 0) %}
+                      <span class="badge bg-warning">⚠️ Low Stock</span>
+                    {% else %}
+                      <span class="badge bg-success">✅ OK</span>
+                    {% endif %}
+                    <button class="btn btn-sm btn-warning ms-1" onclick="openIssueModal('{{ product.id }}', '{{ product.name }}', {{ product.current_stock }}, '{{ product.unit_of_measure }}')">
+                      📤 Issue
+                    </button>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
-      <div class="col-lg-3 col-md-6">
-        <div class="summary-card p-4 h-100 text-center">
-          <h2 class="fs-1 fw-bold mb-1" style="color: #ef4444;">{{ low_stock_count }}</h2>
-          <p class="mb-0" style="color: #6b7280; font-weight: 500;">Low Stock</p>
-        </div>
-      </div>
-      <div class="col-lg-3 col-md-6">
-        <div class="summary-card p-4 h-100 text-center">
-          <h2 class="fs-1 fw-bold mb-1" style="color: #10b981;">{{ recent_logs|length }}</h2>
-          <p class="mb-0" style="color: #6b7280; font-weight: 500;">Activity Today</p>
-        </div>
-      </div>
-      <div class="col-lg-3 col-md-6">
-        <div class="summary-card p-4 h-100 text-center forecast-card">
-          <h2 class="fs-1 fw-bold mb-1 forecast-glow" style="color: #f59e0b;">{{ at_risk_count }}</h2>
-          <p class="mb-0" style="color: #6b7280; font-weight: 500;">30-Day Forecast</p>
-        </div>
-      </div>
-    </div>
 
-    <!-- Search -->
-    <div class="mb-4">
-      <div class="input-group">
-        <span class="input-group-text bg-white border-end-0">
-          <i class="fas fa-search text-muted"></i>
-        </span>
-        <input id="staffSearch" type="text" class="form-control border-start-0 shadow-sm" placeholder="Search inventory by SKU or name...">
-      </div>
-    </div>
-
-    <!-- Paints Section -->
-    <div id="paints-section" class="card shadow-lg mb-4">
-      <div class="card-header bg-white border-0 pb-0">
-        <div class="d-flex justify-content-between align-items-center">
-          <h3 style="color: #1e293b;">🎨 Aviation Paints & Pigments ({{ paints|length }} items)</h3>
-          <a href="{{ url_for('export_paints') }}" class="btn btn-outline-primary">📥 CSV</a>
+      <!-- Others Section -->
+      <div id="others-section" class="card shadow-lg mb-5">
+        <div class="card-header bg-white border-bottom">
+          <div class="d-flex justify-content-between align-items-center">
+            <div>
+              <h3 class="mb-0 fw-bold" style="color: #1e293b;">⚙️ Other Supplies</h3>
+              <small class="text-muted">({{ others|length }}) items</small>
+            </div>
+            <a href="{{ url_for('export_products') }}" class="btn btn-outline-primary">
+              <i class="fas fa-download"></i> CSV
+            </a>
+          </div>
+        </div>
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th>SKU</th>
+                  <th>Name</th>
+                  <th>Unit</th>
+                  <th class="text-end">Stock</th>
+                  <th class="text-end">Min Level</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for product in others %}
+                <tr class="inventory-row">
+                  <td class="fw-medium">{{ product.sku or '-' }}</td>
+                  <td>{{ product.name }}</td>
+                  <td>{{ product.unit_of_measure or '-' }}</td>
+                  <td class="fw-bold text-end {{ 'text-danger' if (product.current_stock or 0) < (product.min_stock_level or 0) else 'text-success' }}">
+                    {{ "%.2f"|format(product.current_stock or 0) }}
+                  </td>
+                  <td class="text-end">{{ "%.2f"|format(product.min_stock_level or 0) }}</td>
+                  <td>
+                    {% if (product.current_stock or 0) < (product.min_stock_level or 0) %}
+                      <span class="badge bg-warning">⚠️ Low Stock</span>
+                    {% else %}
+                      <span class="badge bg-success">✅ OK</span>
+                    {% endif %}
+                    <button class="btn btn-sm btn-warning ms-1" onclick="openIssueModal('{{ product.id }}', '{{ product.name }}', {{ product.current_stock }}, '{{ product.unit_of_measure }}')">
+                      📤 Issue
+                    </button>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
-      <div class="table-responsive">
-        <table class="table table-hover mb-0">
-          <thead>
-            <tr>
-              <th>SKU</th>
-              <th>Name</th>
-              <th>Unit</th>
-              <th class="text-end">Stock</th>
-              <th class="text-end">Min</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for product in paints %}
-            <tr>
-              <td>{{ product.sku or '-' }}</td>
-              <td>{{ product.name }}</td>
-              <td>{{ product.unit_of_measure or '-' }}</td>
-              <td class="text-end fw-bold {{ 'text-danger' if (product.current_stock or 0) < (product.min_stock_level or 0) else 'text-success' }}">
-                {{ "%.2f"|format(product.current_stock or 0) }}
-              </td>
-              <td class="text-end">{{ "%.2f"|format(product.min_stock_level or 0) }}</td>
-              <td>
-                {% if (product.current_stock or 0) < (product.min_stock_level or 0) %}
-                  <span class="badge bg-warning text-dark">⚠️ Low</span>
-                {% else %}
-                  <span class="badge bg-success">✅ OK</span>
+
+      <!-- Recent Activity -->
+      <div id="activity-section" class="card shadow-lg">
+        <div class="card-header bg-white border-bottom">
+          <div class="d-flex justify-content-between align-items-center">
+            <div>
+              <h3 class="mb-0 fw-bold" style="color: #1e293b;">📋 Recent Activity</h3>
+              <small class="text-muted">Last 10 events</small>
+            </div>
+            <a href="{{ url_for('export_logs') }}" class="btn btn-outline-success">
+              <i class="fas fa-download"></i> Export
+            </a>
+          </div>
+        </div>
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th>Product</th>
+                  <th>Qty</th>
+                  <th>Technician</th>
+                  <th>Project</th>
+                  <th>Time</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for log in recent_logs %}
+                <tr>
+                  <td>{{ log.product_sku }}</td>
+                  <td class="{{ 'text-danger fw-bold' if log.quantity_used < 0 else 'text-success fw-bold' }}">
+                    {{ log.quantity_used|float|round(2) }}
+                  </td>
+                  <td>{{ log.technician_name }}</td>
+                  <td>{{ log.project_ref or '-' }}</td>
+                  <td>{{ log.created_at.strftime('%H:%M') if log.created_at else 'N/A' }}</td>
+                </tr>
+                {% endfor %}
+                {% if not recent_logs %}
+                <tr>
+                  <td colspan="5" class="text-center py-4 text-muted">No recent activity</td>
+                </tr>
                 {% endif %}
-                <button class="btn btn-warning btn-sm ms-1" onclick="openIssueModal({{ product.id }}, '{{ product.name }}', {{ product.current_stock }}, '{{ product.unit_of_measure }}')">📤 Issue</button>
-              </td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- Carpets Section -->
-    <div id="carpets-section" class="card shadow-lg mb-4">
-      <div class="card-header bg-white border-0 pb-0">
-        <div class="d-flex justify-content-between align-items-center">
-          <h3 style="color: #1e293b;">🧵 Aviation Carpets ({{ carpets|length }} items)</h3>
-          <a href="{{ url_for('export_carpets') }}" class="btn btn-outline-primary">📥 CSV</a>
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
-      <div class="table-responsive">
-        <table class="table table-hover mb-0">
-          <thead>
-            <tr>
-              <th>SKU</th>
-              <th>Name</th>
-              <th>Unit</th>
-              <th class="text-end">Stock</th>
-              <th class="text-end">Min</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for product in carpets %}
-            <tr>
-              <td>{{ product.sku or '-' }}</td>
-              <td>{{ product.name }}</td>
-              <td>{{ product.unit_of_measure or '-' }}</td>
-              <td class="text-end fw-bold {{ 'text-danger' if (product.current_stock or 0) < (product.min_stock_level or 0) else 'text-success' }}">
-                {{ "%.2f"|format(product.current_stock or 0) }}
-              </td>
-              <td class="text-end">{{ "%.2f"|format(product.min_stock_level or 0) }}</td>
-              <td>
-                {% if (product.current_stock or 0) < (product.min_stock_level or 0) %}
-                  <span class="badge bg-warning text-dark">⚠️ Low</span>
-                {% else %}
-                  <span class="badge bg-success">✅ OK</span>
-                {% endif %}
-                <button class="btn btn-warning btn-sm ms-1" onclick="openIssueModal({{ product.id }}, '{{ product.name }}', {{ product.current_stock }}, '{{ product.unit_of_measure }}')">📤 Issue</button>
-              </td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- Others Section -->
-    <div id="others-section" class="card shadow-lg mb-4">
-      <div class="card-header bg-white border-0 pb-0">
-        <div class="d-flex justify-content-between align-items-center">
-          <h3 style="color: #1e293b;">⚙️ Other Supplies ({{ others|length }} items)</h3>
-          <a href="{{ url_for('export_products') }}" class="btn btn-outline-primary">📥 CSV</a>
-        </div>
-      </div>
-      <div class="table-responsive">
-        <table class="table table-hover mb-0">
-          <thead>
-            <tr>
-              <th>SKU</th>
-              <th>Name</th>
-              <th>Unit</th>
-              <th class="text-end">Stock</th>
-              <th class="text-end">Min</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for product in others %}
-            <tr>
-              <td>{{ product.sku or '-' }}</td>
-              <td>{{ product.name }}</td>
-              <td>{{ product.unit_of_measure or '-' }}</td>
-              <td class="text-end fw-bold {{ 'text-danger' if (product.current_stock or 0) < (product.min_stock_level or 0) else 'text-success' }}">
-                {{ "%.2f"|format(product.current_stock or 0) }}
-              </td>
-              <td class="text-end">{{ "%.2f"|format(product.min_stock_level or 0) }}</td>
-              <td>
-                {% if (product.current_stock or 0) < (product.min_stock_level or 0) %}
-                  <span class="badge bg-warning text-dark">⚠️ Low</span>
-                {% else %}
-                  <span class="badge bg-success">✅ OK</span>
-                {% endif %}
-                <button class="btn btn-warning btn-sm ms-1" onclick="openIssueModal({{ product.id }}, '{{ product.name }}', {{ product.current_stock }}, '{{ product.unit_of_measure }}')">📤 Issue</button>
-              </td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- Recent Activity -->
-    <div class="card shadow-lg">
-      <div class="card-header bg-white border-0 pb-0">
-        <div class="d-flex justify-content-between align-items-center">
-          <h3 style="color: #1e293b;">📋 Recent Activity</h3>
-          <a href="{{ url_for('export_logs') }}" class="btn btn-outline-success">📥 Export</a>
-        </div>
-      </div>
-      <div class="table-responsive">
-        <table class="table table-hover mb-0">
-          <thead>
-            <tr>
-              <th>Product</th>
-              <th>Qty</th>
-              <th>Technician</th>
-              <th>Project</th>
-              <th>Time</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for log in recent_logs %}
-            <tr>
-              <td>{{ log.product_sku }}</td>
-              <td class="{{ 'text-danger fw-bold' if log.quantity_used < 0 else 'text-success fw-bold' }}">
-                {{ "%.2f"|format(log.quantity_used|float) if log.quantity_used >= 0 else "%.2f"|format(log.quantity_used|float|abs) }}
-              </td>
-              <td>{{ log.technician_name }}</td>
-              <td>{{ log.project_ref or '-' }}</td>
-              <td>{{ log.created_at.strftime('%H:%M %d/%m') if log.created_at else 'N/A' }}</td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
       </div>
     </div>
   </div>
 </div>
 
 <!-- Issue Modal -->
-<div class="modal fade" id="issueModal">
+<div class="modal fade" id="issueModal" tabindex="-1">
   <div class="modal-dialog modal-lg">
     <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title">Issue Product</h5>
+      <div class="modal-header bg-light">
+        <h5 class="modal-title fw-bold">📤 Issue Product</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <form method="POST" action="{{ url_for('issue_item') }}">
         <div class="modal-body">
-          <input type="hidden" name="product_id" id="modal-product-id">
-          <div class="row">
+          <input type="hidden" id="modal-id" name="product_id">
+          <div class="row g-3">
             <div class="col-md-6">
               <label class="form-label fw-semibold">Product</label>
-              <input id="modal-product-name" class="form-control" readonly>
+              <input id="modal-name" class="form-control" readonly>
             </div>
             <div class="col-md-3">
-              <label class="form-label fw-semibold">Stock</label>
-              <input id="modal-product-stock" class="form-control" readonly>
+              <label class="form-label fw-semibold">Current Stock</label>
+              <input id="modal-stock" class="form-control" readonly>
             </div>
             <div class="col-md-3">
               <label class="form-label fw-semibold">Unit</label>
-              <input id="modal-product-unit" class="form-control" readonly>
+              <input id="modal-unit" class="form-control" readonly>
             </div>
             <div class="col-md-6">
-              <label class="form-label fw-semibold">Quantity *</label>
-              <input name="quantity_used" type="number" step="0.01" class="form-control" required>
+              <label class="form-label fw-semibold">Quantity <span class="text-danger">*</span></label>
+              <input name="quantity_used" type="number" step="0.01" class="form-control" min="0.01" required>
             </div>
             <div class="col-md-6">
-              <label class="form-label fw-semibold">Technician *</label>
+              <label class="form-label fw-semibold">Technician <span class="text-danger">*</span></label>
               <input name="technician_name" class="form-control" required>
             </div>
             <div class="col-12">
-              <label class="form-label">Project</label>
+              <label class="form-label">Project Reference</label>
               <input name="project_ref" class="form-control">
             </div>
           </div>
         </div>
-        <div class="modal-footer">
+        <div class="modal-footer bg-light">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-          <button type="submit" class="btn btn-warning">✅ Issue Product</button>
-        </button>
+          <button type="submit" class="btn btn-warning fw-bold">✅ Issue Product</button>
+        </div>
       </form>
     </div>
   </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-// Time-based Greeting
-function updateGreeting() {
-  const hour = new Date().getHours();
-  const greeting = hour < 12 ? 'Good Morning' : hour < 17 ? 'Good Afternoon' : 'Good Evening';
-  document.getElementById('live-greeting').textContent = greeting + ', AISL STAFF';
-  
-  const date = new Date().toLocaleDateString('en-US', {weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'});
-  document.getElementById('live-date').textContent = date;
-}
-
-// Carpet Calculator
 document.addEventListener('DOMContentLoaded', function() {
-  updateGreeting();
-  
-  // Carpet calculator
-  const length = document.getElementById('carpet-length');
-  const width = document.getElementById('carpet-width');
-  const result = document.getElementById('carpet-result');
-  
-  function calculate() {
-    const l = parseFloat(length.value) || 0;
-    const w = parseFloat(width.value) || 1;
-    result.textContent = (l * w / 10.764).toFixed(2) + ' m²';
+  // Time Greeting
+  function updateTime() {
+    const hour = new Date().getHours();
+    const greeting = hour < 12 ? 'Good Morning' : hour < 17 ? 'Good Afternoon' : 'Good Evening';
+    document.getElementById('greeting').textContent = greeting + ', AISL STAFF';
+    
+    const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+    document.getElementById('current-date').textContent = new Date().toLocaleDateString('en-US', options);
   }
+  updateTime();
+
+  // Carpet Calculator
+  const lenInput = document.getElementById('carpetLen');
+  const widInput = document.getElementById('carpetWid');
+  const result = document.getElementById('carpetResult');
   
-  length.addEventListener('input', calculate);
-  width.addEventListener('input', calculate);
-  
-  // Search
+  function calculateCarpet() {
+    const len = parseFloat(lenInput.value) || 0;
+    const wid = parseFloat(widInput.value) || 1;
+    const sqm = (len * wid * 0.0929).toFixed(2);
+    result.textContent = sqm + ' sq m';
+  }
+  lenInput.addEventListener('input', calculateCarpet);
+  widInput.addEventListener('input', calculateCarpet);
+
+  // Global Search
   const searchInput = document.getElementById('staffSearch');
   searchInput.addEventListener('input', function() {
-    const query = this.value.toLowerCase();
-    document.querySelectorAll('.table tbody tr').forEach(row => {
+    const query = this.value.toLowerCase().trim();
+    document.querySelectorAll('.inventory-row').forEach(row => {
       const text = row.textContent.toLowerCase();
-      row.style.display = query && !text.includes(query) ? 'none' : '';
+      row.classList.toggle('hidden-row', query && !text.includes(query));
     });
   });
-  
-  // 5-minute auto-refresh
-  setInterval(() => location.reload(), 300000);
-  
-  // Nav toggle
-  toggleNav('inventory');
+
+  // Smooth scroll
+  window.scrollTo = new Proxy(window.scrollTo, {
+    apply(target, thisArg, args) {
+      window.scrollTo({ behavior: 'smooth', ...args[0] });
+    }
+  });
+
+  // 5 minute auto refresh
+  setTimeout(() => location.reload(), 300000);
 });
 
 // Issue Modal
 function openIssueModal(id, name, stock, unit) {
-  document.getElementById('modal-product-id').value = id;
-  document.getElementById('modal-product-name').value = name;
-  document.getElementById('modal-product-stock').value = stock;
-  document.getElementById('modal-product-unit').value = unit;
+  document.getElementById('modal-id').value = id;
+  document.getElementById('modal-name').value = name;
+  document.getElementById('modal-stock').value = stock;
+  document.getElementById('modal-unit').value = unit;
   new bootstrap.Modal(document.getElementById('issueModal')).show();
 }
-
-function toggleNav(id) {
-  const sub = document.getElementById(id + '-sub');
-  sub.style.display = sub.style.display === 'none' ? 'block' : 'none';
-}
 </script>
+
 {% endblock %}
 
