@@ -473,8 +473,88 @@ function openIssueModal(id, name, stock, unit) {
   modal.show();
 }
 
-// === GREETING TIMER ===\nfunction updateGreeting() {\n    const hour = new Date().getHours();\n    const greeting = hour < 12 ? 'Good Morning' : hour < 17 ? 'Good Afternoon' : 'Good Evening';\n    document.getElementById('greeting').textContent = greeting + ', AISL STAFF';\n    \n    const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };\n    document.getElementById('current-date').textContent = new Date().toLocaleDateString('en-US', options);\n}\nupdateGreeting();\n\n// --- HARDWARE BARCODE SCANNER INTEGRATION ---\nlet barcodeBuffer = "";\nlet lastKeyTime = Date.now();\n\ndocument.addEventListener('keydown', (e) => {\n    const currentTime = Date.now();\n    \n    // Hardware scanners type very fast. If the interval is > 50ms, it's a human typing.\n    if (currentTime - lastKeyTime > 50) {\n        barcodeBuffer = "";\n    }\n\n    // Ignore modifier keys like Shift/Ctrl\n    if (e.key.length === 1) {\n        barcodeBuffer += e.key;\n        lastKeyTime = currentTime;\n    }\n\n    // When the scanner hits "Enter" (the default suffix for most scanners)\n    if (e.key === 'Enter' && barcodeBuffer.length > 2) {\n        processBarcode(barcodeBuffer.trim());\n        barcodeBuffer = "";\n        e.preventDefault(); // Stop the page from reloading\n    }\n});\n\nfunction processBarcode(scannedSKU) {\n    console.log("Scanned SKU:", scannedSKU);\n    \n    // 1. Automatic Search: Type the SKU into your search bar\n    const searchInput = document.getElementById('staffSearch');\n    if (searchInput) {\n        searchInput.value = scannedSKU;\n        // Trigger the input event to filter the tables automatically\n        searchInput.dispatchEvent(new Event('input'));\n    }\n\n    // 2. Visual Feedback: Highlight the row or play a sound\n    // Optional: Auto-open the Modal if a perfect match is found\n    const rows = document.querySelectorAll('.inventory-row');\n    rows.forEach(row => {\n        const skuCell = row.querySelector('td:first-child');\n        if (skuCell && skuCell.textContent.trim() === scannedSKU) {\n            row.style.backgroundColor = "#fef3c7"; // Flash yellow for success\n            setTimeout(() => row.style.backgroundColor = "", 2000);\n            \n            // Trigger the Issue button automatically for that row\n            const issueBtn = row.querySelector('.btn-warning');\n            if (issueBtn) issueBtn.click();\n        }\n    });\n}\n
+<script>
+// === 1. REAL-TIME SEARCH (Manual Typing) ===
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('staffSearch');
+    if (searchInput) {
+        searchInput.addEventListener('input', function() {
+            const searchTerm = this.value.toLowerCase();
+            const rows = document.querySelectorAll('.inventory-row');
+            rows.forEach(row => {
+                const text = row.textContent.toLowerCase();
+                row.style.display = searchTerm && !text.includes(searchTerm) ? 'none' : '';
+            });
+        });
+    }
+});
+
+// === 2. ISSUE MODAL LOGIC ===
+function openIssueModal(id, name, stock, unit) {
+    const idField = document.getElementById('modal-product-id') || document.getElementById('modal-id');
+    const nameField = document.getElementById('modal-product-name') || document.getElementById('modal-name');
+    const stockField = document.getElementById('modal-product-stock') || document.getElementById('modal-stock');
+    const unitField = document.getElementById('modal-product-unit') || document.getElementById('modal-unit');
+
+    if(idField) idField.value = id;
+    if(nameField) nameField.value = name;
+    if(stockField) stockField.value = parseFloat(stock).toFixed(3);
+    if(unitField) unitField.value = unit;
+    
+    const qtyInput = document.querySelector('input[name="quantity_used"]');
+    if(qtyInput) qtyInput.value = '';
+
+    const modalElement = document.getElementById('issueModal');
+    const modal = new bootstrap.Modal(modalElement);
+    modal.show();
+}
+
+// === 3. GREETING & DATE TIMER (This is your line 476 fix!) ===
+function updateGreeting() {
+    const hour = new Date().getHours();
+    const greeting = hour < 12 ? 'Good Morning' : hour < 17 ? 'Good Afternoon' : 'Good Evening';
+    const greetingElement = document.getElementById('greeting');
+    const dateElement = document.getElementById('current-date');
+
+    if (greetingElement) greetingElement.textContent = greeting + ', AISL STAFF';
+    if (dateElement) {
+        const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+        dateElement.textContent = new Date().toLocaleDateString('en-KE', options);
+    }
+}
+updateGreeting();
+
+// === 4. HARDWARE BARCODE SCANNER ===
+let barcodeBuffer = "";
+let lastKeyTime = Date.now();
+
+document.addEventListener('keydown', (e) => {
+    const currentTime = Date.now();
+    if (currentTime - lastKeyTime > 50) { barcodeBuffer = ""; }
+    if (e.key.length === 1) {
+        barcodeBuffer += e.key;
+        lastKeyTime = currentTime;
+    }
+    if (e.key === 'Enter' && barcodeBuffer.length > 2) {
+        processBarcode(barcodeBuffer.trim());
+        barcodeBuffer = "";
+        e.preventDefault(); 
+    }
+});
+
+function processBarcode(scannedCode) {
+    const rows = document.querySelectorAll('.inventory-row');
+    rows.forEach(row => {
+        const skuCell = row.querySelector('td:first-child');
+        if (skuCell && skuCell.textContent.trim().toLowerCase() === scannedCode.toLowerCase()) {
+            row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            row.style.backgroundColor = "#fef3c7"; 
+            setTimeout(() => row.style.backgroundColor = "", 2000);
+            const issueBtn = row.querySelector('.btn-warning');
+            if (issueBtn) issueBtn.click();
+        }
+    });
+}
 </script>
 
-{% endblock %} 
-
+{% endblock %}
