@@ -263,12 +263,7 @@ html {
     color: #e2e8f0 !important;
 }
 
-#issueModal .btn-secondary:hover {
-    background: #4a5568 !important;
-    border-color: #718096 !important;
-    color: white !important;
-}
-</style>
+.btn-secondary:hover {\n    background: #4a5568 !important;\n    border-color: #718096 !important;\n    color: white !important;\n}\n\n/* Live Header/Footer - Aviation Stealth */\n.live-header {\n    color: #ffffff;\n}\n.live-header h2 { color: #ffffff; font-weight: 700; }\n.live-header h4 { color: #fbbf24; }\n\n.live-footer {\n    position: fixed;\n    bottom: 0;\n    left: 250px;\n    right: 0;\n    background: rgba(15, 23, 42, 0.95);\n    border-top: 1px solid rgba(251, 191, 36, 0.2);\n    backdrop-filter: blur(12px);\n    z-index: 999;\n    opacity: 0.8;\n    font-size: 0.8rem;\n}\n\n@media (max-width: 768px) {\n    .live-footer { left: 0; }\n}\n</style>
 {% endblock %}
 
 {% block content %}
@@ -324,6 +319,17 @@ html {
 
     <!-- Main Content -->
     <div class="flex-grow-1" style="margin-left: 250px; padding: 2rem;">
+        <!-- Live Dynamic Header -->
+        <div class="live-header mb-4 p-3 rounded-2xl" style="background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255,255,255,0.1); backdrop-filter: blur(12px);">
+            <div class="row align-items-center">
+                <div class="col-md-6">
+                    <h2 id="live-greeting" class="fw-bold text-white mb-0 fs-3"></h2>
+                </div>
+                <div class="col-md-6 text-md-end">
+                    <h4 id="live-date" class="fw-semibold text-yellow-400 mb-0"></h4>
+                </div>
+            </div>
+        </div>
         <div class="container-fluid bg-gradient position-relative" style="min-height: 100vh; background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);">
             
             {% with messages = get_flashed_messages(with_categories=true) %}
@@ -358,10 +364,16 @@ html {
                                     <i class="fas fa-search"></i>
                                 </span>
                                 <input type="text" id="staffSearch" class="form-control form-control-lg bg-transparent border-0 text-white p-2" placeholder="🔍 Search inventory by SKU or Name...">
-                            </div>
-                        </div>
+                <!-- Live Refresh Footer -->
+                <div class="live-footer">
+                    <div class="text-center py-2">
+                        <small id="live-status" class="text-white opacity-70 fw-medium">🔴 System Live - Last Refreshed: <span id="live-time"></span></small>
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
+</div>
             </div>
 
             <!-- Aviation Paints Card -->
@@ -732,48 +744,7 @@ document.getElementById('carpetWid').addEventListener('input', updateSidebarCalc
 document.getElementById('sidebarUnit').addEventListener('change', updateSidebarCalculator);
 
 
-document.addEventListener('DOMContentLoaded', function() {
-    const searchInput = document.getElementById('staffSearch');
-    if (searchInput) {
-        let timeout;
-        searchInput.addEventListener('input', function() {
-            clearTimeout(timeout);
-            timeout = setTimeout(function() {
-                const query = searchInput.value.toLowerCase().trim();
-                // Target item-rows and table rows
-                const allRows = document.querySelectorAll('.item-row, .staff-card tbody tr');
-                let hasMatches = {paints: false, carpets: false, others: false};
-                
-                allRows.forEach(row => {
-                    const text = row.textContent.toLowerCase();
-                    if (query === '' || text.includes(query)) {
-                        row.style.display = '';
-                        // Auto-expand parent accordion if match
-                        const collapse = row.closest('.accordion-collapse');
-                        if (collapse) {
-                            collapse.classList.add('show');
-                            const id = collapse.id;
-                            if (id === 'paintsCollapse') hasMatches.paints = true;
-                            if (id === 'carpetsCollapse') hasMatches.carpets = true;
-                            if (id === 'othersCollapse') hasMatches.others = true;
-                        }
-                    } else {
-                        row.style.display = 'none';
-                    }
-                });
-                
-                // Collapse non-matching accordions
-                ['paintsCollapse', 'carpetsCollapse', 'othersCollapse'].forEach(id => {
-                    const collapse = document.getElementById(id);
-                    if (collapse && !hasMatches[id.replace('Collapse', '')]) {
-                        collapse.classList.remove('show');
-                    }
-                });
-                
-            }, 300);
-        });
-    }
-});
+// Live System Functions\nfunction getGreeting() {\n    const hour = new Date().getHours();\n    if (hour < 12) return 'Good Morning';\n    if (hour < 17) return 'Good Afternoon';\n    return 'Good Evening';\n}\n\nfunction updateLiveHeader() {\n    document.getElementById('live-greeting').textContent = `${getGreeting()}, AISL STAFF`;\n    const now = new Date();\n    const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };\n    document.getElementById('live-date').textContent = now.toLocaleDateString('en-US', options);\n}\n\nfunction updateTimestamp() {\n    document.getElementById('live-time').textContent = new Date().toLocaleTimeString();\n}\n\nfunction safeRefresh() {\n    const issueModal = bootstrap.Modal.getInstance(document.getElementById('issueModal'));\n    if (!issueModal || !document.getElementById('issueModal').classList.contains('show')) {\n        location.reload();\n    }\n}\n\ndocument.addEventListener('DOMContentLoaded', function() {\n    // Initialize live features\n    updateLiveHeader();\n    updateTimestamp();\n    \n    // Update time every 10 seconds\n    setInterval(updateTimestamp, 10000);\n    \n    // Auto refresh every 5 minutes if no modal open\n    setInterval(safeRefresh, 300000);\n    \n    const searchInput = document.getElementById('staffSearch');\n    if (searchInput) {\n        let timeout;\n        searchInput.addEventListener('input', function() {\n            clearTimeout(timeout);\n            timeout = setTimeout(function() {\n                const query = searchInput.value.toLowerCase().trim();\n                // Target item-rows and table rows\n                const allRows = document.querySelectorAll('.item-row, .staff-card tbody tr');\n                let hasMatches = {paints: false, carpets: false, others: false};\n                \n                allRows.forEach(row => {\n                    const text = row.textContent.toLowerCase();\n                    if (query === '' || text.includes(query)) {\n                        row.style.display = '';\n                        // Auto-expand parent accordion if match\n                        const collapse = row.closest('.accordion-collapse');\n                        if (collapse) {\n                            collapse.classList.add('show');\n                            const id = collapse.id;\n                            if (id === 'paintsCollapse') hasMatches.paints = true;\n                            if (id === 'carpetsCollapse') hasMatches.carpets = true;\n                            if (id === 'othersCollapse') hasMatches.others = true;\n                        }\n                    } else {\n                        row.style.display = 'none';\n                    }\n                });\n                \n                // Collapse non-matching accordions\n                ['paintsCollapse', 'carpetsCollapse', 'othersCollapse'].forEach(id => {\n                    const collapse = document.getElementById(id);\n                    if (collapse && !hasMatches[id.replace('Collapse', '')]) {\n                        collapse.classList.remove('show');\n                    }\n                });\n                \n            }, 300);\n        });\n    }\n});
 </script>
 
 {% endblock %}
