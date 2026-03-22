@@ -473,16 +473,7 @@ function openIssueModal(id, name, stock, unit) {
   modal.show();
 }
 
-// === GREETING TIMER ===
-function updateGreeting() {
-    const hour = new Date().getHours();
-    const greeting = hour < 12 ? 'Good Morning' : hour < 17 ? 'Good Afternoon' : 'Good Evening';
-    document.getElementById('greeting').textContent = greeting + ', AISL STAFF';
-    
-    const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-    document.getElementById('current-date').textContent = new Date().toLocaleDateString('en-US', options);
-}
-updateGreeting();
+// === GREETING TIMER ===\nfunction updateGreeting() {\n    const hour = new Date().getHours();\n    const greeting = hour < 12 ? 'Good Morning' : hour < 17 ? 'Good Afternoon' : 'Good Evening';\n    document.getElementById('greeting').textContent = greeting + ', AISL STAFF';\n    \n    const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };\n    document.getElementById('current-date').textContent = new Date().toLocaleDateString('en-US', options);\n}\nupdateGreeting();\n\n// --- HARDWARE BARCODE SCANNER INTEGRATION ---\nlet barcodeBuffer = "";\nlet lastKeyTime = Date.now();\n\ndocument.addEventListener('keydown', (e) => {\n    const currentTime = Date.now();\n    \n    // Hardware scanners type very fast. If the interval is > 50ms, it's a human typing.\n    if (currentTime - lastKeyTime > 50) {\n        barcodeBuffer = "";\n    }\n\n    // Ignore modifier keys like Shift/Ctrl\n    if (e.key.length === 1) {\n        barcodeBuffer += e.key;\n        lastKeyTime = currentTime;\n    }\n\n    // When the scanner hits "Enter" (the default suffix for most scanners)\n    if (e.key === 'Enter' && barcodeBuffer.length > 2) {\n        processBarcode(barcodeBuffer.trim());\n        barcodeBuffer = "";\n        e.preventDefault(); // Stop the page from reloading\n    }\n});\n\nfunction processBarcode(scannedSKU) {\n    console.log("Scanned SKU:", scannedSKU);\n    \n    // 1. Automatic Search: Type the SKU into your search bar\n    const searchInput = document.getElementById('staffSearch');\n    if (searchInput) {\n        searchInput.value = scannedSKU;\n        // Trigger the input event to filter the tables automatically\n        searchInput.dispatchEvent(new Event('input'));\n    }\n\n    // 2. Visual Feedback: Highlight the row or play a sound\n    // Optional: Auto-open the Modal if a perfect match is found\n    const rows = document.querySelectorAll('.inventory-row');\n    rows.forEach(row => {\n        const skuCell = row.querySelector('td:first-child');\n        if (skuCell && skuCell.textContent.trim() === scannedSKU) {\n            row.style.backgroundColor = "#fef3c7"; // Flash yellow for success\n            setTimeout(() => row.style.backgroundColor = "", 2000);\n            \n            // Trigger the Issue button automatically for that row\n            const issueBtn = row.querySelector('.btn-warning');\n            if (issueBtn) issueBtn.click();\n        }\n    });\n}\n
 </script>
 
 {% endblock %} 
