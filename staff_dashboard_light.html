@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+{% extends "base.html" %}
+
+{% block title %}Staff Inventory - Aviation ERP{% endblock %}
+
+{% block page_title %}Staff Inventory{% endblock %}
+
+{% block extra_styles %}
+<style>
+/* Apple-Style High-Contrast Professional Theme */
+:root {
+  --primary-navy: #1a202c;
+  --sidebar-navy: #1a202c;
+  --gold-accent: #f59e0b;
+  --electric-blue: #3b82f6;
+  --light-bg: #f4f7f6;
+  --card-white: #ffffff;
+  --text-charcoal: #2d3748;
+  --shadow-soft: 0 4px 20px rgba(0,0,0,0.05);
+  --border-thin: 1px solid #e2e8f0;
+  --table-header: #f8fafc;
+}
+
+* { box-sizing: border-box; }
+
+body, html {
+  background: var(--light-bg);
+  color: var(--text-charcoal);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* Main Content Area */
+.flex-grow-1 {
+  margin-left: 250px !important;
+  padding: 2rem;
+  background: var(--light-bg);
+  min-height: 100vh;
+}
+
+.container-fluid.bg-gradient {
+  background: var(--light-bg) !important;
+}
+
+/* Sidebar - Deep Navy Professional */
+.sidebar {
+  background: var(--sidebar-navy) !important;
+  box-shadow: 4px 0 20px rgba(0,0,0,0.1) !important;
+}
+
+.sidebar-header h3 {
+  color: var(--gold-accent) !important;
+  font-weight: 700 !important;
+  text-shadow: 0 2px 4px rgba(245,158,11,0.3);
+}
+
+.sidebar-link {
+  color: #cbd5e0 !important;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sidebar-link.active {
+  background: linear-gradient(135deg, var(--electric-blue), #60a5fa) !important;
+  color: white !important;
+  box-shadow: 0 4px 12px rgba(59,130,246,0.4);
+}
+
+.sidebar-link:hover {
+  background: rgba(59,130,246,0.1) !important;
+  color: white !important;
+  transform: translateX(8px);
+}
+
+/* Live Greeting Header - Bold Navy */
+.live-header {
+  background: var(--card-white) !important;
+  border: var(--border-thin) !important;
+  box-shadow: var(--shadow-soft) !important;
+  border-radius: 16px !important;
+  padding: 1.5rem 2rem !important;
+}
+
+.live-header h2 {
+  color: var(--primary-navy) !important;
+  font-weight: 800 !important;
+  font-size: 2rem !important;
+  letter-spacing: -0.025em;
+}
+
+.live-header h4 {
+  color: var(--text-charcoal) !important;
+  opacity: 0.8 !important;
+}
+
+/* Summary Hub - Pure White Cards */
+.summary-hub {
+  background: transparent !important;
+  padding: 0 !important;
+}
+
+.summary-card {
+  background: var(--card-white) !important;
+  border: var(--border-thin) !important;
+  box-shadow: var(--shadow-soft) !important;
+  border-radius: 12px !important;
+  padding: 2rem 1.5rem !important;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  height: 100% !important;
+  text-align: center !important;
+  backdrop-filter: blur(10px);
+}
+
+.summary-card:hover {
+  transform: translateY(-8px) scale(1.02) !important;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.12) !important;
+}
+
+.summary-card h3 {
+  color: var(--primary-navy) !important;
+  font-weight: 800 !important;
+  margin-bottom: 0.5rem !important;
+  text-shadow: none !important;
+}
+
+.summary-card p {
+  color: var(--text-charcoal) !important;
+  font-weight: 500 !important;
+  font-size: 0.95rem !important;
+  opacity: 0.9 !important;
+}
+
+/* Staff Cards - Clean White */
+.staff-card {
+  background: var(--card-white) !important;
+  border: var(--border-thin) !important;
+  box-shadow: var(--shadow-soft) !important;
+  border-radius: 16px !important;
+}
+
+/* Category Headers - Light Blue-Grey */
+.category-header {
+  background: linear-gradient(135deg, #f1f5f9, #e2e8f0) !important;
+  color: var(--text-charcoal) !important;
+  border-left: 5px solid var(--electric-blue) !important;
+  border-radius: 12px 12px 0 0 !important;
+  padding: 1.5rem !important;
+  font-weight: 600 !important;
+}
+
+/* Tables - Crisp Professional */
+.accordion-body {
+  background: transparent !important;
+  color: var(--text-charcoal) !important;
+}
+
+.accordion-body table {
+  background: var(--card-white) !important;
+  border-radius: 0 0 12px 12px !important;
+}
+
+.accordion-body th {
+  background: var(--table-header) !important;
+  color: var(--text-charcoal) !important;
+  border-bottom: 2px solid #e2e8f0 !important;
+  font-weight: 600 !important;
+  padding: 1rem 0.75rem !important;
+}
+
+.accordion-body td {
+  border-color: #f1f5f9 !important;
+  color: var(--text-charcoal) !important;
+  padding: 1rem 0.75rem !important;
+}
+
+.accordion-body tr:hover {
+  background: #f8fafc !important;
+}
+
+/* Carpet Converter - Toolbox Blue */
+.carpet-sidebar-converter {
+  background: linear-gradient(135deg, #3b82f6, #60a5fa) !important;
+  border: 2px solid rgba(255,255,255,0.3) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 4px 20px rgba(59,130,246,0.3);
+}
+
+.carpet-sidebar-converter label {
+  color: white !important;
+  font-weight: 600 !important;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.1);
+}
+
+.carpet-sidebar-converter input, .carpet-sidebar-converter select {
+  background: rgba(255,255,255,0.9) !important;
+  border: 1px solid rgba(255,255,255,0.5) !important;
+  color: var(--text-charcoal) !important;
+}
+
+/* Search Bar Clean */
+#staffSearch {
+  background: var(--card-white) !important;
+  border: 2px solid #e2e8f0 !important;
+  color: var(--text-charcoal) !important;
+  border-radius: 12px !important;
+}
+
+#staffSearch:focus {
+  border-color: var(--electric-blue) !important;
+  box-shadow: 0 0 0 4px rgba(59,130,246,0.1) !important;
+}
+
+/* Modal - Light Professional */
+#issueModal .modal-content {
+  background: var(--card-white) !important;
+  border: var(--border-thin) !important;
+  color: var(--text-charcoal) !important;
+  border-radius: 16px !important;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.15) !important;
+}
+
+#issueModal .modal-header {
+  border-bottom: var(--border-thin) !important;
+  color: var(--primary-navy) !important;
+}
+
+#issueModal .form-label {
+  color: var(--text-charcoal) !important;
+  font-weight: 600 !important;
+}
+
+#issueModal .form-control {
+  background: #fafbfc !important;
+  border: var(--border-thin) !important;
+  color: var(--text-charcoal) !important;
+  border-radius: 8px !important;
+}
+
+#issueModal .btn-warning {
+  background: linear-gradient(135deg, #f59e0b, #fbbf24) !important;
+  border: none !important;
+  color: white !important;
+  border-radius: 8px !important;
+}
+
+/* Live Footer Clean */
+.live-footer {
+  background: var(--card-white) !important;
+  border-top: var(--border-thin) !important;
+  color: var(--text-charcoal) !important;
+}
+
+/* Pulse Animation */
+@keyframes pulse {
+  0%, 100% { text-shadow: 0 0 5px rgba(245,158,11,0.5); }
+  50% { text-shadow: 0 0 20px rgba(245,158,11,0.8), 0 0 30px rgba(245,158,11,0.4); }
+}
+
+.at-risk-number {
+  animation: pulse 2s infinite !important;
+}
+
+/* Responsive Perfection */
+@media (max-width: 992px) {
+  .sidebar { transform: translateX(-100%); }
+  .flex-grow-1 { margin-left: 0 !important; }
+  .live-footer { left: 0 !important; }
+}
+</style>
+{% endblock %}
