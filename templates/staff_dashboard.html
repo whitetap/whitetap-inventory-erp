@@ -141,57 +141,66 @@ body { background: #f8fafc !important; color: #1e293b !important; }
 
     <!-- Paints Table (Exact Jinja Loop) -->
     <div id="paints-section" class="card shadow-lg mb-5">
-      <div class="card-header bg-light border-bottom">
-        <div class="d-flex justify-content-between align-items-center">
-          <div>
-            <h3 class="mb-0 fw-bold" style="color: #1e293b;">🎨 Aviation Paints & Pigments</h3>
-            <small class="text-muted">({{ paints|length }} items)</small>
-          </div>
-          <a href="{{ url_for('export_paints') }}" class="btn btn-outline-primary btn-sm">
-            <i class="fas fa-download"></i> CSV
-          </a>
-        </div>
+  <div class="card-header bg-light border-bottom" 
+       data-bs-toggle="collapse" 
+       data-bs-target="#paintsCollapse" 
+       style="cursor: pointer;">
+    <div class="d-flex justify-content-between align-items-center">
+      <div>
+        <h3 class="mb-0 fw-bold" style="color: #1e293b;">
+          🎨 Aviation Paints & Pigments 
+          <small class="text-muted ms-2" style="font-size: 0.6em;">(Click to Toggle)</small>
+        </h3>
+        <small class="text-muted">({{ paints|length }} items)</small>
       </div>
-      <div class="card-body p-0">
-        <div class="table-responsive">
-          <table class="table table-hover mb-0">
-            <thead class="table-light">
-              <tr>
-                <th>SKU</th>
-                <th>Name</th>
-                <th>Unit</th>
-                <th class="text-end">Stock</th>
-                <th class="text-end">Min Level</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for product in paints %}
-              <tr class="inventory-row">
-                <td class="fw-semibold">{{ product.sku or '-' }}</td>
-                <td>{{ product.name }}</td>
-                <td>{{ product.unit_of_measure or '-' }}</td>
-                <td class="fw-bold text-end {{ 'text-danger' if (product.current_stock or 0) < (product.min_stock_level or 0) else 'text-success' }}">
-                  {{ "%.2f"|format(product.current_stock or 0) }}
-                </td>
-                <td class="text-end">{{ "%.2f"|format(product.min_stock_level or 0) }}</td>
-                <td>
-                  {% if (product.current_stock or 0) < (product.min_stock_level or 0) %}
-                    <span class="badge bg-warning text-dark">⚠️ Low</span>
-                  {% else %}
-                    <span class="badge bg-success">✅ OK</span>
-                  {% endif %}
-                  <button class="btn btn-sm btn-warning ms-1" onclick="openIssueModal('{{ product.id }}', '{{ product.name }}', {{ product.current_stock }}, '{{ product.unit_of_measure }}')">
-                    📤 Issue
-                  </button>
-                </td>
-              </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
+      <a href="{{ url_for('export_paints') }}" class="btn btn-outline-primary btn-sm" onclick="event.stopPropagation();">
+        <i class="fas fa-download"></i> CSV
+      </a>
+    </div>
+  </div>
+
+  <div class="collapse show" id="paintsCollapse">
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-hover mb-0">
+          <thead class="table-light">
+            <tr>
+              <th>SKU</th>
+              <th>Name</th>
+              <th>Unit</th>
+              <th class="text-end">Stock</th>
+              <th class="text-end">Min Level</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for product in paints %}
+            <tr class="inventory-row">
+              <td class="fw-semibold">{{ product.sku or '-' }}</td>
+              <td>{{ product.name }}</td>
+              <td>{{ product.unit_of_measure or '-' }}</td>
+              <td class="fw-bold text-end {{ 'text-danger' if (product.current_stock or 0) < (product.min_stock_level or 0) else 'text-success' }}">
+                {{ "%.2f"|format(product.current_stock or 0) }}
+              </td>
+              <td class="text-end">{{ "%.2f"|format(product.min_stock_level or 0) }}</td>
+              <td>
+                {% if (product.current_stock or 0) < (product.min_stock_level or 0) %}
+                  <span class="badge bg-warning text-dark">⚠️ Low</span>
+                {% else %}
+                  <span class="badge bg-success">✅ OK</span>
+                {% endif %}
+                <button class="btn btn-sm btn-warning ms-1" onclick="openIssueModal('{{ product.id }}', '{{ product.name }}', {{ product.current_stock }}, '{{ product.unit_of_measure }}')">
+                  📤 Issue
+                </button>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
       </div>
     </div>
+  </div>
+</div>
 
     <!-- Carpets Table (Exact Jinja Loop) -->
     <div id="carpets-section" class="card shadow-lg mb-5">
