@@ -102,32 +102,43 @@ body { background: #f8fafc !important; color: #1e293b !important; }
     </div>
 
     <!-- 4 Summary Cards -->
-    <div class="row g-4 mb-5">
-      <div class="col-lg-3 col-md-6">
-        <div class="card summary-card h-100 text-center p-4">
-          <h2 class="display-4 fw-bold mb-1" style="color: #3b82f6;">{{ (paints|length + carpets|length + others|length) }}</h2>
-          <p class="mb-0 fw-semibold text-muted">Total Items</p>
-        </div>
-      </div>
-      <div class="col-lg-3 col-md-6">
-        <div class="card summary-card h-100 text-center p-4">
-          <h2 class="display-4 fw-bold mb-1" style="color: #ef4444;">{{ low_stock_count }}</h2>
-          <p class="mb-0 fw-semibold text-muted">Low Stock Alerts</p>
-        </div>
-      </div>
-      <div class="col-lg-3 col-md-6">
-        <div class="card summary-card h-100 text-center p-4">
-          <h2 class="display-4 fw-bold mb-1" style="color: #10b981;">{{ recent_logs|length }}</h2>
-          <p class="mb-0 fw-semibold text-muted">Recent Activity</p>
-        </div>
-      </div>
-      <div class="col-lg-3 col-md-6">
-        <div class="card summary-card h-100 text-center p-4">
-          <h2 class="display-4 fw-bold mb-1 forecast-glow" style="color: #f59e0b;">{{ at_risk_count }}</h2>
-          <p class="mb-0 fw-semibold text-muted">30-Day Forecast</p>
-        </div>
+    <div class="row g-4 mb-4">
+  <div class="col-md-3">
+    <div class="card bg-dark border-secondary h-100 shadow-sm">
+      <div class="card-body text-center p-4">
+        <h2 class="display-5 fw-bold text-primary mb-0">26</h2>
+        <p class="small fw-bold text-uppercase mt-2 mb-0" style="color: #cbd5e1; letter-spacing: 1px;">Total Items</p>
       </div>
     </div>
+  </div>
+
+  <div class="col-md-3">
+    <div class="card bg-dark border-secondary h-100 shadow-sm">
+      <div class="card-body text-center p-4">
+        <h2 class="display-5 fw-bold text-danger mb-0">--</h2>
+        <p class="small fw-bold text-uppercase mt-2 mb-0" style="color: #cbd5e1; letter-spacing: 1px;">Low Stock Alerts</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-3">
+    <div class="card bg-dark border-secondary h-100 shadow-sm">
+      <div class="card-body text-center p-4">
+        <h2 class="display-5 fw-bold text-success mb-0">10</h2>
+        <p class="small fw-bold text-uppercase mt-2 mb-0" style="color: #cbd5e1; letter-spacing: 1px;">Recent Activity</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-3">
+    <div class="card bg-dark border-secondary h-100 shadow-sm">
+      <div class="card-body text-center p-4">
+        <h2 class="display-5 fw-bold text-warning mb-0">18</h2>
+        <p class="small fw-bold text-uppercase mt-2 mb-0" style="color: #cbd5e1; letter-spacing: 1px;">30-Day Forecast</p>
+      </div>
+    </div>
+  </div>
+</div>
 
     <!-- Full-Width Search -->
     <div class="mb-5">
