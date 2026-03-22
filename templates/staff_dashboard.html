@@ -443,15 +443,42 @@ document.addEventListener('DOMContentLoaded', function() {
   setTimeout(() => location.reload(), 300000);
 });
 
-// Issue Modal
+// --- REAL-TIME SEARCH LOGIC ---
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('staffSearch');
+    
+    if (searchInput) {
+        searchInput.addEventListener('input', function() {
+            const searchTerm = this.value.toLowerCase();
+            // Targets every row inside your inventory tables
+            const rows = document.querySelectorAll('tbody tr');
+
+            rows.forEach(row => {
+                // Get the text from the SKU and Name columns specifically
+                const text = row.textContent.toLowerCase();
+                
+                // If the row contains the search term, show it; otherwise, hide it
+                if (text.includes(searchTerm)) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+        });
+    }
+});
+
+// --- ISSUE MODAL LOGIC ---
 function openIssueModal(id, name, stock, unit) {
   document.getElementById('modal-id').value = id;
   document.getElementById('modal-name').value = name;
   document.getElementById('modal-stock').value = stock;
   document.getElementById('modal-unit').value = unit;
-  new bootstrap.Modal(document.getElementById('issueModal')).show();
+  
+  // Initialize and show the Bootstrap modal
+  var myModal = new bootstrap.Modal(document.getElementById('issueModal'));
+  myModal.show();
 }
 </script>
 
 {% endblock %}
-
