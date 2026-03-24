@@ -1,16 +1,12 @@
-# Aviation ERP Staff Dashboard Fixes (Real-Time Search & Carpet Calculator)
+# Fix Real-Time Search in staff_dashboard.html - TODO Steps
 
-**Status: In Progress**
+**Status: 4/4 completed**
 
-## Steps:
-- [x] Step 1: Analyzed project structure using search_files and read_file on templates/staff_dashboard.html
-- [x] Step 2: Identified key elements (#staffSearch, .inventory-row, #carpetUnit, #carpetLen, #carpetWid, #carpetResult)
-- [x] Step 3: Created detailed edit plan (enhanced search, new calculator logic with yards conversion)
-- [x] Step 4: User approved the plan
-- [x] Step 5: Edit HTML to add id="carpetUnitLabel" to result small tag
-- [x] Step 6: Update <script> section with fixed search (debounced real-time) and full calculator (unit change auto-converts width, live area calc to 3 decimals)
-- [x] Step 7: Verify changes with browser test (search filters instantly across tables, calculator: yards→width=2.187, area updates)
-- [x] Step 8: Update TODO.md to completed and attempt_completion
+1. [✅] Create TODO.md tracking progress 
+2. [✅] Edit templates/staff_dashboard.html: Implement global document event listener for #staffSearch with !important display toggles ('table-row'/'none'), trimmed lowercase search on row.innerText, preserve all existing functions.
+3. [✅] Verify carpet calculator: Ensure updateCarpetCalculator robustly sets carpetWid.value on unit change (meters/yds/in).
+4. [✅] Test & attempt_completion: Confirm search filters .inventory-row instantly, carpetWid updates on toggle.
 
-**Next Action:** Implementing precise edits now.
+Task complete.
 
+**Notes:** No new files. Direct JS fixes in existing <script> block. User approved plan (no TODO.md new file? - using existing as per dir).
