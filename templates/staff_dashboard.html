@@ -445,47 +445,47 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     // === 2. CARPET/SERVICE CALCULATOR ===
-    const METER_TO_YARD = 1.09361;
-    const WIDTH_METERS = 2.00;
-    const carpetUnit = document.getElementById('carpetUnit');
-    const carpetLen = document.getElementById('carpetLen');
-    const carpetWid = document.getElementById('carpetWid');
-    const carpetResult = document.getElementById('carpetResult');
-    const carpetUnitLabel = document.getElementById('carpetUnitLabel');
-
     function updateCarpetCalculator() {
-        const unit = carpetUnit ? carpetUnit.value : 'meters';
-        const len = parseFloat(carpetLen ? carpetLen.value || 0 : 0);
-        let wid = WIDTH_METERS;
+    const unit = document.getElementById('carpetUnit').value;
+    const inputLen = parseFloat(document.getElementById('carpetLen').value || 0);
+    const inputWid = parseFloat(document.getElementById('carpetWid').value || 0);
+    const resultDisplay = document.getElementById('carpetResult');
+    const unitLabel = document.getElementById('carpetUnitLabel');
 
-        if (unit === 'yards') {
-            wid = WIDTH_METERS * METER_TO_YARD;
-            if (carpetUnitLabel) carpetUnitLabel.textContent = ' sq yd';
-        } else if (unit === 'meters') {
-            wid = WIDTH_METERS;
-            if (carpetUnitLabel) carpetUnitLabel.textContent = ' sq m';
-        } else { // inches
-            wid = WIDTH_METERS * 39.3701;
-            if (carpetUnitLabel) carpetUnitLabel.textContent = ' sq in';
-        }
+    let lengthInMeters = 0;
+    let widthInMeters = 0;
 
-        // Force width update for carpet calculator fix
-        if (carpetWid) {
-            carpetWid.value = wid.toFixed(3);
-            carpetWid.dispatchEvent(new Event('input', { bubbles: true }));
-        }
+    // Conversion Factors
+    const INCH_TO_METER = 0.0254;
+    const YARD_TO_METER = 0.9144;
 
-        const area = len * wid;
-        if (carpetResult) {
-            carpetResult.textContent = isNaN(area) || area === 0 ? '0.000' : area.toFixed(3);
-        }
+    if (unit === 'inches') {
+        lengthInMeters = inputLen * INCH_TO_METER;
+        widthInMeters = inputWid * INCH_TO_METER;
+    } else if (unit === 'yards') {
+        lengthInMeters = inputLen * YARD_TO_METER;
+        widthInMeters = inputWid * YARD_TO_METER;
+    } else {
+        // Default to meters if something else is selected
+        lengthInMeters = inputLen;
+        widthInMeters = inputWid;
     }
 
-    if (carpetUnit) carpetUnit.addEventListener('change', updateCarpetCalculator);
-    if (carpetLen) carpetLen.addEventListener('input', updateCarpetCalculator);
-    
-    updateCarpetCalculator(); // Run once on load
-});
+    const areaM2 = lengthInMeters * widthInMeters;
+
+    if (resultDisplay) {
+        // Show result in m2 to match your stock records
+        resultDisplay.textContent = areaM2.toFixed(3);
+    }
+    if (unitLabel) {
+        unitLabel.textContent = ' sq m';
+    }
+}
+
+// Attach listeners to all inputs
+document.getElementById('carpetUnit').addEventListener('change', updateCarpetCalculator);
+document.getElementById('carpetLen').addEventListener('input', updateCarpetCalculator);
+document.getElementById('carpetWid').addEventListener('input', updateCarpetCalculator);
 
 // === 3. ISSUE MODAL LOGIC ===
 function openIssueModal(id, name, stock, unit) {
