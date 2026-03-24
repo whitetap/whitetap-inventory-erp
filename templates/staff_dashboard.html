@@ -429,7 +429,7 @@ body { background: #f8fafc !important; color: #1e293b !important; }
 <parameter name="path">templates/staff_dashboard.html
        <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // 1. Global search listener
+    // === 1. SEARCH LOGIC (KEEPING IT WORKING) ===
     document.addEventListener('input', function(e) {
         if (e.target.id === 'staffSearch') {
             const term = e.target.value.toLowerCase().trim();
@@ -444,7 +444,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    /// === 2. DYNAMIC CARPET CALCULATOR (Safe Version) ===
+    // === 2. DYNAMIC CARPET CALCULATOR (THE MAGIC) ===
     function updateCarpetCalculator() {
         const unit = document.getElementById('carpetUnit').value;
         const inputLen = parseFloat(document.getElementById('carpetLen').value || 0);
@@ -452,55 +452,61 @@ document.addEventListener('DOMContentLoaded', function() {
         const resultDisplay = document.getElementById('carpetResult');
 
         let lengthInMeters = 0;
-        let widthInMeters = inputWid; // Treat width as the direct value entered
+        let widthInMeters = 0;
 
-        // Conversion factors to get Length into Meters
         const INCH_TO_METER = 0.0254;
         const YARD_TO_METER = 0.9144;
 
         if (unit === 'inches') {
             lengthInMeters = inputLen * INCH_TO_METER;
+            widthInMeters = inputWid * INCH_TO_METER;
         } else if (unit === 'yards') {
             lengthInMeters = inputLen * YARD_TO_METER;
+            widthInMeters = inputWid * YARD_TO_METER;
         } else {
             lengthInMeters = inputLen;
+            widthInMeters = inputWid;
         }
 
-        // Final Calculation: Length(m) x Width(m)
         const areaM2 = lengthInMeters * widthInMeters;
-
         if (resultDisplay) {
             resultDisplay.textContent = areaM2.toFixed(3);
         }
     }
 
-// === 3. ISSUE MODAL LOGIC ===
+    // Attach listeners so it updates AS YOU TYPE
+    const ids = ['carpetUnit', 'carpetLen', 'carpetWid'];
+    ids.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.addEventListener(id === 'carpetUnit' ? 'change' : 'input', updateCarpetCalculator);
+        }
+    });
+
+}); // <--- THIS CLOSES THE WRAPPER. DO NOT REMOVE.
+
+// === 3. OTHER FUNCTIONS (MODAL, GREETING, SCANNER) ===
 function openIssueModal(id, name, stock, unit) {
     const idField = document.getElementById('modal-product-id') || document.getElementById('modal-id');
     const nameField = document.getElementById('modal-product-name') || document.getElementById('modal-name');
     const stockField = document.getElementById('modal-product-stock') || document.getElementById('modal-stock');
     const unitField = document.getElementById('modal-product-unit') || document.getElementById('modal-unit');
-
     if(idField) idField.value = id;
     if(nameField) nameField.value = name;
     if(stockField) stockField.value = parseFloat(stock).toFixed(3);
     if(unitField) unitField.value = unit;
-    
-    const qtyInput = document.querySelector('input[name="quantity_used"]');
-    if(qtyInput) qtyInput.value = '';
-
     const modalElement = document.getElementById('issueModal');
-    const modal = new bootstrap.Modal(modalElement);
-    modal.show();
+    if (modalElement) {
+        const modal = new bootstrap.Modal(modalElement);
+        modal.show();
+    }
 }
 
-// === 4. GREETING & DATE TIMER ===
 function updateGreeting() {
     const hour = new Date().getHours();
     const greeting = hour < 12 ? 'Good Morning' : hour < 17 ? 'Good Afternoon' : 'Good Evening';
     const gElem = document.getElementById('greeting');
     const dElem = document.getElementById('current-date');
-
     if (gElem) gElem.textContent = greeting + ', AISL STAFF';
     if (dElem) {
         const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
@@ -509,10 +515,9 @@ function updateGreeting() {
 }
 updateGreeting();
 
-// === 5. BARCODE SCANNER ===
+// Barcode Scanner Logic (Simplified)
 let barcodeBuffer = "";
 let lastKeyTime = Date.now();
-
 document.addEventListener('keydown', (e) => {
     const currentTime = Date.now();
     if (currentTime - lastKeyTime > 50) { barcodeBuffer = ""; }
@@ -521,25 +526,18 @@ document.addEventListener('keydown', (e) => {
         lastKeyTime = currentTime;
     }
     if (e.key === 'Enter' && barcodeBuffer.length > 2) {
-        processBarcode(barcodeBuffer.trim());
+        const rows = document.querySelectorAll('.inventory-row');
+        rows.forEach(row => {
+            const sku = row.querySelector('td:first-child');
+            if (sku && sku.textContent.trim().toLowerCase() === barcodeBuffer.trim().toLowerCase()) {
+                row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                row.querySelector('.btn-warning')?.click();
+            }
+        });
         barcodeBuffer = "";
         e.preventDefault(); 
     }
 });
-
-function processBarcode(scannedCode) {
-    const rows = document.querySelectorAll('.inventory-row');
-    rows.forEach(row => {
-        const skuCell = row.querySelector('td:first-child');
-        if (skuCell && skuCell.textContent.trim().toLowerCase() === scannedCode.toLowerCase()) {
-            row.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            row.style.backgroundColor = "#fef3c7"; 
-            setTimeout(() => row.style.backgroundColor = "", 2000);
-            const issueBtn = row.querySelector('.btn-warning');
-            if (issueBtn) issueBtn.click();
-        }
-    });
-}
 </script>
 
 {% endblock %}
