@@ -444,43 +444,33 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // === 2. FULLY FLEXIBLE CARPET CALCULATOR ===
+    /// === 2. DYNAMIC CARPET CALCULATOR (Safe Version) ===
     function updateCarpetCalculator() {
         const unit = document.getElementById('carpetUnit').value;
         const inputLen = parseFloat(document.getElementById('carpetLen').value || 0);
         const inputWid = parseFloat(document.getElementById('carpetWid').value || 0);
         const resultDisplay = document.getElementById('carpetResult');
-        const unitLabel = document.getElementById('carpetUnitLabel');
 
         let lengthInMeters = 0;
-        let widthInMeters = 0;
+        let widthInMeters = inputWid; // Treat width as the direct value entered
 
-        // Conversion constants
-        const INCH_TO_METER = 0.0254; // 1 inch = 0.0254m
-        const YARD_TO_METER = 0.9144; // 1 yard = 0.9144m
+        // Conversion factors to get Length into Meters
+        const INCH_TO_METER = 0.0254;
+        const YARD_TO_METER = 0.9144;
 
         if (unit === 'inches') {
-            // Convert both Length AND Width from Inches to Meters
             lengthInMeters = inputLen * INCH_TO_METER;
-            widthInMeters = inputWid * INCH_TO_METER;
         } else if (unit === 'yards') {
-            // Convert both Length AND Width from Yards to Meters
             lengthInMeters = inputLen * YARD_TO_METER;
-            widthInMeters = inputWid * YARD_TO_METER;
         } else {
-            // Already in Meters
             lengthInMeters = inputLen;
-            widthInMeters = inputWid;
         }
 
-        // Final Area in m2 (Square Meters)
+        // Final Calculation: Length(m) x Width(m)
         const areaM2 = lengthInMeters * widthInMeters;
 
         if (resultDisplay) {
             resultDisplay.textContent = areaM2.toFixed(3);
-        }
-        if (unitLabel) {
-            unitLabel.textContent = ' sq m';
         }
     }
 
