@@ -444,7 +444,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // === 2. CARPET/SERVICE CALCULATOR ===
+    // === 2. FULLY FLEXIBLE CARPET CALCULATOR ===
     function updateCarpetCalculator() {
         const unit = document.getElementById('carpetUnit').value;
         const inputLen = parseFloat(document.getElementById('carpetLen').value || 0);
@@ -454,33 +454,35 @@ document.addEventListener('DOMContentLoaded', function() {
 
         let lengthInMeters = 0;
         let widthInMeters = 0;
-        const INCH_TO_METER = 0.0254;
-        const YARD_TO_METER = 0.9144;
+
+        // Conversion constants
+        const INCH_TO_METER = 0.0254; // 1 inch = 0.0254m
+        const YARD_TO_METER = 0.9144; // 1 yard = 0.9144m
 
         if (unit === 'inches') {
+            // Convert both Length AND Width from Inches to Meters
             lengthInMeters = inputLen * INCH_TO_METER;
             widthInMeters = inputWid * INCH_TO_METER;
         } else if (unit === 'yards') {
+            // Convert both Length AND Width from Yards to Meters
             lengthInMeters = inputLen * YARD_TO_METER;
             widthInMeters = inputWid * YARD_TO_METER;
         } else {
+            // Already in Meters
             lengthInMeters = inputLen;
             widthInMeters = inputWid;
         }
 
+        // Final Area in m2 (Square Meters)
         const areaM2 = lengthInMeters * widthInMeters;
-        if (resultDisplay) resultDisplay.textContent = areaM2.toFixed(3);
-        if (unitLabel) unitLabel.textContent = ' sq m';
+
+        if (resultDisplay) {
+            resultDisplay.textContent = areaM2.toFixed(3);
+        }
+        if (unitLabel) {
+            unitLabel.textContent = ' sq m';
+        }
     }
-
-    const carpetUnit = document.getElementById('carpetUnit');
-    const carpetLen = document.getElementById('carpetLen');
-    const carpetWid = document.getElementById('carpetWid');
-    if (carpetUnit) carpetUnit.addEventListener('change', updateCarpetCalculator);
-    if (carpetLen) carpetLen.addEventListener('input', updateCarpetCalculator);
-    if (carpetWid) carpetWid.addEventListener('input', updateCarpetCalculator);
-
-}); // <--- THIS WAS MISSING! It closes the DOMContentLoaded block.
 
 // === 3. ISSUE MODAL LOGIC ===
 function openIssueModal(id, name, stock, unit) {
