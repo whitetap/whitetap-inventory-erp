@@ -427,20 +427,22 @@ body { background: #f8fafc !important; color: #1e293b !important; }
 
 <xai:function_call name="edit_file">
 <parameter name="path">templates/staff_dashboard.html
-        // FIXED Real-Time Search - Event Delegation + CSS !important Override
-        document.addEventListener('input', function(e) {
-            if (e.target.id === 'staffSearch') {
-                const term = e.target.value.toLowerCase().trim();
-                document.querySelectorAll('.inventory-row').forEach(row => {
-                    const text = row.innerText.toLowerCase();
-                    if (term.length === 0 || text.includes(term)) {
-                        row.style.setProperty('display', '', 'important');
-                    } else {
-                        row.style.setProperty('display', 'none', 'important');
-                    }
-                });
-            }
-        });
+        <script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Global search listener (catches dynamic loads)
+    document.addEventListener('input', function(e) {
+        if (e.target.id === 'staffSearch') {
+            const term = e.target.value.toLowerCase().trim();
+            document.querySelectorAll('.inventory-row').forEach(row => {
+                const text = row.innerText.toLowerCase();
+                if (term.length === 0 || text.includes(term)) {
+                    row.style.setProperty('display', 'table-row', 'important');
+                } else {
+                    row.style.setProperty('display', 'none', 'important');
+                }
+            });
+        }
+    });
 
     // === 2. CARPET/SERVICE CALCULATOR ===
     const METER_TO_YARD = 1.09361;
@@ -454,21 +456,23 @@ body { background: #f8fafc !important; color: #1e293b !important; }
     function updateCarpetCalculator() {
         const unit = carpetUnit ? carpetUnit.value : 'meters';
         const len = parseFloat(carpetLen ? carpetLen.value || 0 : 0);
-        let wid = parseFloat(carpetWid ? carpetWid.value || WIDTH_METERS : WIDTH_METERS);
+        let wid = WIDTH_METERS;
 
-        // Auto-convert width on unit change
         if (unit === 'yards') {
             wid = WIDTH_METERS * METER_TO_YARD;
-            if (carpetWid) carpetWid.value = wid.toFixed(3);
             if (carpetUnitLabel) carpetUnitLabel.textContent = ' sq yd';
         } else if (unit === 'meters') {
             wid = WIDTH_METERS;
-            if (carpetWid) carpetWid.value = wid.toFixed(3);
             if (carpetUnitLabel) carpetUnitLabel.textContent = ' sq m';
         } else { // inches
             wid = WIDTH_METERS * 39.3701;
-            if (carpetWid) carpetWid.value = wid.toFixed(3);
             if (carpetUnitLabel) carpetUnitLabel.textContent = ' sq in';
+        }
+
+        // Force width update for carpet calculator fix
+        if (carpetWid) {
+            carpetWid.value = wid.toFixed(3);
+            carpetWid.dispatchEvent(new Event('input', { bubbles: true }));
         }
 
         const area = len * wid;
@@ -477,14 +481,13 @@ body { background: #f8fafc !important; color: #1e293b !important; }
         }
     }
 
-    // Event listeners
     if (carpetUnit) carpetUnit.addEventListener('change', updateCarpetCalculator);
     if (carpetLen) carpetLen.addEventListener('input', updateCarpetCalculator);
-    // Initial calc
-    updateCarpetCalculator();
+    
+    updateCarpetCalculator(); // Run once on load
 });
 
-// === 2. ISSUE MODAL LOGIC ===
+// === 3. ISSUE MODAL LOGIC ===
 function openIssueModal(id, name, stock, unit) {
     const idField = document.getElementById('modal-product-id') || document.getElementById('modal-id');
     const nameField = document.getElementById('modal-product-name') || document.getElementById('modal-name');
@@ -504,22 +507,22 @@ function openIssueModal(id, name, stock, unit) {
     modal.show();
 }
 
-// === 3. GREETING & DATE TIMER (This is your line 476 fix!) ===
+// === 4. GREETING & DATE TIMER ===
 function updateGreeting() {
     const hour = new Date().getHours();
     const greeting = hour < 12 ? 'Good Morning' : hour < 17 ? 'Good Afternoon' : 'Good Evening';
-    const greetingElement = document.getElementById('greeting');
-    const dateElement = document.getElementById('current-date');
+    const gElem = document.getElementById('greeting');
+    const dElem = document.getElementById('current-date');
 
-    if (greetingElement) greetingElement.textContent = greeting + ', AISL STAFF';
-    if (dateElement) {
+    if (gElem) gElem.textContent = greeting + ', AISL STAFF';
+    if (dElem) {
         const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-        dateElement.textContent = new Date().toLocaleDateString('en-KE', options);
+        dElem.textContent = new Date().toLocaleDateString('en-KE', options);
     }
 }
 updateGreeting();
 
-// === 4. HARDWARE BARCODE SCANNER ===
+// === 5. BARCODE SCANNER ===
 let barcodeBuffer = "";
 let lastKeyTime = Date.now();
 
@@ -551,5 +554,3 @@ function processBarcode(scannedCode) {
     });
 }
 </script>
-
-{% endblock %}
