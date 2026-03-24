@@ -444,7 +444,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // === 2. CARPET/SERVICE CALCULATOR ===
+    // === 2. CARPET/SERVICE CALCULATOR (Fixed Dynamic Updates) ===
     function updateCarpetCalculator() {
     const unit = document.getElementById('carpetUnit').value;
     const inputLen = parseFloat(document.getElementById('carpetLen').value || 0);
@@ -483,9 +483,12 @@ document.addEventListener('DOMContentLoaded', function() {
 }
 
 // Attach listeners to all inputs
-document.getElementById('carpetUnit').addEventListener('change', updateCarpetCalculator);
-document.getElementById('carpetLen').addEventListener('input', updateCarpetCalculator);
-document.getElementById('carpetWid').addEventListener('input', updateCarpetCalculator);
+const carpetUnit = document.getElementById('carpetUnit');
+const carpetLen = document.getElementById('carpetLen');
+const carpetWid = document.getElementById('carpetWid');
+if (carpetUnit) carpetUnit.addEventListener('change', updateCarpetCalculator);
+if (carpetLen) carpetLen.addEventListener('input', updateCarpetCalculator);
+if (carpetWid) carpetWid.addEventListener('input', updateCarpetCalculator);
 
 // === 3. ISSUE MODAL LOGIC ===
 function openIssueModal(id, name, stock, unit) {
