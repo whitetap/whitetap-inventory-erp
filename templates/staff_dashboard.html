@@ -427,9 +427,9 @@ body { background: #f8fafc !important; color: #1e293b !important; }
 
 <xai:function_call name="edit_file">
 <parameter name="path">templates/staff_dashboard.html
-        <script>
+       <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Global search listener (catches dynamic loads)
+    // 1. Global search listener
     document.addEventListener('input', function(e) {
         if (e.target.id === 'staffSearch') {
             const term = e.target.value.toLowerCase().trim();
@@ -444,51 +444,43 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // === 2. CARPET/SERVICE CALCULATOR (Fixed Dynamic Updates) ===
+    // === 2. CARPET/SERVICE CALCULATOR ===
     function updateCarpetCalculator() {
-    const unit = document.getElementById('carpetUnit').value;
-    const inputLen = parseFloat(document.getElementById('carpetLen').value || 0);
-    const inputWid = parseFloat(document.getElementById('carpetWid').value || 0);
-    const resultDisplay = document.getElementById('carpetResult');
-    const unitLabel = document.getElementById('carpetUnitLabel');
+        const unit = document.getElementById('carpetUnit').value;
+        const inputLen = parseFloat(document.getElementById('carpetLen').value || 0);
+        const inputWid = parseFloat(document.getElementById('carpetWid').value || 0);
+        const resultDisplay = document.getElementById('carpetResult');
+        const unitLabel = document.getElementById('carpetUnitLabel');
 
-    let lengthInMeters = 0;
-    let widthInMeters = 0;
+        let lengthInMeters = 0;
+        let widthInMeters = 0;
+        const INCH_TO_METER = 0.0254;
+        const YARD_TO_METER = 0.9144;
 
-    // Conversion Factors
-    const INCH_TO_METER = 0.0254;
-    const YARD_TO_METER = 0.9144;
+        if (unit === 'inches') {
+            lengthInMeters = inputLen * INCH_TO_METER;
+            widthInMeters = inputWid * INCH_TO_METER;
+        } else if (unit === 'yards') {
+            lengthInMeters = inputLen * YARD_TO_METER;
+            widthInMeters = inputWid * YARD_TO_METER;
+        } else {
+            lengthInMeters = inputLen;
+            widthInMeters = inputWid;
+        }
 
-    if (unit === 'inches') {
-        lengthInMeters = inputLen * INCH_TO_METER;
-        widthInMeters = inputWid * INCH_TO_METER;
-    } else if (unit === 'yards') {
-        lengthInMeters = inputLen * YARD_TO_METER;
-        widthInMeters = inputWid * YARD_TO_METER;
-    } else {
-        // Default to meters if something else is selected
-        lengthInMeters = inputLen;
-        widthInMeters = inputWid;
+        const areaM2 = lengthInMeters * widthInMeters;
+        if (resultDisplay) resultDisplay.textContent = areaM2.toFixed(3);
+        if (unitLabel) unitLabel.textContent = ' sq m';
     }
 
-    const areaM2 = lengthInMeters * widthInMeters;
+    const carpetUnit = document.getElementById('carpetUnit');
+    const carpetLen = document.getElementById('carpetLen');
+    const carpetWid = document.getElementById('carpetWid');
+    if (carpetUnit) carpetUnit.addEventListener('change', updateCarpetCalculator);
+    if (carpetLen) carpetLen.addEventListener('input', updateCarpetCalculator);
+    if (carpetWid) carpetWid.addEventListener('input', updateCarpetCalculator);
 
-    if (resultDisplay) {
-        // Show result in m2 to match your stock records
-        resultDisplay.textContent = areaM2.toFixed(3);
-    }
-    if (unitLabel) {
-        unitLabel.textContent = ' sq m';
-    }
-}
-
-// Attach listeners to all inputs
-const carpetUnit = document.getElementById('carpetUnit');
-const carpetLen = document.getElementById('carpetLen');
-const carpetWid = document.getElementById('carpetWid');
-if (carpetUnit) carpetUnit.addEventListener('change', updateCarpetCalculator);
-if (carpetLen) carpetLen.addEventListener('input', updateCarpetCalculator);
-if (carpetWid) carpetWid.addEventListener('input', updateCarpetCalculator);
+}); // <--- THIS WAS MISSING! It closes the DOMContentLoaded block.
 
 // === 3. ISSUE MODAL LOGIC ===
 function openIssueModal(id, name, stock, unit) {
