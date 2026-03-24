@@ -146,7 +146,7 @@ body { background: #f8fafc !important; color: #1e293b !important; }
         <span class="input-group-text bg-white border-end-0">
           <i class="fas fa-search text-muted"></i>
         </span>
-        <input input type="text" id="staffSearch" class="form-control" placeholder="Search by SKU, Name, or Category...">
+        <input type="text" id="staffSearch" class="form-control" placeholder="Search by SKU, Name, or Category...">
       </div>
     </div>
 
@@ -427,32 +427,20 @@ body { background: #f8fafc !important; color: #1e293b !important; }
 
 <xai:function_call name="edit_file">
 <parameter name="path">templates/staff_dashboard.html
-// === 1. REAL-TIME SEARCH (Manual Typing) ===
-document.addEventListener('DOMContentLoaded', function() {
-    const searchInput = document.getElementById('staffSearch');
-    
-    if (searchInput) {
-        searchInput.addEventListener('input', function() {
-            const searchTerm = this.value.toLowerCase().trim();
-            // This targets every row in your inventory table
-            const rows = document.querySelectorAll('.inventory-row');
-            
-            rows.forEach(row => {
-                // Get all text inside the row to allow searching by SKU, Name, or Unit
-                const rowText = row.textContent.toLowerCase();
-                
-                if (rowText.includes(searchTerm)) {
-                    row.style.display = ""; // Show row
-                } else {
-                    row.style.display = "none"; // Hide row
-                }
-            });
+        // FIXED Real-Time Search - Event Delegation + CSS !important Override
+        document.addEventListener('input', function(e) {
+            if (e.target.id === 'staffSearch') {
+                const term = e.target.value.toLowerCase().trim();
+                document.querySelectorAll('.inventory-row').forEach(row => {
+                    const text = row.innerText.toLowerCase();
+                    if (term.length === 0 || text.includes(term)) {
+                        row.style.setProperty('display', '', 'important');
+                    } else {
+                        row.style.setProperty('display', 'none', 'important');
+                    }
+                });
+            }
         });
-        console.log("Search listener initialized successfully.");
-    } else {
-        console.error("Search input with ID 'staffSearch' not found!");
-    }
-});
 
     // === 2. CARPET/SERVICE CALCULATOR ===
     const METER_TO_YARD = 1.09361;
