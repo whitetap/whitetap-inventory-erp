@@ -86,8 +86,8 @@ body { background: #f8fafc !important; color: #1e293b !important; }
           <input id="carpetWid" type="number" value="2.00" class="form-control form-control-sm bg-secondary text-white border-0" readonly>
         </div>
         <div class="text-center p-2 bg-dark rounded border border-warning">
-          <span id="carpetResult" class="h5 fw-bold text-warning">0.00</span>
-          <small class="text-warning"> sq m</small>
+<span id="carpetResult" class="h5 fw-bold text-warning">0.000</span>
+          <small id="carpetUnitLabel" class="text-warning"> sq m</small>
         </div>
       </div>
     </div>
@@ -193,7 +193,7 @@ body { background: #f8fafc !important; color: #1e293b !important; }
               <td class="fw-bold text-end {{ 'text-danger' if (product.current_stock or 0) < (product.min_stock_level or 0) else 'text-success' }}">
                 {{ "%.3f"|format(product.current_stock or 0) }}
               </td>
-              <td class="text-end">{{ "%.2f"|format(product.min_stock_level or 0) }}</td>
+              <td class="text-end">{{ "%.3f"|format(product.min_stock_level or 0) }}</td>
               <td>
                 {% if (product.current_stock or 0) < (product.min_stock_level or 0) %}
                   <span class="badge bg-warning text-dark">⚠️ Low</span>
@@ -246,9 +246,9 @@ body { background: #f8fafc !important; color: #1e293b !important; }
                 <td>{{ product.name }}</td>
                 <td>{{ product.unit_of_measure or '-' }}</td>
                 <td class="fw-bold text-end {{ 'text-danger' if (product.current_stock or 0) < (product.min_stock_level or 0) else 'text-success' }}">
-                  {{ "%.2f"|format(product.current_stock or 0) }}
+                  {{ "%.3f"|format(product.current_stock or 0) }}
                 </td>
-                <td class="text-end">{{ "%.2f"|format(product.min_stock_level or 0) }}</td>
+                <td class="text-end">{{ "%.3f"|format(product.min_stock_level or 0) }}</td>
                 <td>
                   {% if (product.current_stock or 0) < (product.min_stock_level or 0) %}
                     <span class="badge bg-warning text-dark">⚠️ Low</span>
@@ -300,9 +300,9 @@ body { background: #f8fafc !important; color: #1e293b !important; }
                 <td>{{ product.name }}</td>
                 <td>{{ product.unit_of_measure or '-' }}</td>
                 <td class="fw-bold text-end {{ 'text-danger' if (product.current_stock or 0) < (product.min_stock_level or 0) else 'text-success' }}">
-                  {{ "%.2f"|format(product.current_stock or 0) }}
+                  {{ "%.3f"|format(product.current_stock or 0) }}
                 </td>
-                <td class="text-end">{{ "%.2f"|format(product.min_stock_level or 0) }}</td>
+                <td class="text-end">{{ "%.3f"|format(product.min_stock_level or 0) }}</td>
                 <td>
                   {% if (product.current_stock or 0) < (product.min_stock_level or 0) %}
                     <span class="badge bg-warning text-dark">⚠️ Low</span>
@@ -400,7 +400,12 @@ body { background: #f8fafc !important; color: #1e293b !important; }
             <div class="col-md-6">
               <label class="form-label fw-semibold">Quantity <span class="text-danger">*</span></label>
               <input name="quantity_used" id="issueQuantity" type="number" step="0.001" class="form-control" min="0.001" placeholder="0.000" required>
+              <div id="remainingPreview" class="text-success fw-bold mt-1">0.000 remaining</div>
             </div>
+</xai:function_call >
+
+<xai:function_call name="edit_file">
+<parameter name="path">templates/staff_dashboard.html
             <div class="col-md-6">
               <label class="form-label fw-semibold">Technician <span class="text-danger">*</span></label>
               <input name="technician_name" class="form-control" required placeholder="John Doe">
@@ -418,75 +423,69 @@ body { background: #f8fafc !important; color: #1e293b !important; }
       </form>
     </div>
   </div>
-</div>
+</xai:function_call > 
 
-<script>
-// === CARPET CALCULATOR ===
-function runCarpetCalc() {
-    const len = parseFloat(document.getElementById('carpetLen').value) || 0;
-    const unit = document.getElementById('carpetUnit').value;
-    const wid = parseFloat(document.getElementById('carpetWid').value) || 2.0;
-    const display = document.getElementById('carpetResult');
-
-    let mLen = len;
-    if (unit === 'yards') mLen = len * 0.9144;
-    if (unit === 'inches') mLen = len * 0.0254;
-
-    const final = (mLen * wid).toFixed(2);
-    display.innerText = final;
-}
-
-// Carpet listeners
-document.addEventListener('DOMContentLoaded', function() {
-    const lInput = document.getElementById('carpetLen');
-    const uInput = document.getElementById('carpetUnit');
-    
-    if(lInput) lInput.addEventListener('input', runCarpetCalc);
-    if(uInput) uInput.addEventListener('change', runCarpetCalc);
-});
-
-// === REAL-TIME SEARCH ===
-document.addEventListener('DOMContentLoaded', function() {
-    const searchInput = document.getElementById('staffSearch');
-    
-    if (searchInput) {
-        searchInput.addEventListener('input', function() {
-            const searchTerm = this.value.toLowerCase();
-            const rows = document.querySelectorAll('.inventory-row');
-            
-            rows.forEach(row => {
-                const text = row.textContent.toLowerCase();
-                row.style.display = searchTerm && !text.includes(searchTerm) ? 'none' : '';
-            });
-        });
-    }
-});
-
-// === ISSUE MODAL ===
-function openIssueModal(id, name, stock, unit) {
-  document.getElementById('modal-product-id').value = id;
-  document.getElementById('modal-product-name').value = name;
-  document.getElementById('modal-product-stock').value = stock;
-  document.getElementById('modal-product-unit').value = unit;
-  
-  const modal = new bootstrap.Modal(document.getElementById('issueModal'));
-  modal.show();
-}
-
-<script>
+<xai:function_call name="edit_file">
+<parameter name="path">templates/staff_dashboard.html
 // === 1. REAL-TIME SEARCH (Manual Typing) ===
 document.addEventListener('DOMContentLoaded', function() {
+    // === 1. ENHANCED REAL-TIME SEARCH (Debounced for performance) ===
     const searchInput = document.getElementById('staffSearch');
     if (searchInput) {
+        let searchTimeout;
         searchInput.addEventListener('input', function() {
-            const searchTerm = this.value.toLowerCase();
-            const rows = document.querySelectorAll('.inventory-row');
-            rows.forEach(row => {
-                const text = row.textContent.toLowerCase();
-                row.style.display = searchTerm && !text.includes(searchTerm) ? 'none' : '';
-            });
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                const searchTerm = this.value.toLowerCase().trim();
+                const rows = document.querySelectorAll('.inventory-row');
+                rows.forEach(row => {
+                    const text = row.textContent.toLowerCase();
+                    row.style.display = (searchTerm.length > 0 && !text.includes(searchTerm)) ? 'none' : '';
+                });
+            }, 200); // 200ms debounce
         });
     }
+
+    // === 2. CARPET/SERVICE CALCULATOR ===
+    const METER_TO_YARD = 1.09361;
+    const WIDTH_METERS = 2.00;
+    const carpetUnit = document.getElementById('carpetUnit');
+    const carpetLen = document.getElementById('carpetLen');
+    const carpetWid = document.getElementById('carpetWid');
+    const carpetResult = document.getElementById('carpetResult');
+    const carpetUnitLabel = document.getElementById('carpetUnitLabel');
+
+    function updateCarpetCalculator() {
+        const unit = carpetUnit ? carpetUnit.value : 'meters';
+        const len = parseFloat(carpetLen ? carpetLen.value || 0 : 0);
+        let wid = parseFloat(carpetWid ? carpetWid.value || WIDTH_METERS : WIDTH_METERS);
+
+        // Auto-convert width on unit change
+        if (unit === 'yards') {
+            wid = WIDTH_METERS * METER_TO_YARD;
+            if (carpetWid) carpetWid.value = wid.toFixed(3);
+            if (carpetUnitLabel) carpetUnitLabel.textContent = ' sq yd';
+        } else if (unit === 'meters') {
+            wid = WIDTH_METERS;
+            if (carpetWid) carpetWid.value = wid.toFixed(3);
+            if (carpetUnitLabel) carpetUnitLabel.textContent = ' sq m';
+        } else { // inches
+            wid = WIDTH_METERS * 39.3701;
+            if (carpetWid) carpetWid.value = wid.toFixed(3);
+            if (carpetUnitLabel) carpetUnitLabel.textContent = ' sq in';
+        }
+
+        const area = len * wid;
+        if (carpetResult) {
+            carpetResult.textContent = isNaN(area) || area === 0 ? '0.000' : area.toFixed(3);
+        }
+    }
+
+    // Event listeners
+    if (carpetUnit) carpetUnit.addEventListener('change', updateCarpetCalculator);
+    if (carpetLen) carpetLen.addEventListener('input', updateCarpetCalculator);
+    // Initial calc
+    updateCarpetCalculator();
 });
 
 // === 2. ISSUE MODAL LOGIC ===
