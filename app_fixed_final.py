@@ -37,6 +37,7 @@ class Product(db.Model):
     unit_of_measure = db.Column(db.String(20))
     category_id = db.Column(UUID(as_uuid=True))
     current_stock = db.Column(db.Float, default=0.0)
+    parent_stock = db.Column(db.Float, default=0.0)
     min_stock_level = db.Column(db.Float, default=0.0)
 
     def __repr__(self):
@@ -274,6 +275,7 @@ def admin_add_product():
         return redirect(url_for('admin_dashboard'))
     
     current_stock = float(request.form.get('current_stock', 0))
+    parent_stock = float(request.form.get('parent_stock', 0))
     min_stock_level = float(request.form.get('min_stock_level', 0))
     
     new_product = Product(
@@ -281,6 +283,7 @@ def admin_add_product():
         name=name,
         unit_of_measure=unit_of_measure,
         current_stock=current_stock,
+        parent_stock=parent_stock,
         min_stock_level=min_stock_level
     )
     
@@ -377,6 +380,42 @@ def delete_product(product_id):
         flash(f'Delete failed: {str(e)}', 'error')
     return redirect(url_for('admin_dashboard'))
 
+@app.route('/admin/transfer-stock', methods=['POST'])
+def admin_transfer_stock():
+    try:
+        product_id = request.form['product_id']
+        quantity = float(request.form['quantity'])
+        
+        product = Product.query.get_or_404(product_id)
+        
+        if quantity <= 0:
+            flash('Quantity must be greater than 0.', 'error')
+            return redirect(url_for('admin_dashboard'))
+        
+        if product.parent_stock < quantity:
+            flash(f'Insufficient parent stock! Required: {quantity}, Available: {product.parent_stock:.3f}', 'error')
+            return redirect(url_for('admin_dashboard'))
+        
+        product.parent_stock -= quantity
+        product.current_stock += quantity
+        
+        # Log the transfer
+        usage_log = UsageLog(
+            product_id=product_id,
+            quantity_used=quantity,  # Positive for transfer
+            technician_name='TRANSFER_TO_STAFF',
+            project_ref=f'Transfer +{quantity:.3f} units'
+        )
+        db.session.add(usage_log)
+        db.session.commit()
+        
+        flash(f'Transferred {quantity:.3f} from Parent to Staff Stock for {product.name}. Parent: {product.parent_stock:.3f}, Staff: {product.current_stock:.3f}', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Transfer failed: {str(e)}', 'error')
+    
+    return redirect(url_for('admin_dashboard'))
+
 @app.route('/edit-product/<string:product_id>', methods=['GET', 'POST'])
 def edit_product(product_id):
     product = Product.query.get_or_404(product_id)
@@ -386,6 +425,7 @@ def edit_product(product_id):
         product.name = request.form['name'].strip()
         product.unit_of_measure = request.form['unit_of_measure'].strip()
         product.current_stock = float(request.form.get('current_stock', product.current_stock))
+        product.parent_stock = float(request.form.get('parent_stock', product.parent_stock))
         product.min_stock_level = float(request.form.get('min_stock_level', product.min_stock_level))
         
         try:
@@ -399,6 +439,7 @@ def edit_product(product_id):
     return render_template('edit_product.html', product=product)
 
 port = int(os.environ.get('PORT', 10000))
+
 
 if __name__ == '__main__':
     with app.app_context():

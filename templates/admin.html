@@ -164,6 +164,10 @@
                                         <input type="number" step="0.01" class="form-control form-control-lg" name="current_stock" value="0" style="background: #34495e; color: #ecf0f1; border: 2px solid transparent; transition: all 0.3s ease;" onfocus="this.style.borderColor='#3498db'; this.style.boxShadow='0 0 10px rgba(52, 152, 219, 0.3)'" onblur="this.style.borderColor='transparent'; this.style.boxShadow='none'">
                                     </div>
                                     <div class="col-md-1">
+                                        <label class="form-label fw-bold text-light" style="color: #ecf0f1 !important;">Parent Stock</label>
+                                        <input type="number" step="0.01" class="form-control form-control-lg" name="parent_stock" value="0" style="background: #34495e; color: #ecf0f1; border: 2px solid transparent; transition: all 0.3s ease;" onfocus="this.style.borderColor='#3498db'; this.style.boxShadow='0 0 10px rgba(52, 152, 219, 0.3)'" onblur="this.style.borderColor='transparent'; this.style.boxShadow='none'">
+                                    </div>
+                                    <div class="col-md-1">
                                         <label class="form-label fw-bold text-light" style="color: #ecf0f1 !important;">Min Level</label>
                                         <input type="number" step="0.01" class="form-control form-control-lg" name="min_stock_level" value="0" style="background: #34495e; color: #ecf0f1; border: 2px solid transparent; transition: all 0.3s ease;" onfocus="this.style.borderColor='#3498db'; this.style.boxShadow='0 0 10px rgba(52, 152, 219, 0.3)'" onblur="this.style.borderColor='transparent'; this.style.boxShadow='none'">
                                     </div>
@@ -198,6 +202,7 @@
                                         <th>Name</th>
                                         <th>Unit</th>
                                         <th>Stock</th>
+                                        <th>Parent Stock</th>
                                         <th>Min Level</th>
                                         <th>Status</th>
                                         <th>Actions</th>
@@ -214,6 +219,7 @@
                                                 {{ "%.2f"|format(product.current_stock or 0) }}
                                             </span>
                                         </td>
+                                        <td class="fw-bold">{{ "%.2f"|format(product.parent_stock or 0) }}</td>
                                         <td class="fw-semibold">{{ "%.2f"|format(product.min_stock_level or 0) }}</td>
                                         <td>
                                             {% if (product.current_stock or 0) < (product.min_stock_level or 0) %}
@@ -227,6 +233,9 @@
                                                 <a href="{{ url_for('edit_product', product_id=product.id) }}" class="btn btn-outline-primary btn-sm">
                                                     <i class="fas fa-edit"></i>
                                                 </a>
+                                                <button class="btn btn-outline-info btn-sm" onclick="openTransferModal('{{ product.id }}', '{{ product.name }}', {{ product.parent_stock or 0 }})">
+                                                    <i class="fas fa-exchange-alt"></i>
+                                                </button>
                                                 <form method="POST" action="{{ url_for('delete_product', product_id=product.id) }}" style="display: inline;" onsubmit="return confirm('Delete {{ product.name }}?');">
                                                     <button type="submit" class="btn btn-outline-danger btn-sm">
                                                         <i class="fas fa-trash"></i>
@@ -248,6 +257,7 @@
                 </div>
             {% endif %}
             
+
             <!-- Footer -->
             <footer id="pageFooter" class="mt-5 pt-4 pb-3 border-top" style="color: #adb5bd; font-size: 0.875rem; text-align: center;">
                 System Live | Refreshes every 5 minutes | Last updated: <span id="lastUpdateTime"></span>
@@ -255,6 +265,51 @@
         </div>
     </div>
 </div>
+
+<!-- Transfer to Staff Modal -->
+<div class="modal fade" id="transferModal" tabindex="-1" aria-labelledby="transferModalLabel">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content">
+      <div class="modal-header bg-info text-white">
+        <h5 class="modal-title" id="transferModalLabel">🔄 Transfer to Staff Stock</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="POST" action="{{ url_for('admin_transfer_stock') }}">
+        <div class="modal-body">
+          <input type="hidden" id="transferProductId" name="product_id">
+          <div class="mb-3">
+            <label class="form-label fw-bold">Product</label>
+            <input id="transferProductName" class="form-control" readonly>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-bold">Available Parent Stock</label>
+            <input id="transferAvailableStock" class="form-control bg-secondary" readonly>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-bold">Transfer Amount <span class="text-danger">*</span></label>
+            <input type="number" name="quantity" id="transferQuantity" step="0.001" min="0.001" class="form-control" required>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-info text-white fw-bold">Transfer Now</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+function openTransferModal(id, name, available) {
+    document.getElementById('transferProductId').value = id;
+    document.getElementById('transferProductName').value = name;
+    document.getElementById('transferAvailableStock').value = available.toFixed(3);
+    document.getElementById('transferQuantity').max = available;
+    document.getElementById('transferQuantity').value = '';
+    const modal = new bootstrap.Modal(document.getElementById('transferModal'));
+    modal.show();
+}
+</script>
 
 <!-- Enhanced Styles for High Contrast -->
 <style>

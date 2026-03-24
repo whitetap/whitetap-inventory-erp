@@ -35,6 +35,10 @@
                             </select>
                         </div>
                         <div class="mb-4">
+                            <label class="form-label fw-bold">Parent Stock</label>
+                            <input type="number" name="parent_stock" step="0.01" class="form-control" value="{{ product.parent_stock or 0 }}" min="0">
+                        </div>
+                        <div class="mb-4">
                             <label class="form-label fw-bold">Current Stock</label>
                             <input type="number" name="current_stock" step="0.01" class="form-control" value="{{ product.current_stock }}" min="0">
                         </div>
