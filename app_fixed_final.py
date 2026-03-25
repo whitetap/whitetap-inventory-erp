@@ -297,46 +297,6 @@ def admin_add_product():
     
     return redirect(url_for('admin_dashboard'))
 
-@app.route('/admin/transfer-stock', methods=['POST'])
-def admin_transfer_stock():
-    try:
-        product_id = request.form['product_id']
-        quantity = float(request.form['quantity'])
-        
-        product = Product.query.get_or_404(product_id)
-        
-        if quantity <= 0:
-            flash('Quantity must be greater than 0.', 'error')
-            return redirect(url_for('admin_dashboard'))
-        
-        if product.parent_stock < quantity:
-            flash(f'Insufficient parent stock! Available: {product.parent_stock:.3f}', 'error')
-            return redirect(url_for('admin_dashboard'))
-        
-        # 1. Update the numbers in Supabase via SQLAlchemy (The safe way)
-        product.parent_stock -= quantity
-        product.current_stock += quantity
-        
-        # 2. Log it in your working UsageLog table
-        usage_log = UsageLog(
-            product_id=product_id,
-            quantity_used=quantity,
-            technician_name='ADMIN_TRANSFER',
-            project_ref=f'Transfer to Staff: {product.name}'
-        )
-        db.session.add(usage_log)
-        
-        # 3. Save changes
-        db.session.commit()
-        
-        flash(f'Transferred {quantity:.3f} successfully!', 'success')
-        
-    except Exception as e:
-        db.session.rollback()
-        flash(f'Transfer failed: {str(e)}', 'error')
-    
-    return redirect(url_for('admin_dashboard'))
-
 @app.route('/issue-item', methods=['POST'])
 def issue_item():
     try:
@@ -405,14 +365,14 @@ def admin_transfer_stock():
             return redirect(url_for('admin_dashboard'))
         
         if product.parent_stock < quantity:
-            flash(f'Insufficient parent stock!', 'error')
+            flash(f'Insufficient parent stock! Available: {product.parent_stock:.3f}', 'error')
             return redirect(url_for('admin_dashboard'))
         
-        # 1. Update the math
+        # Perform the transfer
         product.parent_stock -= quantity
         product.current_stock += quantity
         
-        # 2. Log it in your internal table
+        # Log the action in your existing UsageLog table
         usage_log = UsageLog(
             product_id=product_id,
             quantity_used=quantity,
@@ -420,8 +380,6 @@ def admin_transfer_stock():
             project_ref=f'Transfer to Staff: {product.name}'
         )
         db.session.add(usage_log)
-        
-        # 3. Save to Supabase (SQLAlchemy Pipe)
         db.session.commit()
         
         flash(f'Transferred {quantity:.3f} successfully!', 'success')
