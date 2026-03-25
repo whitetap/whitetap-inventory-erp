@@ -405,26 +405,26 @@ def admin_transfer_stock():
             return redirect(url_for('admin_dashboard'))
         
         if product.parent_stock < quantity:
-            flash(f'Insufficient parent stock! Required: {quantity}, Available: {product.parent_stock:.3f}', 'error')
+            flash(f'Insufficient parent stock!', 'error')
             return redirect(url_for('admin_dashboard'))
         
-        # 1. Update the stock balances (SQLAlchemy)
+        # 1. Update the math
         product.parent_stock -= quantity
         product.current_stock += quantity
         
-        # 2. Log the transfer using your working UsageLog model
+        # 2. Log it in your internal table
         usage_log = UsageLog(
             product_id=product_id,
             quantity_used=quantity,
             technician_name='TRANSFER_TO_STAFF',
-            project_ref=f'Transfer +{quantity:.3f} units to Staff'
+            project_ref=f'Transfer to Staff: {product.name}'
         )
         db.session.add(usage_log)
         
-        # 3. Save to your database
+        # 3. Save to Supabase (SQLAlchemy Pipe)
         db.session.commit()
         
-        flash(f'Transferred {quantity:.3f} successfully for {product.name}.', 'success')
+        flash(f'Transferred {quantity:.3f} successfully!', 'success')
         
     except Exception as e:
         db.session.rollback()
