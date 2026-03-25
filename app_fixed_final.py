@@ -396,8 +396,11 @@ def admin_transfer_stock():
             flash(f'Insufficient parent stock! Required: {quantity}, Available: {product.parent_stock:.3f}', 'error')
             return redirect(url_for('admin_dashboard'))
         
+        current_parent = product.parent_stock
         product.parent_stock -= quantity
         product.current_stock += quantity
+        new_parent = product.parent_stock
+        qty_to_move = quantity
         
         # Log the transfer
         usage_log = UsageLog(
@@ -407,6 +410,19 @@ def admin_transfer_stock():
             project_ref=f'Transfer +{quantity:.3f} units'
         )
         db.session.add(usage_log)
+        
+        # Supabase inventory_logs insert
+        log_data = {
+            "product_name": product.name,
+            "sku": product.sku,
+            "action_type": "Transfer to Staff",
+            "quantity": qty_to_move,
+            "previous_parent_stock": current_parent,
+            "new_parent_stock": new_parent,
+            "performed_by": session.get('user_email', 'Admin')
+        }
+        supabase.table('inventory_logs').insert(log_data).execute()
+        
         db.session.commit()
         
         flash(f'Transferred {quantity:.3f} from Parent to Staff Stock for {product.name}. Parent: {product.parent_stock:.3f}, Staff: {product.current_stock:.3f}', 'success')
