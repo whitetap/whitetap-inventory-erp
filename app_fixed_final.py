@@ -11,7 +11,6 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy import desc, text
 from sqlalchemy.dialects.postgresql import UUID
 from datetime import datetime
-from supabase import create_client, Client
 
 def get_conn():
     return psycopg2.connect(os.getenv('DATABASE_URL'))
@@ -298,32 +297,44 @@ def admin_add_product():
     
     return redirect(url_for('admin_dashboard'))
 
-@app.route('/restock-item', methods=['POST'])
-def restock_item():
-    product_id = request.form['product_id']
-    amount_to_add = float(request.form['amount_to_add'])
+@app.route('/admin/transfer-stock', methods=['POST'])
+def admin_transfer_stock():
+    try:
+        product_id = request.form['product_id']
+        quantity = float(request.form['quantity'])
+        
+        product = Product.query.get_or_404(product_id)
+        
+        if quantity <= 0:
+            flash('Quantity must be greater than 0.', 'error')
+            return redirect(url_for('admin_dashboard'))
+        
+        if product.parent_stock < quantity:
+            flash(f'Insufficient parent stock! Available: {product.parent_stock:.3f}', 'error')
+            return redirect(url_for('admin_dashboard'))
+        
+        # 1. Update the numbers in Supabase via SQLAlchemy (The safe way)
+        product.parent_stock -= quantity
+        product.current_stock += quantity
+        
+        # 2. Log it in your working UsageLog table
+        usage_log = UsageLog(
+            product_id=product_id,
+            quantity_used=quantity,
+            technician_name='ADMIN_TRANSFER',
+            project_ref=f'Transfer to Staff: {product.name}'
+        )
+        db.session.add(usage_log)
+        
+        # 3. Save changes
+        db.session.commit()
+        
+        flash(f'Transferred {quantity:.3f} successfully!', 'success')
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Transfer failed: {str(e)}', 'error')
     
-    product = Product.query.get(product_id)
-    if not product:
-        flash('Product not found!', 'error')
-        return redirect(url_for('admin_dashboard'))
-    
-    if amount_to_add <= 0:
-        flash('Restock amount must be positive.', 'error')
-        return redirect(url_for('admin_dashboard'))
-    
-    product.current_stock += amount_to_add
-    
-    usage_log = UsageLog(
-        product_id=product_id,
-        quantity_used=amount_to_add,
-        technician_name='RESTOCK',
-        project_ref=f'Restock +{amount_to_add}'
-    )
-    db.session.add(usage_log)
-    db.session.commit()
-    
-    flash(f'Restocked +{amount_to_add} to {product.name}. New stock: {product.current_stock}', 'success')
     return redirect(url_for('admin_dashboard'))
 
 @app.route('/issue-item', methods=['POST'])
