@@ -11,6 +11,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy import desc, text
 from sqlalchemy.dialects.postgresql import UUID
 from datetime import datetime
+from supabase import create_client, Client
 
 def get_conn():
     return psycopg2.connect(os.getenv('DATABASE_URL'))
@@ -396,36 +397,24 @@ def admin_transfer_stock():
             flash(f'Insufficient parent stock! Required: {quantity}, Available: {product.parent_stock:.3f}', 'error')
             return redirect(url_for('admin_dashboard'))
         
-        current_parent = product.parent_stock
+        # 1. Update the stock balances (SQLAlchemy)
         product.parent_stock -= quantity
         product.current_stock += quantity
-        new_parent = product.parent_stock
-        qty_to_move = quantity
         
-        # Log the transfer
+        # 2. Log the transfer using your working UsageLog model
         usage_log = UsageLog(
             product_id=product_id,
-            quantity_used=quantity,  # Positive for transfer
+            quantity_used=quantity,
             technician_name='TRANSFER_TO_STAFF',
-            project_ref=f'Transfer +{quantity:.3f} units'
+            project_ref=f'Transfer +{quantity:.3f} units to Staff'
         )
         db.session.add(usage_log)
         
-        # Supabase inventory_logs insert
-        log_data = {
-            "product_name": product.name,
-            "sku": product.sku,
-            "action_type": "Transfer to Staff",
-            "quantity": qty_to_move,
-            "previous_parent_stock": current_parent,
-            "new_parent_stock": new_parent,
-            "performed_by": session.get('user_email', 'Admin')
-        }
-        supabase.table('inventory_logs').insert(log_data).execute()
-        
+        # 3. Save to your database
         db.session.commit()
         
-        flash(f'Transferred {quantity:.3f} from Parent to Staff Stock for {product.name}. Parent: {product.parent_stock:.3f}, Staff: {product.current_stock:.3f}', 'success')
+        flash(f'Transferred {quantity:.3f} successfully for {product.name}.', 'success')
+        
     except Exception as e:
         db.session.rollback()
         flash(f'Transfer failed: {str(e)}', 'error')
