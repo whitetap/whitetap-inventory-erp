@@ -440,8 +440,8 @@ def edit_product(product_id):
         product.sku = request.form['sku'].strip()
         product.name = request.form['name'].strip()
         product.unit_of_measure = request.form['unit_of_measure'].strip()
-        product.current_stock = float(request.form.get('current_stock', product.current_stock))
-        product.parent_stock = float(request.form.get('parent_stock', product.parent_stock))
+        product.current_stock += float(request.form.get('current_stock') or 0)
+        product.parent_stock += float(request.form.get('parent_stock') or 0)
         product.min_stock_level = float(request.form.get('min_stock_level', product.min_stock_level))
         
         try:
