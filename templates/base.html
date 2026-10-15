@@ -93,15 +93,17 @@
             .sidebar.active { transform: translateX(0); }
         }
     </style>
+    {% block extra_styles %}{% endblock %}
 </head>
-<body>
+<body class="{% block body_class %}{% endblock %}">
     <!-- Sidebar -->
-    <nav class="sidebar d-flex flex-column p-3">
+    <nav id="mainSidebar" class="sidebar d-flex flex-column p-3">
         <div class="navbar-brand text-white mb-4 py-3 px-3 d-flex align-items-center">
             <i class="fas fa-plane-departure me-3 text-primary"></i>
             Aviation ERP
         </div>
         <ul class="nav flex-column flex-grow-1">
+            {% block sidebar_navigation %}
             <li class="nav-item">
                 <a class="nav-link active" href="{{ url_for('staff_inventory') }}">
                     <i class="fas fa-boxes me-2"></i>Inventory
@@ -117,15 +119,16 @@
                     <i class="fas fa-chart-bar me-2"></i>Reports
                 </a>
             </li>
-
+            {% endblock %}
         </ul>
     </nav>
+    {% block sidebar_extra %}{% endblock %}
 
     <!-- Topbar -->
     <div class="topbar shadow-sm">
         <div class="container-fluid">
             <div class="d-flex justify-content-between align-items-center">
-                <button class="btn btn-link d-md-none text-white p-0" id="sidebarToggle">
+                <button class="btn btn-link d-lg-none text-white p-0" id="sidebarToggle" aria-label="Toggle navigation" aria-controls="mainSidebar" aria-expanded="false">
                     <i class="fas fa-bars fa-lg"></i>
                 </button>
                 <h4 class="mb-0 text-white font-weight-bold">{% block page_title %}Dashboard{% endblock %}</h4>
@@ -155,9 +158,13 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         // Mobile sidebar toggle
-        document.getElementById('sidebarToggle').addEventListener('click', function() {
-            document.querySelector('.sidebar').classList.toggle('active');
-        });
+        const sidebarToggle = document.getElementById('sidebarToggle');
+        if (sidebarToggle) {
+            sidebarToggle.addEventListener('click', function() {
+                const isOpen = document.getElementById('mainSidebar').classList.toggle('active');
+                sidebarToggle.setAttribute('aria-expanded', String(isOpen));
+            });
+        }
     </script>
     {% block scripts %}{% endblock %}
 </body>

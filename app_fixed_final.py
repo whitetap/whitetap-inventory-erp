@@ -9,11 +9,22 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import desc, text
+from sqlalchemy.engine import make_url
 from sqlalchemy.dialects.postgresql import UUID
 from datetime import datetime
 
+def get_database_url(drivername):
+    database_url = os.getenv('DATABASE_URL')
+    if not database_url:
+        return None
+    url = make_url(database_url)
+    if url.drivername in ('postgres', 'postgresql', 'postgresql+psycopg', 'postgresql+psycopg2'):
+        return url.set(drivername=drivername)
+    return url
+
 def get_conn():
-    return psycopg2.connect(os.getenv('DATABASE_URL'))
+    url = get_database_url('postgresql')
+    return psycopg2.connect(url.render_as_string(hide_password=False))
 
 # Force Environment Overwrite (Render priority)
 load_dotenv(override=True)
@@ -21,7 +32,7 @@ load_dotenv(override=True)
 app = Flask(__name__)
 app.secret_key = 'RAV4Adventure2020-secure-session-key'
 
-app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL')
+app.config['SQLALCHEMY_DATABASE_URI'] = get_database_url('postgresql+psycopg2')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'Aviation-ERP-Secret-2026-Secure')
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {'creator': get_conn}
