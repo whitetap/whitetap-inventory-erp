@@ -78,12 +78,12 @@ body { background: #f8fafc !important; color: #1e293b !important; }
           </select>
         </div>
         <div class="mb-2">
-          <label class="form-label small text-light fw-medium mb-1">Length:</label>
+          <label id="carpetLenLabel" class="form-label small text-light fw-medium mb-1">Length (m):</label>
           <input id="carpetLen" type="number" step="0.01" class="form-control form-control-sm bg-dark text-white border-secondary" placeholder="0.00">
         </div>
         <div class="mb-3">
-          <label class="form-label small text-light fw-medium mb-1">Width (m):</label>
-          <input id="carpetWid" type="number" value="2.00" class="form-control form-control-sm bg-secondary text-white border-0" readonly>
+          <label id="carpetWidLabel" class="form-label small text-light fw-medium mb-1">Width (m):</label>
+          <input id="carpetWid" type="number" step="0.01" class="form-control form-control-sm bg-dark text-white border-secondary" placeholder="0.00">
         </div>
         <div class="text-center p-2 bg-dark rounded border border-warning">
 <span id="carpetResult" class="h5 fw-bold text-warning">0.000</span>
@@ -329,12 +329,17 @@ body { background: #f8fafc !important; color: #1e293b !important; }
             <h3 class="mb-0 fw-bold" style="color: #1e293b;">📋 Recent Activity</h3>
             <small class="text-muted">Last 10 events</small>
           </div>
-          <a href="{{ url_for('export_logs') }}" class="btn btn-outline-success btn-sm">
-            <i class="fas fa-download"></i> Export
-          </a>
+          <div class="d-flex align-items-center gap-2">
+            <button id="activityToggle" type="button" class="btn btn-outline-secondary btn-sm" aria-label="Collapse recent activity" aria-expanded="true" aria-controls="recentActivityContent" title="Collapse recent activity">
+              <i class="fas fa-chevron-up" aria-hidden="true"></i>
+            </button>
+            <a href="{{ url_for('export_logs') }}" class="btn btn-outline-success btn-sm">
+              <i class="fas fa-download"></i> Export
+            </a>
+          </div>
         </div>
       </div>
-      <div class="card-body p-0">
+      <div id="recentActivityContent" class="card-body p-0">
         <div class="table-responsive">
           <table class="table table-hover mb-0">
             <thead class="table-light">
@@ -450,6 +455,9 @@ document.addEventListener('DOMContentLoaded', function() {
         const inputLen = parseFloat(document.getElementById('carpetLen').value || 0);
         const inputWid = parseFloat(document.getElementById('carpetWid').value || 0);
         const resultDisplay = document.getElementById('carpetResult');
+      const unitLabels = { meters: 'm', yards: 'yd', inches: 'in' };
+      document.getElementById('carpetLenLabel').textContent = `Length (${unitLabels[unit]})`;
+      document.getElementById('carpetWidLabel').textContent = `Width (${unitLabels[unit]})`;
 
         let lengthInMeters = 0;
         let widthInMeters = 0;
@@ -482,6 +490,19 @@ document.addEventListener('DOMContentLoaded', function() {
             el.addEventListener(id === 'carpetUnit' ? 'change' : 'input', updateCarpetCalculator);
         }
     });
+
+      const activityToggle = document.getElementById('activityToggle');
+      const activityContent = document.getElementById('recentActivityContent');
+      if (activityToggle && activityContent) {
+        activityToggle.addEventListener('click', function() {
+          const isExpanded = activityToggle.getAttribute('aria-expanded') === 'true';
+          activityToggle.setAttribute('aria-expanded', String(!isExpanded));
+          activityToggle.setAttribute('aria-label', isExpanded ? 'Expand recent activity' : 'Collapse recent activity');
+          activityToggle.title = isExpanded ? 'Expand recent activity' : 'Collapse recent activity';
+          activityToggle.querySelector('i').className = isExpanded ? 'fas fa-chevron-down' : 'fas fa-chevron-up';
+          activityContent.hidden = isExpanded;
+        });
+      }
 
 }); // <--- THIS CLOSES THE WRAPPER. DO NOT REMOVE.
 
