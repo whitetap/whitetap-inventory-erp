@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}{{ invoice.invoice_number }} - Proforma{% endblock %}
+{% block page_title %}Proforma Invoice{% endblock %}
+{% block body_class %}admin-dashboard{% endblock %}
+
+{% block extra_styles %}
+<style>
+:root { --admin-ink:#252c2a; --admin-muted:#707a76; --admin-paper:#f4f5f3; --admin-line:#dfe3df; --admin-copper:#b86b3d; }
+body.admin-dashboard { background:var(--admin-paper); color:var(--admin-ink); }
+body.admin-dashboard .sidebar { width:260px; background:#252c2a; border-right:1px solid #39413d; }
+body.admin-dashboard .sidebar .nav-link { margin:3px 0; padding:11px 12px !important; border-radius:5px; color:#c0c9c4 !important; font-size:.9rem; }
+body.admin-dashboard .sidebar .nav-link:hover, body.admin-dashboard .sidebar .nav-link.active { color:#fff !important; background:#3b4540; transform:none; }
+body.admin-dashboard .sidebar .nav-link.active { box-shadow:inset 3px 0 #d69a68; }
+body.admin-dashboard .topbar { position:sticky; top:0; z-index:900; width:calc(100% - 260px); margin-left:260px; padding:14px 28px; background:rgba(255,255,255,.97); border-bottom:1px solid var(--admin-line); }
+body.admin-dashboard .topbar h4 { color:var(--admin-ink) !important; font-size:1rem; font-weight:700; }
+body.admin-dashboard .main-content { min-height:calc(100vh - 62px); margin-left:260px; padding:26px clamp(18px, 3vw, 42px); background:var(--admin-paper); }
+.invoice-page { max-width:1040px; margin:0 auto; }
+.invoice-actions { display:flex; justify-content:space-between; gap:12px; margin-bottom:16px; }
+.invoice-sheet { padding:clamp(22px, 4vw, 48px); border:1px solid var(--admin-line); border-radius:6px; background:#fff; box-shadow:0 2px 8px rgba(35,44,39,.045); }
+.invoice-brand { color:var(--admin-copper); font-size:.72rem; font-weight:700; text-transform:uppercase; }
+.invoice-title { margin:5px 0 24px; color:var(--admin-ink); font-size:1.8rem; font-weight:750; }
+.invoice-note { margin:-16px 0 24px; color:var(--admin-muted); font-size:.85rem; }
+.invoice-meta { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:16px; margin-bottom:26px; }
+.invoice-meta span { display:block; color:var(--admin-muted); font-size:.75rem; text-transform:uppercase; }
+.invoice-meta strong { display:block; margin-top:4px; color:var(--admin-ink); }
+.invoice-table { color:var(--admin-ink); }
+.invoice-table th { background:#f6f7f5; color:#5f6965; font-size:.72rem; text-transform:uppercase; }
+.invoice-totals { width:min(340px, 100%); margin:18px 0 0 auto; }
+.invoice-totals div { display:flex; justify-content:space-between; gap:18px; padding:6px 0; }
+.invoice-totals .total { margin-top:6px; padding-top:12px; border-top:1px solid var(--admin-line); font-size:1.15rem; font-weight:750; }
+@media(max-width:992px) { body.admin-dashboard .topbar { width:100%; margin-left:0; } body.admin-dashboard .main-content { margin-left:0; padding:20px 16px; } }
+@media print { body.admin-dashboard .sidebar, body.admin-dashboard .topbar, .invoice-actions { display:none !important; } body.admin-dashboard .main-content { margin:0; padding:0; } body.admin-dashboard { background:#fff; } .invoice-sheet { padding:0; border:0; box-shadow:none; } }
+</style>
+{% endblock %}
+
+{% block sidebar_navigation %}
+<li class="nav-item"><a class="nav-link" href="{{ url_for('admin_dashboard', view='summary') }}"><i class="fas fa-chart-simple me-2"></i>Overview</a></li>
+<li class="nav-item"><a class="nav-link" href="{{ url_for('admin_dashboard', view='inventory') }}"><i class="fas fa-boxes-stacked me-2"></i>Inventory</a></li>
+<li class="nav-item"><a class="nav-link active" href="{{ url_for('admin_proforma_invoices') }}"><i class="fas fa-file-invoice-dollar me-2"></i>Proforma invoices</a></li>
+<li class="nav-item"><a class="nav-link" href="{{ url_for('admin_usage_logs') }}"><i class="fas fa-file-lines me-2"></i>Usage logs</a></li>
+<li class="nav-item"><a class="nav-link" href="{{ url_for('staff_inventory') }}"><i class="fas fa-users me-2"></i>Staff workspace</a></li>
+<li class="nav-item mt-auto"><a class="nav-link" href="{{ url_for('logout') }}"><i class="fas fa-arrow-right-from-bracket me-2"></i>Sign out</a></li>
+{% endblock %}
+
+{% block content %}
+<div class="invoice-page">
+  <div class="invoice-actions">
+    <a class="btn btn-outline-secondary" href="{{ url_for('admin_proforma_invoices') }}"><i class="fas fa-arrow-left me-2" aria-hidden="true"></i>Invoices</a>
+    <button class="btn btn-outline-secondary" type="button" onclick="window.print()"><i class="fas fa-print me-2" aria-hidden="true"></i>Print</button>
+  </div>
+  <article class="invoice-sheet">
+    <div class="invoice-brand">Aviation ERP / Proforma</div>
+    <h1 class="invoice-title">Proforma invoice</h1>
+    <p class="invoice-note">Proforma only; not a tax invoice.</p>
+    <div class="invoice-meta">
+      <div><span>Invoice number</span><strong>{{ invoice.invoice_number }}</strong></div>
+      <div><span>Date</span><strong><time data-utc-timestamp="{{ invoice.created_at.isoformat() }}">{{ invoice.created_at.strftime('%Y-%m-%d') }}</time></strong></div>
+      <div><span>Client</span><strong>{{ client.name }}</strong></div>
+      <div><span>Project reference</span><strong>{{ invoice.project_ref }}</strong></div>
+      <div><span>Currency</span><strong>{{ invoice.currency }}</strong></div>
+      <div><span>Tax</span><strong>{{ 'Exempt' if invoice.tax_mode == 'exempt' else '16%' }}</strong></div>
+    </div>
+    <div class="table-responsive">
+      <table class="table invoice-table">
+        <thead><tr><th>SKU</th><th>Product</th><th class="text-end">Qty</th><th>Unit</th><th class="text-end">Unit price</th><th class="text-end">Line total</th></tr></thead>
+        <tbody>
+          {% for item in items %}
+          <tr><td>{{ item.product_sku or '-' }}</td><td>{{ item.product_name }}</td><td class="text-end">{{ '%.3f'|format(item.quantity) }}</td><td>{{ item.unit or '-' }}</td><td class="text-end">{{ invoice.currency }} {{ '%.2f'|format(item.unit_price) }}</td><td class="text-end">{{ invoice.currency }} {{ '%.2f'|format(item.line_total) }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="invoice-totals">
+      <div><span>Subtotal</span><strong>{{ invoice.currency }} {{ '%.2f'|format(invoice.subtotal) }}</strong></div>
+      <div><span>Tax ({{ 'Exempt' if invoice.tax_mode == 'exempt' else '16%' }})</span><strong>{{ invoice.currency }} {{ '%.2f'|format(invoice.tax_amount) }}</strong></div>
+      <div class="total"><span>Total</span><strong>{{ invoice.currency }} {{ '%.2f'|format(invoice.total) }}</strong></div>
+    </div>
+  </article>
+</div>
+{% endblock %}

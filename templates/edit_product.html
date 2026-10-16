@@ -33,6 +33,20 @@
                             <input id="customEditUnit" type="text" class="form-control mt-2" name="custom_unit_of_measure" placeholder="Enter a unit" maxlength="20" hidden>
                         </div>
                         <div class="mb-4">
+                            <label class="form-label fw-bold" for="editCategory">Category</label>
+                            {% set current_category_name = category_name_by_id.get(product.category_id|string) if product.category_id else none %}
+                            {% if not current_category_name %}
+                                {% set current_category_name = 'Aviation paints & pigments' if 'PNT' in (product.sku or '').upper() else 'Carpet & textile' if 'CRP' in (product.sku or '').upper() else 'Other supplies' %}
+                            {% endif %}
+                            <select id="editCategory" name="category_id" class="form-select" required>
+                                {% for category in product_categories %}
+                                <option value="{{ category.id }}" {% if current_category_name == category.name %}selected{% endif %}>{{ category.name }}</option>
+                                {% endfor %}
+                                <option value="__custom__">Add a category...</option>
+                            </select>
+                            <input id="customEditCategory" type="text" class="form-control mt-2" name="custom_category_name" placeholder="New category name" maxlength="100" hidden>
+                        </div>
+                        <div class="mb-4">
                             <label class="form-label fw-bold">Parent Stock</label>
                             <input type="number" name="parent_stock" step="0.01" class="form-control" value="{{ product.parent_stock or 0 }}" min="0">
                         </div>
@@ -58,13 +72,24 @@
 document.addEventListener('DOMContentLoaded', function() {
     const unitSelect = document.getElementById('editUnit');
     const customUnit = document.getElementById('customEditUnit');
-    if (!unitSelect || !customUnit) return;
-    unitSelect.addEventListener('change', function() {
-        const showCustomUnit = unitSelect.value === '__custom__';
-        customUnit.hidden = !showCustomUnit;
-        customUnit.required = showCustomUnit;
-        if (!showCustomUnit) customUnit.value = '';
-    });
+    if (unitSelect && customUnit) {
+        unitSelect.addEventListener('change', function() {
+            const showCustomUnit = unitSelect.value === '__custom__';
+            customUnit.hidden = !showCustomUnit;
+            customUnit.required = showCustomUnit;
+            if (!showCustomUnit) customUnit.value = '';
+        });
+    }
+    const categorySelect = document.getElementById('editCategory');
+    const customCategory = document.getElementById('customEditCategory');
+    if (categorySelect && customCategory) {
+        categorySelect.addEventListener('change', function() {
+            const showCustomCategory = categorySelect.value === '__custom__';
+            customCategory.hidden = !showCustomCategory;
+            customCategory.required = showCustomCategory;
+            if (!showCustomCategory) customCategory.value = '';
+        });
+    }
 });
 </script>
 {% endblock %}

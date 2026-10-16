@@ -1,7 +1,7 @@
 import os
 import psycopg2
 from dotenv import load_dotenv
-from uuid import uuid4
+from uuid import uuid4, UUID as PythonUUID
 import csv
 from io import StringIO
 from flask import Flask, render_template, request, redirect, url_for, flash, session, Response, make_response, jsonify
@@ -12,7 +12,7 @@ from sqlalchemy import desc, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.dialects.postgresql import UUID
 from datetime import datetime, timedelta, timezone
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 
 def get_database_url(drivername):
     database_url = os.getenv('DATABASE_URL')
@@ -47,13 +47,20 @@ class Product(db.Model):
     sku = db.Column(db.String(50))
     name = db.Column(db.String(100))
     unit_of_measure = db.Column(db.String(20))
-    category_id = db.Column(UUID(as_uuid=True))
+    category_id = db.Column(UUID(as_uuid=True), db.ForeignKey('product_categories.id', ondelete='SET NULL'))
     current_stock = db.Column(db.Float, default=0.0)
     parent_stock = db.Column(db.Float, default=0.0)
     min_stock_level = db.Column(db.Float, default=0.0)
 
     def __repr__(self):
         return f'<Product {self.name} ({self.sku})>'
+
+class ProductCategory(db.Model):
+    __tablename__ = 'product_categories'
+
+    id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    name = db.Column(db.String(100), nullable=False, unique=True, index=True)
+    created_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
 
 class UsageLog(db.Model):
     __tablename__ = 'usage_logs'
@@ -86,6 +93,43 @@ class TintRecipeItem(db.Model):
     product_id = db.Column(db.BigInteger, nullable=True)
     created_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
 
+class Client(db.Model):
+    __tablename__ = 'clients'
+
+    id = db.Column(db.BigInteger, primary_key=True, autoincrement=True)
+    name = db.Column(db.Text, nullable=False)
+    normalized_name = db.Column(db.Text, nullable=False, unique=True, index=True)
+    created_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+
+class ProformaInvoice(db.Model):
+    __tablename__ = 'proforma_invoices'
+
+    id = db.Column(db.BigInteger, primary_key=True, autoincrement=True)
+    invoice_number = db.Column(db.String(40), nullable=False, unique=True, index=True)
+    client_id = db.Column(db.BigInteger, db.ForeignKey('clients.id'), nullable=False, index=True)
+    project_ref = db.Column(db.Text, nullable=False)
+    currency = db.Column(db.String(3), nullable=False)
+    tax_mode = db.Column(db.String(10), nullable=False)
+    tax_rate = db.Column(db.Numeric(5, 2), nullable=False)
+    subtotal = db.Column(db.Numeric(14, 2), nullable=False)
+    tax_amount = db.Column(db.Numeric(14, 2), nullable=False)
+    total = db.Column(db.Numeric(14, 2), nullable=False)
+    created_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+
+class ProformaInvoiceItem(db.Model):
+    __tablename__ = 'proforma_invoice_items'
+
+    id = db.Column(db.BigInteger, primary_key=True, autoincrement=True)
+    invoice_id = db.Column(db.BigInteger, db.ForeignKey('proforma_invoices.id', ondelete='CASCADE'), nullable=False, index=True)
+    product_id = db.Column(UUID(as_uuid=True), nullable=True)
+    product_sku = db.Column(db.Text, nullable=True)
+    product_name = db.Column(db.Text, nullable=False)
+    quantity = db.Column(db.Numeric(14, 3), nullable=False)
+    unit = db.Column(db.Text, nullable=True)
+    unit_price = db.Column(db.Numeric(14, 2), nullable=False)
+    line_total = db.Column(db.Numeric(14, 2), nullable=False)
+    created_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+
 _tint_recipe_schema_ready = False
 
 def ensure_tint_recipe_tables():
@@ -93,10 +137,40 @@ def ensure_tint_recipe_tables():
     if not _tint_recipe_schema_ready:
         db.metadata.create_all(
             bind=db.engine,
-            tables=[TintRecipe.__table__, TintRecipeItem.__table__],
+            tables=[
+                TintRecipe.__table__, TintRecipeItem.__table__, ProductCategory.__table__,
+                Client.__table__, ProformaInvoice.__table__, ProformaInvoiceItem.__table__
+            ],
             checkfirst=True
         )
         _tint_recipe_schema_ready = True
+    for category_name in ('Aviation paints & pigments', 'Carpet & textile', 'Other supplies'):
+        category = ProductCategory.query.filter(db.func.lower(ProductCategory.name) == category_name.lower()).first()
+        if not category:
+            db.session.add(ProductCategory(name=category_name))
+    db.session.commit()
+
+def get_product_category_name_map():
+    return {str(category.id): category.name for category in ProductCategory.query.order_by(ProductCategory.name).all()}
+
+def resolve_product_category():
+    selected_id = request.form.get('category_id', '').strip()
+    if selected_id == '__custom__':
+        category_name = request.form.get('custom_category_name', '').strip()
+        if not category_name or len(category_name) > 100:
+            return None
+        category = ProductCategory.query.filter(db.func.lower(ProductCategory.name) == category_name.lower()).first()
+        if not category:
+            category = ProductCategory(name=category_name)
+            db.session.add(category)
+            db.session.flush()
+        return category
+    if not selected_id:
+        return None
+    try:
+        return ProductCategory.query.get(PythonUUID(selected_id))
+    except (ValueError, TypeError):
+        return None
 
 def get_product_units():
     rows = db.session.query(Product.unit_of_measure).filter(
@@ -138,6 +212,31 @@ def get_usage_period_start(period, today=None):
         return None
     return datetime.combine(start_date, datetime.min.time())
 
+def normalize_client_name(name):
+    return ' '.join(name.casefold().split())
+
+def get_project_invoice_lines(project_ref):
+    rows = db.session.query(
+        Product.id,
+        Product.sku,
+        Product.name,
+        Product.unit_of_measure,
+        db.func.sum(db.func.abs(UsageLog.quantity_used)).label('quantity')
+    ).join(Product, Product.id == UsageLog.product_id).filter(
+        db.func.lower(UsageLog.project_ref) == project_ref.casefold(),
+        UsageLog.quantity_used < 0,
+        UsageLog.technician_name != 'TRANSFER_TO_STAFF'
+    ).group_by(
+        Product.id, Product.sku, Product.name, Product.unit_of_measure
+    ).order_by(Product.name).all()
+    return [{
+        'product_id': row.id,
+        'sku': row.sku or '-',
+        'name': row.name or 'Unnamed product',
+        'unit': row.unit_of_measure or '',
+        'quantity': Decimal(str(row.quantity or 0)).quantize(Decimal('0.001'), rounding=ROUND_HALF_UP)
+    } for row in rows]
+
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -145,15 +244,22 @@ def index():
 @app.route('/staff-inventory')
 def staff_inventory():
     ensure_tint_recipe_tables()
+    category_names = get_product_category_name_map()
     search_query = request.args.get('search', '')
     activity_filter = request.args.get('activity_filter', '')
     
     all_products = Product.query.all()
     
     # Split products
-    paints = [p for p in all_products if 'PNT' in (p.sku or '').upper()]
-    carpets = [p for p in all_products if 'CRP' in (p.sku or '').upper()]
-    others = [p for p in all_products if 'PNT' not in (p.sku or '').upper() and 'CRP' not in (p.sku or '').upper()]
+    def belongs_to_category(product, category_name, sku_marker):
+        saved_category = category_names.get(str(product.category_id), '')
+        if saved_category:
+            return saved_category.casefold() == category_name.casefold()
+        return sku_marker in (product.sku or '').upper()
+
+    paints = [p for p in all_products if belongs_to_category(p, 'Aviation paints & pigments', 'PNT')]
+    carpets = [p for p in all_products if belongs_to_category(p, 'Carpet & textile', 'CRP')]
+    others = [p for p in all_products if p not in paints and p not in carpets]
     
     # Apply search filter
     if search_query:
@@ -174,7 +280,7 @@ def staff_inventory():
     low_stock_count = len(low_stock_products)
     tint_projects = [row[0] for row in db.session.query(TintRecipe.project_ref).filter(TintRecipe.project_ref.isnot(None)).order_by(TintRecipe.project_ref).all()]
     
-    return render_template('staff_dashboard.html', paints=paints, carpets=carpets, others=others, recent_logs=recent_logs, search_query=search_query, activity_filter=activity_filter, low_stock_products=low_stock_products, low_stock_count=low_stock_count, tint_projects=tint_projects)
+    return render_template('staff_dashboard.html', paints=paints, carpets=carpets, others=others, recent_logs=recent_logs, search_query=search_query, activity_filter=activity_filter, low_stock_products=low_stock_products, low_stock_count=low_stock_count, tint_projects=tint_projects, category_name_by_id=category_names)
 
 @app.route('/api/tint-recipes')
 def api_tint_recipes():
@@ -221,15 +327,35 @@ def api_tint_recipes():
         app.logger.exception('Unable to load tint recipe')
         return jsonify({'success': False, 'error': 'Unable to load recipe right now.'}), 500
 
+@app.route('/api/tint-recipes/<int:recipe_id>', methods=['DELETE'])
+def delete_tint_recipe(recipe_id):
+    try:
+        ensure_tint_recipe_tables()
+        recipe = TintRecipe.query.get(recipe_id)
+        if not recipe:
+            return jsonify({'success': False, 'error': 'Recipe not found.'}), 404
+
+        TintRecipeItem.query.filter_by(recipe_id=recipe.id).delete(synchronize_session=False)
+        db.session.delete(recipe)
+        db.session.commit()
+        return jsonify({'success': True, 'deleted_recipe_id': recipe_id})
+    except Exception:
+        db.session.rollback()
+        app.logger.exception('Unable to delete tint recipe')
+        return jsonify({'success': False, 'error': 'Unable to delete recipe right now.'}), 500
+
 @app.route('/export-logs')
 def export_logs():
     period = request.args.get('period', 'all')
+    project_ref = request.args.get('project_ref', '').strip()
     if period not in USAGE_PERIOD_LABELS:
         period = 'all'
     start = get_usage_period_start(period)
     logs_query = db.session.query(UsageLog, Product.name).outerjoin(Product, Product.id == UsageLog.product_id)
     if start:
         logs_query = logs_query.filter(UsageLog.created_at >= start)
+    if project_ref:
+        logs_query = logs_query.filter(UsageLog.project_ref.ilike(f'%{project_ref}%'))
     logs = logs_query.order_by(desc(UsageLog.created_at)).all()
     
     output = StringIO()
@@ -260,12 +386,15 @@ def admin_usage_logs():
         return redirect(url_for('login'))
 
     period = request.args.get('period', 'daily')
+    project_ref = request.args.get('project_ref', '').strip()
     if period not in USAGE_PERIOD_LABELS:
         period = 'daily'
     start = get_usage_period_start(period)
     logs_query = db.session.query(UsageLog, Product.name).outerjoin(Product, Product.id == UsageLog.product_id)
     if start:
         logs_query = logs_query.filter(UsageLog.created_at >= start)
+    if project_ref:
+        logs_query = logs_query.filter(UsageLog.project_ref.ilike(f'%{project_ref}%'))
     rows = logs_query.order_by(desc(UsageLog.created_at)).all()
     logs = [{
         'created_at': log.created_at,
@@ -280,9 +409,141 @@ def admin_usage_logs():
         'usage_logs.html',
         logs=logs,
         period=period,
+        project_ref=project_ref,
         period_label=USAGE_PERIOD_LABELS[period],
         period_options=USAGE_PERIOD_LABELS
     )
+
+@app.route('/admin/proforma-invoices', methods=['GET', 'POST'])
+def admin_proforma_invoices():
+    if not session.get('logged_in'):
+        return redirect(url_for('login'))
+
+    ensure_tint_recipe_tables()
+    if request.method == 'POST':
+        client_name = ' '.join(request.form.get('client_name', '').split())
+        project_ref = request.form.get('project_ref', '').strip()
+        currency = request.form.get('currency', '').upper()
+        tax_mode = request.form.get('tax_mode', '')
+
+        if not client_name or len(client_name) > 200:
+            flash('Enter a client name of no more than 200 characters.', 'error')
+            return redirect(url_for('admin_proforma_invoices', project_ref=project_ref, currency=currency, tax_mode=tax_mode))
+        if currency not in ('USD', 'KES'):
+            flash('Choose USD or KES.', 'error')
+            return redirect(url_for('admin_proforma_invoices', project_ref=project_ref, client_name=client_name, tax_mode=tax_mode))
+        if tax_mode not in ('standard', 'exempt'):
+            flash('Choose 16% tax or tax exempt.', 'error')
+            return redirect(url_for('admin_proforma_invoices', project_ref=project_ref, client_name=client_name, currency=currency))
+
+        project_lines = get_project_invoice_lines(project_ref) if project_ref else []
+        if not project_lines:
+            flash('Choose a project with recorded issued products.', 'error')
+            return redirect(url_for('admin_proforma_invoices', client_name=client_name, currency=currency, tax_mode=tax_mode))
+
+        submitted_ids = set(request.form.getlist('product_id'))
+        line_items = []
+        for line in project_lines:
+            product_id = str(line['product_id'])
+            if product_id not in submitted_ids:
+                flash('Invoice line items did not match the selected project.', 'error')
+                return redirect(url_for('admin_proforma_invoices', project_ref=project_ref, client_name=client_name, currency=currency, tax_mode=tax_mode))
+            try:
+                unit_price = Decimal(request.form.get(f'unit_price_{product_id}', '').strip())
+            except Exception:
+                flash('Enter a valid price for every invoice line.', 'error')
+                return redirect(url_for('admin_proforma_invoices', project_ref=project_ref, client_name=client_name, currency=currency, tax_mode=tax_mode))
+            if not unit_price.is_finite() or unit_price < 0:
+                flash('Prices must be zero or greater.', 'error')
+                return redirect(url_for('admin_proforma_invoices', project_ref=project_ref, client_name=client_name, currency=currency, tax_mode=tax_mode))
+            unit_price = unit_price.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+            line_total = (line['quantity'] * unit_price).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+            line_items.append((line, unit_price, line_total))
+
+        try:
+            client_key = normalize_client_name(client_name)
+            client = Client.query.filter_by(normalized_name=client_key).first()
+            if not client:
+                client = Client(name=client_name, normalized_name=client_key)
+                db.session.add(client)
+                db.session.flush()
+
+            subtotal = sum((line_total for _, _, line_total in line_items), Decimal('0.00'))
+            tax_rate = Decimal('16.00') if tax_mode == 'standard' else Decimal('0.00')
+            tax_amount = (subtotal * tax_rate / Decimal('100')).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+            invoice = ProformaInvoice(
+                invoice_number=f"PF-{datetime.now().strftime('%Y%m%d')}-{uuid4().hex[:6].upper()}",
+                client_id=client.id,
+                project_ref=project_ref,
+                currency=currency,
+                tax_mode=tax_mode,
+                tax_rate=tax_rate,
+                subtotal=subtotal,
+                tax_amount=tax_amount,
+                total=subtotal + tax_amount
+            )
+            db.session.add(invoice)
+            db.session.flush()
+            for line, unit_price, line_total in line_items:
+                db.session.add(ProformaInvoiceItem(
+                    invoice_id=invoice.id,
+                    product_id=line['product_id'],
+                    product_sku=line['sku'],
+                    product_name=line['name'],
+                    quantity=line['quantity'],
+                    unit=line['unit'],
+                    unit_price=unit_price,
+                    line_total=line_total
+                ))
+            db.session.commit()
+            flash(f'Proforma {invoice.invoice_number} saved for {client.name}.', 'success')
+            return redirect(url_for('proforma_invoice_detail', invoice_id=invoice.id))
+        except Exception:
+            db.session.rollback()
+            app.logger.exception('Unable to create proforma invoice')
+            flash('Unable to save the proforma invoice. Please try again.', 'error')
+            return redirect(url_for('admin_proforma_invoices', project_ref=project_ref, client_name=client_name, currency=currency, tax_mode=tax_mode))
+
+    project_refs = [row[0] for row in db.session.query(UsageLog.project_ref).filter(
+        UsageLog.project_ref.isnot(None),
+        UsageLog.project_ref != '',
+        UsageLog.quantity_used < 0,
+        UsageLog.technician_name != 'TRANSFER_TO_STAFF'
+    ).distinct().order_by(UsageLog.project_ref).all()]
+    project_ref = request.args.get('project_ref', '').strip()
+    client_name = request.args.get('client_name', '').strip()
+    currency = request.args.get('currency', 'KES').upper()
+    if currency not in ('KES', 'USD'):
+        currency = 'KES'
+    tax_mode = request.args.get('tax_mode', 'standard')
+    if tax_mode not in ('standard', 'exempt'):
+        tax_mode = 'standard'
+    invoices = db.session.query(ProformaInvoice, Client.name).join(
+        Client, Client.id == ProformaInvoice.client_id
+    ).order_by(ProformaInvoice.created_at.desc()).limit(100).all()
+    lines = get_project_invoice_lines(project_ref) if project_ref else []
+    return render_template(
+        'proforma_invoices.html',
+        project_refs=project_refs,
+        selected_project_ref=project_ref,
+        client_name=client_name,
+        currency=currency,
+        tax_mode=tax_mode,
+        project_lines=lines,
+        clients=Client.query.order_by(Client.name).all(),
+        invoices=invoices
+    )
+
+@app.route('/admin/proforma-invoices/<int:invoice_id>')
+def proforma_invoice_detail(invoice_id):
+    if not session.get('logged_in'):
+        return redirect(url_for('login'))
+
+    ensure_tint_recipe_tables()
+    invoice = ProformaInvoice.query.get_or_404(invoice_id)
+    client = Client.query.get_or_404(invoice.client_id)
+    items = ProformaInvoiceItem.query.filter_by(invoice_id=invoice.id).order_by(ProformaInvoiceItem.product_name).all()
+    return render_template('proforma_invoice_detail.html', invoice=invoice, client=client, items=items)
 
 @app.route('/export-products')
 def export_products():
@@ -410,6 +671,7 @@ def admin_dashboard():
     if not session.get('logged_in'):
         return redirect(url_for('login'))
         
+    ensure_tint_recipe_tables()
     view = request.args.get('view', 'summary')
     
     all_products = Product.query.order_by(Product.name).all()
@@ -427,17 +689,23 @@ def admin_dashboard():
     # Today's usage logs count
     today_logs = UsageLog.query.filter(db.func.date(UsageLog.created_at) == datetime.now().date()).count()
     
-    return render_template('admin.html', view=view, display_products=display_products, all_products=all_products, total_items=total_items, low_stock_count=low_stock_count, total_inventory_value=total_inventory_value, today_logs=today_logs, unit_options=get_product_units())
+    return render_template('admin.html', view=view, display_products=display_products, all_products=all_products, total_items=total_items, low_stock_count=low_stock_count, total_inventory_value=total_inventory_value, today_logs=today_logs, unit_options=get_product_units(), product_categories=ProductCategory.query.order_by(ProductCategory.name).all(), category_name_by_id=get_product_category_name_map())
 
 @app.route('/admin/add-product', methods=['POST'])
 def admin_add_product():
+    ensure_tint_recipe_tables()
     name = request.form['name'].strip()
     sku = request.form['sku'].strip()
     unit_of_measure = get_submitted_unit()
     
     if not name or not sku or not unit_of_measure or len(unit_of_measure) > 20:
-        flash('Please fill in all required fields: Name, SKU, Unit of Measure.', 'error')
-        return redirect(url_for('admin_dashboard'))
+        flash('Please enter a name, SKU, and a unit no longer than 20 characters.', 'error')
+        return redirect(url_for('admin_dashboard', view='inventory'))
+
+    category = resolve_product_category()
+    if not category:
+        flash('Please choose a valid category or enter a new category name.', 'error')
+        return redirect(url_for('admin_dashboard', view='inventory'))
     
     current_stock = float(request.form.get('current_stock', 0))
     parent_stock = float(request.form.get('parent_stock', 0))
@@ -447,6 +715,7 @@ def admin_add_product():
         sku=sku,
         name=name,
         unit_of_measure=unit_of_measure,
+        category_id=category.id,
         current_stock=current_stock,
         parent_stock=parent_stock,
         min_stock_level=min_stock_level
@@ -590,16 +859,22 @@ def admin_transfer_stock():
 
 @app.route('/edit-product/<string:product_id>', methods=['GET', 'POST'])
 def edit_product(product_id):
+    ensure_tint_recipe_tables()
     product = Product.query.get_or_404(product_id)
     
     if request.method == 'POST':
         unit_of_measure = get_submitted_unit()
         if not unit_of_measure or len(unit_of_measure) > 20:
             flash('Enter a unit of measure no longer than 20 characters.', 'error')
-            return render_template('edit_product.html', product=product, unit_options=get_product_units())
+            return render_template('edit_product.html', product=product, unit_options=get_product_units(), product_categories=ProductCategory.query.order_by(ProductCategory.name).all(), category_name_by_id=get_product_category_name_map())
+        category = resolve_product_category()
+        if not category:
+            flash('Choose a valid product category.', 'error')
+            return render_template('edit_product.html', product=product, unit_options=get_product_units(), product_categories=ProductCategory.query.order_by(ProductCategory.name).all(), category_name_by_id=get_product_category_name_map())
         product.sku = request.form['sku'].strip()
         product.name = request.form['name'].strip()
         product.unit_of_measure = unit_of_measure
+        product.category_id = category.id
         product.current_stock += float(request.form.get('current_stock') or 0)
         product.parent_stock += float(request.form.get('parent_stock') or 0)
         product.min_stock_level = float(request.form.get('min_stock_level', product.min_stock_level))
@@ -612,7 +887,7 @@ def edit_product(product_id):
             db.session.rollback()
             flash('SKU already exists. Please choose a unique SKU.', 'error')
     
-    return render_template('edit_product.html', product=product, unit_options=get_product_units())
+    return render_template('edit_product.html', product=product, unit_options=get_product_units(), product_categories=ProductCategory.query.order_by(ProductCategory.name).all(), category_name_by_id=get_product_category_name_map())
 
 port = int(os.environ.get('PORT', 10000))
 

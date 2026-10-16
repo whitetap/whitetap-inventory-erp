@@ -134,7 +134,7 @@ body.staff-dashboard .card:hover { transform: none; }
       <p id="current-date" class="mb-0"></p>
     </div>
     <div class="dashboard-actions">
-      <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#recipeBookModal"><i class="fas fa-book-open me-2" aria-hidden="true"></i>Saved recipes <span class="badge text-bg-light ms-1">{{ tint_projects|length }}</span></button>
+      <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#recipeBookModal"><i class="fas fa-book-open me-2" aria-hidden="true"></i>Saved recipes <span id="recipeBookCount" class="badge text-bg-light ms-1">{{ tint_projects|length }}</span></button>
       <span class="badge rounded-pill text-bg-light border px-3 py-2"><i class="fas fa-circle text-success me-2" style="font-size:.55rem" aria-hidden="true"></i>Inventory overview</span>
     </div>
   </header>
@@ -371,7 +371,7 @@ body.staff-dashboard .card:hover { transform: none; }
                 </td>
                 <td>{{ log.technician_name }}</td>
                 <td>{{ log.project_ref or '-' }}</td>
-                <td>{{ log.created_at.strftime('%H:%M') if log.created_at else 'N/A' }}</td>
+                <td>{% if log.created_at %}<time data-utc-timestamp="{{ log.created_at.isoformat() }}" data-local-format="time">{{ log.created_at.strftime('%H:%M') }}</time>{% else %}N/A{% endif %}</td>
               </tr>
               {% endfor %}
               {% if not recent_logs %}
@@ -560,6 +560,7 @@ document.addEventListener('DOMContentLoaded', function() {
       let recipeLookupTimer;
       let recipeLookupId = 0;
       let recipeBookRequestId = 0;
+      let activeRecipeButton = null;
 
       function fetchTintRecipe(projectRef) {
         return fetch(`/api/tint-recipes?project_ref=${encodeURIComponent(projectRef)}`)
@@ -568,14 +569,51 @@ document.addEventListener('DOMContentLoaded', function() {
               if (!response.ok || !payload.success) {
                 throw new Error(payload.error || 'Unable to load saved recipe');
               }
-              return payload.items;
+              return payload;
             });
           });
       }
-
+      function renderRecipeTable(container, recipe) {
       function renderRecipeTable(container, ingredients) {
+        const ingredients = recipe.items;
+        const heading = document.createElement('h3');
+        heading.className = 'h6 fw-bold mb-3';
+        heading.textContent = recipe.recipe.recipe_name;
+        container.appendChild(heading);
+
+        const deleteButton = document.createElement('button');
+        deleteButton.type = 'button';
+        deleteButton.className = 'btn btn-sm btn-outline-danger mb-3';
+        deleteButton.title = 'Delete saved recipe';
+        deleteButton.setAttribute('aria-label', `Delete recipe ${recipe.recipe.recipe_name}`);
+        deleteButton.innerHTML = '<i class="fas fa-trash" aria-hidden="true"></i>';
+        deleteButton.addEventListener('click', function() {
+          if (!window.confirm(`Delete the saved recipe for ${recipe.recipe.recipe_name}?`)) return;
+          deleteButton.disabled = true;
+          fetch(`/api/tint-recipes/${recipe.recipe.id}`, { method: 'DELETE' })
+            .then(response => response.json().then(payload => {
+              if (!response.ok || !payload.success) throw new Error(payload.error || 'Unable to delete recipe');
+              return payload;
+            }))
+            .then(() => {
+              activeRecipeButton?.remove();
+              activeRecipeButton = null;
+              const recipeCount = document.getElementById('recipeBookCount');
+              if (recipeCount) recipeCount.textContent = document.querySelectorAll('.recipe-project-button').length;
+              container.textContent = 'Recipe deleted.';
+            })
+            .catch(() => {
+              deleteButton.disabled = false;
+              window.alert('Could not delete this recipe. Please try again.');
+            });
+        });
+        container.appendChild(deleteButton);
+
         container.replaceChildren();
-        if (!ingredients.length) {
+          const emptyState = document.createElement('p');
+          emptyState.className = 'text-secondary';
+          emptyState.textContent = 'This recipe has no saved ingredients.';
+          container.appendChild(emptyState);
           container.textContent = 'This recipe has no saved ingredients.';
           return;
         }
@@ -609,11 +647,12 @@ document.addEventListener('DOMContentLoaded', function() {
             });
             button.classList.add('active');
             button.setAttribute('aria-pressed', 'true');
+            activeRecipeButton = button;
             const projectRef = button.dataset.projectRef;
             recipeBookDetails.textContent = `Loading recipe for ${projectRef}...`;
             fetchTintRecipe(projectRef)
-              .then(ingredients => {
-                if (requestId === recipeBookRequestId) renderRecipeTable(recipeBookDetails, ingredients);
+              .then(recipe => {
+                if (requestId === recipeBookRequestId) renderRecipeTable(recipeBookDetails, recipe);
               })
               .catch(() => {
                 if (requestId === recipeBookRequestId) recipeBookDetails.textContent = 'Could not load this recipe. Try again in a moment.';
@@ -635,9 +674,10 @@ document.addEventListener('DOMContentLoaded', function() {
         recipeTitle.textContent = `Saved recipe for ${projectRef}`;
         recipeItems.textContent = 'Looking for saved ingredients...';
         fetchTintRecipe(projectRef)
-          .then(ingredients => {
+          .then(recipe => {
             if (lookupId !== recipeLookupId) return;
             recipeItems.replaceChildren();
+            const ingredients = recipe.items;
             if (!ingredients.length) {
               recipeItems.textContent = 'No saved ingredients yet. Issues marked as tinting will be added to this recipe.';
               return;

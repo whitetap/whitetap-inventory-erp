@@ -90,6 +90,7 @@ body.admin-dashboard .modal-content { border: 1px solid var(--admin-line); borde
 {% block sidebar_navigation %}
     <li class="nav-item"><a class="nav-link {% if view == 'summary' %}active{% endif %}" href="{{ url_for('admin_dashboard', view='summary') }}"><i class="fas fa-chart-simple me-2"></i>Overview</a></li>
     <li class="nav-item"><a class="nav-link {% if view == 'inventory' %}active{% endif %}" href="{{ url_for('admin_dashboard', view='inventory') }}"><i class="fas fa-boxes-stacked me-2"></i>Inventory</a></li>
+    <li class="nav-item"><a class="nav-link" href="{{ url_for('admin_proforma_invoices') }}"><i class="fas fa-file-invoice-dollar me-2"></i>Proforma invoices</a></li>
     <li class="nav-item"><a class="nav-link" href="{{ url_for('staff_inventory') }}"><i class="fas fa-users me-2"></i>Staff workspace</a></li>
     <li class="nav-item"><a class="nav-link {% if request.endpoint == 'admin_usage_logs' %}active{% endif %}" href="{{ url_for('admin_usage_logs') }}"><i class="fas fa-file-lines me-2"></i>Usage logs</a></li>
     <li class="nav-item mt-auto"><a class="nav-link" href="{{ url_for('logout') }}"><i class="fas fa-arrow-right-from-bracket me-2"></i>Sign out</a></li>
@@ -173,9 +174,18 @@ body.admin-dashboard .modal-content { border: 1px solid var(--admin-line); borde
                             </select>
                             <input id="customUnitOfMeasure" type="text" class="form-control mt-2" name="custom_unit_of_measure" placeholder="Enter a unit" maxlength="20" hidden>
                           </div>
-                          <div class="col-sm-6 col-lg-2"><label class="form-label" for="newStock">Current stock</label><input id="newStock" type="number" step="0.01" class="form-control" name="current_stock" value="0"></div>
+                          <div class="col-sm-6 col-lg-2">
+                            <label class="form-label" for="newCategory">Category <span class="text-danger">*</span></label>
+                            <select id="newCategory" class="form-select" name="category_id" required>
+                              <option value="" disabled selected>Select a category</option>
+                              {% for category in product_categories %}<option value="{{ category.id }}">{{ category.name }}</option>{% endfor %}
+                              <option value="__custom__">Add a category...</option>
+                            </select>
+                            <input id="customCategoryName" type="text" class="form-control mt-2" name="custom_category_name" placeholder="New category name" maxlength="100" hidden>
+                          </div>
+                          <div class="col-sm-6 col-lg-2"><label class="form-label" for="newStock">Current stock</label><input id="newStock" type="number" step="0.001" class="form-control" name="current_stock" value="0"></div>
                           <div class="col-sm-6 col-lg-1"><label class="form-label" for="newParentStock">Parent</label><input id="newParentStock" type="number" step="0.01" class="form-control" name="parent_stock" value="0"></div>
-                          <div class="col-sm-6 col-lg-2"><label class="form-label" for="newMinStock">Min level</label><input id="newMinStock" type="number" step="0.01" class="form-control" name="min_stock_level" value="0"></div>
+                          <div class="col-sm-6 col-lg-1"><label class="form-label" for="newMinStock">Min level</label><input id="newMinStock" type="number" step="0.001" class="form-control" name="min_stock_level" value="0"></div>
                         </div>
                         <div class="text-end mt-3"><button type="submit" class="btn admin-add-toggle"><i class="fas fa-plus me-2" aria-hidden="true"></i>Create product</button></div>
                       </form>
@@ -196,6 +206,7 @@ body.admin-dashboard .modal-content { border: 1px solid var(--admin-line); borde
                                     <tr>
                                         <th>SKU</th>
                                         <th>Name</th>
+                                        <th>Category</th>
                                         <th>Unit</th>
                                         <th>Stock</th>
                                         <th>Parent Stock</th>
@@ -209,6 +220,7 @@ body.admin-dashboard .modal-content { border: 1px solid var(--admin-line); borde
                                     <tr class="product-row align-middle">
                                         <td class="fw-bold">{{ product.sku or '-' }}</td>
                                         <td>{{ product.name or '-' }}</td>
+                                        <td>{{ (category_name_by_id.get(product.category_id|string) if product.category_id else none) or ('Aviation paints &amp; pigments' if 'PNT' in (product.sku or '').upper() else 'Carpet &amp; textile' if 'CRP' in (product.sku or '').upper() else 'Other supplies') }}</td>
                                         <td>{{ product.unit_of_measure or '-' }}</td>
                                         <td>
                                             <span class="admin-stock {% if (product.current_stock or 0) < (product.min_stock_level or 0) %}low{% endif %}">
@@ -242,9 +254,9 @@ body.admin-dashboard .modal-content { border: 1px solid var(--admin-line); borde
                                     </tr>
                                     {% endfor %}
                                     {% if not all_products %}
-                                    <tr><td colspan="8" class="py-5 text-center text-secondary">No inventory products yet. Add a product to get started.</td></tr>
+                                    <tr><td colspan="9" class="py-5 text-center text-secondary">No inventory products yet. Add a product to get started.</td></tr>
                                     {% endif %}
-                                    <tr id="emptySearchState" hidden><td colspan="8" class="py-4 text-center text-secondary">No products match this search.</td></tr>
+                                    <tr id="emptySearchState" hidden><td colspan="9" class="py-4 text-center text-secondary">No products match this search.</td></tr>
                                 </tbody>
                             </table>
                         </div>
@@ -324,6 +336,19 @@ document.addEventListener('DOMContentLoaded', function() {
     };
     unitSelect.addEventListener('change', syncCustomUnit);
     syncCustomUnit();
+  }
+
+  const categorySelect = document.getElementById('newCategory');
+  const customCategory = document.getElementById('customCategoryName');
+  if (categorySelect && customCategory) {
+    const syncCustomCategory = function() {
+      const showCustomCategory = categorySelect.value === '__custom__';
+      customCategory.hidden = !showCustomCategory;
+      customCategory.required = showCustomCategory;
+      if (!showCustomCategory) customCategory.value = '';
+    };
+    categorySelect.addEventListener('change', syncCustomCategory);
+    syncCustomCategory();
   }
 
     const searchInput = document.getElementById('tableSearch');

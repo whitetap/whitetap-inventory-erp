@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+{% block title %}Proforma Invoices - Aviation ERP{% endblock %}
+{% block page_title %}Proforma Invoices{% endblock %}
+{% block body_class %}admin-dashboard{% endblock %}
+
+{% block extra_styles %}
+<style>
+:root { --admin-ink:#252c2a; --admin-muted:#707a76; --admin-paper:#f4f5f3; --admin-line:#dfe3df; --admin-copper:#b86b3d; }
+body.admin-dashboard { background:var(--admin-paper); color:var(--admin-ink); }
+body.admin-dashboard .sidebar { width:260px; background:#252c2a; border-right:1px solid #39413d; }
+body.admin-dashboard .sidebar .nav-link { margin:3px 0; padding:11px 12px !important; border-radius:5px; color:#c0c9c4 !important; font-size:.9rem; }
+body.admin-dashboard .sidebar .nav-link:hover, body.admin-dashboard .sidebar .nav-link.active { color:#fff !important; background:#3b4540; transform:none; }
+body.admin-dashboard .sidebar .nav-link.active { box-shadow:inset 3px 0 #d69a68; }
+body.admin-dashboard .topbar { position:sticky; top:0; z-index:900; width:calc(100% - 260px); margin-left:260px; padding:14px 28px; background:rgba(255,255,255,.97); border-bottom:1px solid var(--admin-line); }
+body.admin-dashboard .topbar h4 { color:var(--admin-ink) !important; font-size:1rem; font-weight:700; }
+body.admin-dashboard .main-content { min-height:calc(100vh - 62px); margin-left:260px; padding:26px clamp(18px, 3vw, 42px); background:var(--admin-paper); }
+body.admin-dashboard .card { border:1px solid var(--admin-line) !important; border-radius:6px; background:#fff !important; box-shadow:0 2px 8px rgba(35,44,39,.045) !important; }
+.proforma-page { max-width:1560px; margin:0 auto; }
+.proforma-heading { display:flex; align-items:flex-end; justify-content:space-between; gap:18px; margin-bottom:22px; }
+.proforma-heading h1 { margin:4px 0; color:var(--admin-ink); font-size:1.65rem; font-weight:750; }
+.proforma-heading p { margin:0; color:var(--admin-muted); }
+.proforma-eyebrow { color:var(--admin-copper); font-size:.72rem; font-weight:700; text-transform:uppercase; }
+.proforma-toolbar { display:flex; align-items:flex-end; flex-wrap:wrap; gap:12px; padding:17px; border-bottom:1px solid var(--admin-line); }
+.proforma-toolbar .field { flex:1 1 180px; }
+.proforma-toolbar label, .price-field label { display:block; margin-bottom:5px; color:#535e59; font-size:.78rem; font-weight:650; }
+.proforma-toolbar .form-control, .proforma-toolbar .form-select, .price-field .form-control { border-color:var(--admin-line); }
+.proforma-toolbar .form-control:focus, .proforma-toolbar .form-select:focus, .price-field .form-control:focus { border-color:var(--admin-copper); box-shadow:0 0 0 3px rgba(184,107,61,.12); }
+.proforma-primary { color:#fff; border-color:var(--admin-copper); background:var(--admin-copper); }
+.proforma-primary:hover { color:#fff; border-color:#9f572f; background:#9f572f; }
+.proforma-table { margin:0; color:var(--admin-ink); font-size:.88rem; }
+.proforma-table th { padding:11px 13px; border-bottom:1px solid var(--admin-line); background:#f6f7f5; color:#5f6965; font-size:.72rem; text-transform:uppercase; }
+.proforma-table td { padding:11px 13px; border-color:#edf0ed; vertical-align:middle; }
+.price-field { min-width:140px; }
+.proforma-totals { width:min(360px, 100%); margin:18px 18px 18px auto; }
+.proforma-totals div { display:flex; justify-content:space-between; gap:20px; padding:5px 0; }
+.proforma-totals .grand-total { margin-top:7px; padding-top:12px; border-top:1px solid var(--admin-line); font-size:1.1rem; font-weight:750; }
+.proforma-list { overflow:hidden; border:1px solid var(--admin-line); border-radius:6px; background:#fff; }
+.proforma-list th { padding:11px 14px; background:#f6f7f5; color:#5f6965; font-size:.72rem; text-transform:uppercase; }
+.proforma-list td { padding:12px 14px; border-color:#edf0ed; vertical-align:middle; }
+@media(max-width:992px) { body.admin-dashboard .topbar { width:100%; margin-left:0; } body.admin-dashboard .main-content { margin-left:0; padding:20px 16px; } }
+@media(max-width:575px) { .proforma-heading { align-items:flex-start; flex-direction:column; } .proforma-heading h1 { font-size:1.4rem; } }
+</style>
+{% endblock %}
+
+{% block sidebar_navigation %}
+<li class="nav-item"><a class="nav-link" href="{{ url_for('admin_dashboard', view='summary') }}"><i class="fas fa-chart-simple me-2"></i>Overview</a></li>
+<li class="nav-item"><a class="nav-link" href="{{ url_for('admin_dashboard', view='inventory') }}"><i class="fas fa-boxes-stacked me-2"></i>Inventory</a></li>
+<li class="nav-item"><a class="nav-link active" href="{{ url_for('admin_proforma_invoices') }}"><i class="fas fa-file-invoice-dollar me-2"></i>Proforma invoices</a></li>
+<li class="nav-item"><a class="nav-link" href="{{ url_for('admin_usage_logs') }}"><i class="fas fa-file-lines me-2"></i>Usage logs</a></li>
+<li class="nav-item"><a class="nav-link" href="{{ url_for('staff_inventory') }}"><i class="fas fa-users me-2"></i>Staff workspace</a></li>
+<li class="nav-item mt-auto"><a class="nav-link" href="{{ url_for('logout') }}"><i class="fas fa-arrow-right-from-bracket me-2"></i>Sign out</a></li>
+{% endblock %}
+
+{% block content %}
+<div class="proforma-page">
+  <header class="proforma-heading">
+    <div><div class="proforma-eyebrow">Control room / Billing</div><h1>Proforma invoices</h1><p>Prepare a priced proforma from issued items on a project.</p></div>
+  </header>
+
+  <section class="card mb-4" aria-label="Select invoice details">
+    <form method="get" action="{{ url_for('admin_proforma_invoices') }}" class="proforma-toolbar">
+      <div class="field"><label for="clientName">Client</label><input id="clientName" class="form-control" name="client_name" list="knownClients" value="{{ client_name }}" maxlength="200" placeholder="Enter or select client" required><datalist id="knownClients">{% for client in clients %}<option value="{{ client.name }}">{% endfor %}</datalist></div>
+      <div class="field"><label for="projectRef">Project reference</label><select id="projectRef" class="form-select" name="project_ref" required><option value="">Select project</option>{% for project in project_refs %}<option value="{{ project }}" {% if selected_project_ref == project %}selected{% endif %}>{{ project }}</option>{% endfor %}</select></div>
+      <div class="field"><label for="currency">Currency</label><select id="currency" class="form-select" name="currency"><option value="KES" {% if currency == 'KES' %}selected{% endif %}>KES</option><option value="USD" {% if currency == 'USD' %}selected{% endif %}>USD</option></select></div>
+      <div class="field"><label for="taxMode">Tax</label><select id="taxMode" class="form-select" name="tax_mode"><option value="standard" {% if tax_mode == 'standard' %}selected{% endif %}>16% tax</option><option value="exempt" {% if tax_mode == 'exempt' %}selected{% endif %}>Exempt</option></select></div>
+      <button type="submit" class="btn proforma-primary"><i class="fas fa-list-check me-2" aria-hidden="true"></i>Load project items</button>
+    </form>
+  </section>
+
+  {% if selected_project_ref %}
+  <section class="card mb-4" aria-label="Price invoice items">
+    <div class="p-3 border-bottom"><h2 class="h6 fw-bold mb-1">Project {{ selected_project_ref }}</h2><small class="text-secondary">Add a unit price to each issued product. Client details are saved when the invoice is created.</small></div>
+    {% if project_lines %}
+    <form method="post" action="{{ url_for('admin_proforma_invoices') }}" id="proformaForm" data-currency="{{ currency }}" data-tax-rate="{{ '16' if tax_mode == 'standard' else '0' }}">
+      <input type="hidden" name="client_name" value="{{ client_name }}">
+      <input type="hidden" name="project_ref" value="{{ selected_project_ref }}">
+      <input type="hidden" name="currency" value="{{ currency }}">
+      <input type="hidden" name="tax_mode" value="{{ tax_mode }}">
+      <div class="table-responsive"><table class="table proforma-table">
+        <thead><tr><th>SKU</th><th>Product</th><th class="text-end">Qty</th><th>Unit</th><th>Unit price ({{ currency }})</th><th class="text-end">Line total</th></tr></thead>
+        <tbody>
+          {% for line in project_lines %}
+          <tr>
+            <td>{{ line.sku }}</td><td>{{ line.name }}</td>
+            <td class="text-end">{{ '%.3f'|format(line.quantity) }}<input type="hidden" name="product_id" value="{{ line.product_id }}"></td>
+            <td>{{ line.unit }}</td>
+            <td class="price-field"><label for="price{{ loop.index }}" class="visually-hidden">Price for {{ line.name }}</label><input id="price{{ loop.index }}" class="form-control form-control-sm unit-price" name="unit_price_{{ line.product_id }}" type="number" min="0" step="0.01" placeholder="0.00" required></td>
+            <td class="text-end line-total" data-quantity="{{ line.quantity }}">0.00</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table></div>
+      <div class="proforma-totals">
+        <div><span>Subtotal</span><strong id="subtotalValue">{{ currency }} 0.00</strong></div>
+        <div><span>Tax ({{ '16%' if tax_mode == 'standard' else 'Exempt' }})</span><strong id="taxValue">{{ currency }} 0.00</strong></div>
+        <div class="grand-total"><span>Total</span><strong id="totalValue">{{ currency }} 0.00</strong></div>
+      </div>
+      <div class="text-end px-3 pb-3"><button class="btn proforma-primary" type="submit"><i class="fas fa-file-circle-check me-2" aria-hidden="true"></i>Save proforma</button></div>
+    </form>
+    {% else %}
+    <div class="p-4 text-secondary">No issued products were found for this project.</div>
+    {% endif %}
+  </section>
+  {% endif %}
+
+  <section class="proforma-list" aria-label="Recent proforma invoices">
+    <div class="p-3 border-bottom"><h2 class="h6 fw-bold mb-0">Recent invoices</h2></div>
+    <div class="table-responsive"><table class="table mb-0">
+      <thead><tr><th>Invoice</th><th>Client</th><th>Project</th><th>Date</th><th class="text-end">Total</th></tr></thead>
+      <tbody>
+        {% for invoice, invoice_client_name in invoices %}
+        <tr><td><a href="{{ url_for('proforma_invoice_detail', invoice_id=invoice.id) }}">{{ invoice.invoice_number }}</a></td><td>{{ invoice_client_name }}</td><td>{{ invoice.project_ref }}</td><td><time data-utc-timestamp="{{ invoice.created_at.isoformat() }}">{{ invoice.created_at.strftime('%Y-%m-%d') }}</time></td><td class="text-end fw-bold">{{ invoice.currency }} {{ '%.2f'|format(invoice.total) }}</td></tr>
+        {% else %}
+        <tr><td colspan="5" class="py-4 text-center text-secondary">No proforma invoices have been created.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table></div>
+  </section>
+</div>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const form = document.getElementById('proformaForm');
+  if (!form) return;
+  const currency = form.dataset.currency;
+  const taxRate = Number(form.dataset.taxRate) / 100;
+  const money = new Intl.NumberFormat(undefined, { style: 'currency', currency: currency, currencyDisplay: 'code' });
+  function updateTotals() {
+    let subtotal = 0;
+    form.querySelectorAll('.unit-price').forEach(input => {
+      const row = input.closest('tr');
+      const quantity = Number(row.querySelector('.line-total').dataset.quantity);
+      const lineTotal = quantity * (Number(input.value) || 0);
+      row.querySelector('.line-total').textContent = lineTotal.toFixed(2);
+      subtotal += lineTotal;
+    });
+    const tax = subtotal * taxRate;
+    document.getElementById('subtotalValue').textContent = money.format(subtotal);
+    document.getElementById('taxValue').textContent = money.format(tax);
+    document.getElementById('totalValue').textContent = money.format(subtotal + tax);
+  }
+  form.addEventListener('input', updateTotals);
+  updateTotals();
+});
+</script>
+{% endblock %}

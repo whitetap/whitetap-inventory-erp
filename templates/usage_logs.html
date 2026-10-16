@@ -23,7 +23,8 @@ body.admin-dashboard .main-content { min-height: calc(100vh - 62px); margin-left
 .usage-filter { display: flex; align-items: end; flex-wrap: wrap; gap: 10px; }
 .usage-filter label { display: block; margin-bottom: 4px; color: #535e59; font-size: .78rem; font-weight: 650; }
 .usage-filter select { min-width: 175px; border-color: var(--admin-line); }
-.usage-filter select:focus { border-color: var(--admin-copper); box-shadow: 0 0 0 3px rgba(184,107,61,.12); }
+.usage-filter select:focus, .usage-filter input:focus { border-color: var(--admin-copper); box-shadow: 0 0 0 3px rgba(184,107,61,.12); }
+.usage-filter input { min-width: 190px; border-color: var(--admin-line); }
 .usage-apply { color: #fff; border-color: var(--admin-copper); background: var(--admin-copper); }
 .usage-apply:hover { color: #fff; border-color: #9f572f; background: #9f572f; }
 .usage-table { margin: 0; color: var(--admin-ink); font-size: .88rem; }
@@ -41,6 +42,7 @@ body.admin-dashboard .main-content { min-height: calc(100vh - 62px); margin-left
 {% block sidebar_navigation %}
 <li class="nav-item"><a class="nav-link" href="{{ url_for('admin_dashboard', view='summary') }}"><i class="fas fa-chart-simple me-2"></i>Overview</a></li>
 <li class="nav-item"><a class="nav-link" href="{{ url_for('admin_dashboard', view='inventory') }}"><i class="fas fa-boxes-stacked me-2"></i>Inventory</a></li>
+<li class="nav-item"><a class="nav-link" href="{{ url_for('admin_proforma_invoices') }}"><i class="fas fa-file-invoice-dollar me-2"></i>Proforma invoices</a></li>
 <li class="nav-item"><a class="nav-link" href="{{ url_for('staff_inventory') }}"><i class="fas fa-users me-2"></i>Staff workspace</a></li>
 <li class="nav-item"><a class="nav-link active" href="{{ url_for('admin_usage_logs') }}"><i class="fas fa-file-lines me-2"></i>Usage logs</a></li>
 <li class="nav-item mt-auto"><a class="nav-link" href="{{ url_for('logout') }}"><i class="fas fa-arrow-right-from-bracket me-2"></i>Sign out</a></li>
@@ -63,8 +65,12 @@ body.admin-dashboard .main-content { min-height: calc(100vh - 62px); margin-left
                     {% endfor %}
                 </select>
             </div>
+            <div>
+                <label for="projectReference">Project reference</label>
+                <input id="projectReference" class="form-control" type="search" name="project_ref" value="{{ project_ref }}" placeholder="Search project reference">
+            </div>
             <button type="submit" class="btn usage-apply"><i class="fas fa-filter me-2" aria-hidden="true"></i>Apply</button>
-            <a class="btn btn-outline-secondary" href="{{ url_for('export_logs', period=period) }}" title="Download this period as CSV"><i class="fas fa-download me-2" aria-hidden="true"></i>Export CSV</a>
+            <a class="btn btn-outline-secondary" href="{{ url_for('export_logs', period=period, project_ref=project_ref) }}" title="Download filtered logs as CSV"><i class="fas fa-download me-2" aria-hidden="true"></i>Export CSV</a>
         </form>
     </header>
 
@@ -76,7 +82,7 @@ body.admin-dashboard .main-content { min-height: calc(100vh - 62px); margin-left
                 <tbody>
                     {% for log in logs %}
                     <tr>
-                        <td>{{ log.created_at.strftime('%Y-%m-%d %H:%M') if log.created_at else 'N/A' }}</td>
+                        <td>{% if log.created_at %}<time data-utc-timestamp="{{ log.created_at.isoformat() }}">{{ log.created_at.strftime('%Y-%m-%d %H:%M') }}</time>{% else %}N/A{% endif %}</td>
                         <td><strong>{{ log.product_name }}</strong><br><small class="text-secondary">{{ log.product_sku }}</small></td>
                         <td class="usage-qty">{{ "%.3f"|format(log.quantity_used or 0) }}</td>
                         <td>{{ log.technician_name }}</td>
