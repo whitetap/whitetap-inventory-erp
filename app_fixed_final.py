@@ -8,10 +8,11 @@ from flask import Flask, render_template, request, redirect, url_for, flash, ses
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy import desc, text, UniqueConstraint
+from sqlalchemy import desc, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.dialects.postgresql import UUID
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+from decimal import Decimal
 
 def get_database_url(drivername):
     database_url = os.getenv('DATABASE_URL')
@@ -68,23 +69,22 @@ class UsageLog(db.Model):
 class TintRecipe(db.Model):
     __tablename__ = 'tint_recipes'
 
-    id = db.Column(db.Integer, primary_key=True)
-    project_ref = db.Column(db.String(100), nullable=False, unique=True, index=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    id = db.Column(db.BigInteger, primary_key=True, autoincrement=True)
+    recipe_name = db.Column(db.Text, nullable=False)
+    project_ref = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+    updated_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
 
-class TintRecipeIngredient(db.Model):
-    __tablename__ = 'tint_recipe_ingredients'
+class TintRecipeItem(db.Model):
+    __tablename__ = 'tint_recipe_items'
 
-    id = db.Column(db.Integer, primary_key=True)
-    recipe_id = db.Column(db.Integer, db.ForeignKey('tint_recipes.id', ondelete='CASCADE'), nullable=False, index=True)
-    product_id = db.Column(UUID(as_uuid=True), db.ForeignKey('products.id', ondelete='SET NULL'))
-    product_sku = db.Column(db.String(50))
-    product_name = db.Column(db.String(100), nullable=False)
-    unit_of_measure = db.Column(db.String(20))
-    quantity = db.Column(db.Float, nullable=False)
-
-    __table_args__ = (UniqueConstraint('recipe_id', 'product_id', name='uq_tint_recipe_product'),)
+    id = db.Column(db.BigInteger, primary_key=True, autoincrement=True)
+    recipe_id = db.Column(db.BigInteger, db.ForeignKey('tint_recipes.id'), nullable=False, index=True)
+    product_name = db.Column(db.Text, nullable=False)
+    quantity = db.Column(db.Numeric, nullable=False)
+    unit = db.Column(db.Text, nullable=True)
+    product_id = db.Column(db.BigInteger, nullable=True)
+    created_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
 
 _tint_recipe_schema_ready = False
 
@@ -93,7 +93,7 @@ def ensure_tint_recipe_tables():
     if not _tint_recipe_schema_ready:
         db.metadata.create_all(
             bind=db.engine,
-            tables=[TintRecipe.__table__, TintRecipeIngredient.__table__],
+            tables=[TintRecipe.__table__, TintRecipeItem.__table__],
             checkfirst=True
         )
         _tint_recipe_schema_ready = True
@@ -172,32 +172,54 @@ def staff_inventory():
     all_items = paints + carpets + others
     low_stock_products = [p for p in all_products if (p.current_stock or 0) < (p.min_stock_level or 0)]
     low_stock_count = len(low_stock_products)
-    tint_projects = [row[0] for row in db.session.query(TintRecipe.project_ref).order_by(TintRecipe.project_ref).all()]
+    tint_projects = [row[0] for row in db.session.query(TintRecipe.project_ref).filter(TintRecipe.project_ref.isnot(None)).order_by(TintRecipe.project_ref).all()]
     
     return render_template('staff_dashboard.html', paints=paints, carpets=carpets, others=others, recent_logs=recent_logs, search_query=search_query, activity_filter=activity_filter, low_stock_products=low_stock_products, low_stock_count=low_stock_count, tint_projects=tint_projects)
 
 @app.route('/api/tint-recipes')
 def api_tint_recipes():
+    recipe_name = (request.args.get('recipe_name') or request.args.get('name') or '').strip()
     project_ref = request.args.get('project_ref', '').strip()
-    if not project_ref:
-        return jsonify([])
+    if not recipe_name and not project_ref:
+        return jsonify({'success': False, 'error': 'Provide a recipe_name, name, or project_ref.'}), 400
 
-    ensure_tint_recipe_tables()
-    recipe = TintRecipe.query.filter(db.func.lower(TintRecipe.project_ref) == project_ref.lower()).first()
-    if not recipe:
-        return jsonify([])
+    try:
+        ensure_tint_recipe_tables()
+        filters = []
+        if recipe_name:
+            filters.append(db.func.lower(TintRecipe.recipe_name) == recipe_name.lower())
+        if project_ref:
+            filters.append(db.func.lower(TintRecipe.project_ref) == project_ref.lower())
+        recipe = TintRecipe.query.filter(db.or_(*filters)).order_by(TintRecipe.updated_at.desc()).first()
+        if not recipe:
+            return jsonify({'success': False, 'error': 'Recipe not found.'}), 404
 
-    ingredients = db.session.query(TintRecipeIngredient, Product).outerjoin(
-        Product, Product.id == TintRecipeIngredient.product_id
-    ).filter(TintRecipeIngredient.recipe_id == recipe.id).order_by(TintRecipeIngredient.product_name).all()
-    return jsonify([{
-        'product_id': str(ingredient.product_id or ''),
-        'sku': ingredient.product_sku or '-',
-        'name': ingredient.product_name,
-        'unit': ingredient.unit_of_measure or '',
-        'quantity': float(ingredient.quantity),
-        'available_stock': float(product.current_stock or 0) if product else 0
-    } for ingredient, product in ingredients])
+        items = TintRecipeItem.query.filter_by(recipe_id=recipe.id).order_by(TintRecipeItem.product_name).all()
+        matched_products = Product.query.filter(Product.name.in_([item.product_name for item in items])).all() if items else []
+        products_by_name = {product.name: product for product in matched_products}
+        return jsonify({
+            'success': True,
+            'recipe': {
+                'id': recipe.id,
+                'recipe_name': recipe.recipe_name,
+                'project_ref': recipe.project_ref,
+                'created_at': recipe.created_at.isoformat() if recipe.created_at else None,
+                'updated_at': recipe.updated_at.isoformat() if recipe.updated_at else None
+            },
+            'items': [{
+                'product_id': str(products_by_name[item.product_name].id) if item.product_name in products_by_name else '',
+                'stored_product_id': item.product_id,
+                'sku': products_by_name[item.product_name].sku if item.product_name in products_by_name else '-',
+                'name': item.product_name,
+                'unit': item.unit or '',
+                'quantity': format(item.quantity, 'f'),
+                'available_stock': float(products_by_name[item.product_name].current_stock or 0) if item.product_name in products_by_name else 0
+            } for item in items]
+        })
+    except Exception:
+        db.session.rollback()
+        app.logger.exception('Unable to load tint recipe')
+        return jsonify({'success': False, 'error': 'Unable to load recipe right now.'}), 500
 
 @app.route('/export-logs')
 def export_logs():
@@ -485,26 +507,26 @@ def issue_item():
                 db.func.lower(TintRecipe.project_ref) == project_ref.lower()
             ).first()
             if not recipe:
-                recipe = TintRecipe(project_ref=project_ref)
+                recipe = TintRecipe(recipe_name=project_ref, project_ref=project_ref)
                 db.session.add(recipe)
                 db.session.flush()
 
-            ingredient = TintRecipeIngredient.query.filter_by(
+            ingredient = TintRecipeItem.query.filter_by(
                 recipe_id=recipe.id,
-                product_id=product.id
+                product_name=product.name or 'Unnamed product',
+                unit=product.unit_of_measure or ''
             ).first()
             if ingredient:
-                ingredient.quantity += quantity_used
+                ingredient.quantity += Decimal(str(quantity_used))
             else:
-                db.session.add(TintRecipeIngredient(
+                db.session.add(TintRecipeItem(
                     recipe_id=recipe.id,
-                    product_id=product.id,
-                    product_sku=product.sku,
                     product_name=product.name or 'Unnamed product',
-                    unit_of_measure=product.unit_of_measure,
-                    quantity=quantity_used
+                    quantity=Decimal(str(quantity_used)),
+                    unit=product.unit_of_measure or '',
+                    product_id=None
                 ))
-            recipe.updated_at = datetime.utcnow()
+            recipe.updated_at = datetime.now(timezone.utc)
 
         db.session.commit()
         flash('Item issued and added to the saved tint recipe.' if is_tinting else 'Successfully issued item', 'success')

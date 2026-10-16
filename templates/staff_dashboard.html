@@ -564,8 +564,12 @@ document.addEventListener('DOMContentLoaded', function() {
       function fetchTintRecipe(projectRef) {
         return fetch(`/api/tint-recipes?project_ref=${encodeURIComponent(projectRef)}`)
           .then(response => {
-            if (!response.ok) throw new Error('Unable to load saved recipe');
-            return response.json();
+            return response.json().then(payload => {
+              if (!response.ok || !payload.success) {
+                throw new Error(payload.error || 'Unable to load saved recipe');
+              }
+              return payload.items;
+            });
           });
       }
 
@@ -583,7 +587,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const body = document.createElement('tbody');
         ingredients.forEach(ingredient => {
           const row = document.createElement('tr');
-          [ingredient.sku, ingredient.name, `${ingredient.quantity.toFixed(3)} ${ingredient.unit}`, `${ingredient.available_stock.toFixed(3)} ${ingredient.unit}`].forEach((value, index) => {
+          [ingredient.sku, ingredient.name, `${Number(ingredient.quantity).toFixed(3)} ${ingredient.unit}`, `${ingredient.available_stock.toFixed(3)} ${ingredient.unit}`].forEach((value, index) => {
             const cell = document.createElement('td');
             cell.textContent = value;
             if (index > 1) cell.className = 'text-end';
@@ -642,13 +646,13 @@ document.addEventListener('DOMContentLoaded', function() {
               const button = document.createElement('button');
               button.type = 'button';
               button.className = 'btn btn-sm btn-outline-secondary text-start';
-              button.textContent = `${ingredient.name} (${ingredient.sku}) · ${ingredient.quantity.toFixed(3)} ${ingredient.unit} used · ${ingredient.available_stock.toFixed(3)} available`;
+              button.textContent = `${ingredient.name} (${ingredient.sku}) · ${Number(ingredient.quantity).toFixed(3)} ${ingredient.unit} used · ${ingredient.available_stock.toFixed(3)} available`;
               button.addEventListener('click', function() {
                 document.getElementById('modal-product-id').value = ingredient.product_id;
                 document.getElementById('modal-product-name').value = ingredient.name;
                 document.getElementById('modal-product-stock').value = ingredient.available_stock.toFixed(3);
                 document.getElementById('modal-product-unit').value = ingredient.unit;
-                document.getElementById('issueQuantity').value = ingredient.quantity.toFixed(3);
+                document.getElementById('issueQuantity').value = Number(ingredient.quantity).toFixed(3);
                 updateIssueRemainingPreview();
               });
               recipeItems.appendChild(button);
