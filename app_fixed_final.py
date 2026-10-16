@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 from uuid import uuid4
 import csv
 from io import StringIO
-from flask import Flask, render_template, request, redirect, url_for, flash, session, Response, make_response
+from flask import Flask, render_template, request, redirect, url_for, flash, session, Response, make_response, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
 from sqlalchemy.exc import IntegrityError
