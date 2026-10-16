@@ -97,7 +97,7 @@
 </head>
 <body class="{% block body_class %}{% endblock %}">
     <!-- Sidebar -->
-    <nav id="mainSidebar" class="sidebar d-flex flex-column p-3">
+    <aside id="mainSidebar" class="sidebar d-flex flex-column p-3">
         <div class="navbar-brand text-white mb-4 py-3 px-3 d-flex align-items-center">
             <i class="fas fa-plane-departure me-3 text-primary"></i>
             Aviation ERP
@@ -121,8 +121,8 @@
             </li>
             {% endblock %}
         </ul>
-    </nav>
     {% block sidebar_extra %}{% endblock %}
+    </aside>
 
     <!-- Topbar -->
     <div class="topbar shadow-sm">

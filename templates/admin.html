@@ -1,202 +1,165 @@
-<!DOCTYPE html>
-<html lang="en">
 {% extends "base.html" %}
 
 {% block title %}Admin Dashboard - Aviation ERP{% endblock %}
 
 {% block page_title %}Admin Dashboard{% endblock %}
 
+{% block body_class %}admin-dashboard{% endblock %}
+
+{% block extra_styles %}
+<style>
+:root {
+    --admin-ink: #252c2a;
+    --admin-muted: #707a76;
+    --admin-paper: #f4f5f3;
+    --admin-line: #dfe3df;
+    --admin-copper: #b86b3d;
+    --admin-copper-soft: #f6e9e0;
+    --admin-green: #426a56;
+}
+body.admin-dashboard { background: var(--admin-paper); color: var(--admin-ink); }
+body.admin-dashboard .sidebar { width: 260px; background: #252c2a; border-right: 1px solid #39413d; }
+body.admin-dashboard .sidebar .navbar-brand { font-size: 1.12rem; }
+body.admin-dashboard .sidebar .navbar-brand i { color: #d69a68 !important; }
+body.admin-dashboard .sidebar .nav-link { margin: 3px 0; padding: 11px 12px !important; border-radius: 5px; color: #c0c9c4 !important; font-size: .9rem; transition: background-color .18s ease, color .18s ease; }
+body.admin-dashboard .sidebar .nav-link:hover, body.admin-dashboard .sidebar .nav-link.active { color: #fff !important; background: #3b4540; transform: none; }
+body.admin-dashboard .sidebar .nav-link.active { box-shadow: inset 3px 0 #d69a68; }
+body.admin-dashboard .topbar { position: sticky; top: 0; z-index: 900; width: calc(100% - 260px); margin-left: 260px; padding: 14px 28px; background: rgba(255,255,255,.97); border-bottom: 1px solid var(--admin-line); }
+body.admin-dashboard .topbar h4 { color: var(--admin-ink) !important; font-size: 1rem; font-weight: 700; }
+body.admin-dashboard .topbar .fa-user-circle, body.admin-dashboard #sidebarToggle { color: var(--admin-copper) !important; }
+body.admin-dashboard .main-content { min-height: calc(100vh - 62px); margin-left: 260px; padding: 26px clamp(18px, 3vw, 42px); background: var(--admin-paper); }
+body.admin-dashboard .card { border: 1px solid var(--admin-line) !important; border-radius: 6px; background: #fff !important; box-shadow: 0 2px 8px rgba(35,44,39,.045) !important; backdrop-filter: none; }
+body.admin-dashboard .card:hover { transform: none; }
+body.admin-dashboard .modal-content { border: 1px solid var(--admin-line); border-radius: 6px; color: var(--admin-ink); }
+.admin-page { max-width: 1560px; margin: 0 auto; }
+.admin-heading { display: flex; justify-content: space-between; align-items: flex-end; gap: 18px; margin: 0 0 22px; }
+.admin-eyebrow { color: var(--admin-copper); font-size: .72rem; font-weight: 700; text-transform: uppercase; }
+.admin-heading h1 { margin: 4px 0 0; color: var(--admin-ink); font-size: 1.65rem; font-weight: 750; }
+.admin-heading p { margin: 4px 0 0; color: var(--admin-muted); }
+.admin-metrics { margin-bottom: 22px; }
+.admin-metric { min-height: 106px; border-left: 3px solid var(--admin-copper) !important; }
+.admin-metric:nth-child(2) { border-left-color: #b24d3c !important; }
+.admin-metric:nth-child(3) { border-left-color: var(--admin-green) !important; }
+.admin-metric:nth-child(4) { border-left-color: #607b91 !important; }
+.admin-metric .card-body { display: flex; align-items: center; justify-content: space-between; padding: 18px; }
+.admin-metric-label { color: var(--admin-muted); font-size: .8rem; font-weight: 600; }
+.admin-metric-value { margin-top: 6px; color: var(--admin-ink); font-size: 1.6rem; line-height: 1.1; font-weight: 750; }
+.admin-metric-icon { display: grid; place-items: center; width: 38px; aspect-ratio: 1; border-radius: 5px; color: var(--admin-copper); background: var(--admin-copper-soft); }
+.admin-toolbar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding: 15px 18px; border-bottom: 1px solid var(--admin-line); }
+.admin-toolbar h2 { margin: 0; color: var(--admin-ink); font-size: 1rem; font-weight: 700; }
+.admin-toolbar .form-control { width: min(300px, 60vw); min-height: 38px; border-color: var(--admin-line); }
+.admin-toolbar .form-control:focus, .admin-form .form-control:focus { border-color: var(--admin-copper); box-shadow: 0 0 0 3px rgba(184,107,61,.12); }
+.admin-table { margin: 0; color: var(--admin-ink); font-size: .87rem; }
+.admin-table th { padding: 11px 13px; border-bottom: 1px solid var(--admin-line); background: #f6f7f5; color: #5f6965; font-size: .72rem; text-transform: uppercase; }
+.admin-table td { padding: 11px 13px; border-color: #edf0ed; vertical-align: middle; }
+.admin-table tbody tr:hover { background: #f8f9f7; }
+.admin-stock { display: inline-block; min-width: 66px; padding: 5px 8px; border-radius: 4px; background: #e9f1eb; color: #315b42; text-align: right; font-weight: 700; }
+.admin-stock.low { background: #f8e9e5; color: #943e31; }
+.admin-status { display: inline-block; padding: 4px 7px; border-radius: 4px; font-size: .72rem; font-weight: 700; }
+.admin-status.low { color: #943e31; background: #f8e9e5; }
+.admin-status.ok { color: #315b42; background: #e9f1eb; }
+.admin-actions .btn { width: 32px; height: 32px; padding: 0; }
+.admin-add-toggle { color: #fff; border-color: var(--admin-copper); background: var(--admin-copper); }
+.admin-add-toggle:hover { color: #fff; border-color: #9f572f; background: #9f572f; }
+.admin-form { margin-bottom: 18px; }
+.admin-form .card-header { padding: 14px 18px; border-bottom: 1px solid var(--admin-line); background: #fff; color: var(--admin-ink); font-weight: 700; }
+.admin-form .card-body { padding: 18px; }
+.admin-form .form-label { color: #535e59; font-size: .8rem; font-weight: 650; }
+#pageFooter { margin-top: 22px; padding: 14px 0; border-top: 1px solid var(--admin-line); color: var(--admin-muted); font-size: .78rem; }
+@media (max-width: 992px) {
+    body.admin-dashboard .topbar { width: 100%; margin-left: 0; }
+    body.admin-dashboard .main-content { margin-left: 0; padding: 20px 16px; }
+}
+@media (max-width: 575px) {
+    .admin-heading { align-items: flex-start; flex-direction: column; }
+    .admin-heading h1 { font-size: 1.4rem; }
+    .admin-toolbar { align-items: stretch; flex-direction: column; }
+    .admin-toolbar .form-control { width: 100%; }
+}
+@media print {
+    body.admin-dashboard .sidebar, body.admin-dashboard .topbar, .admin-toolbar, .admin-actions, .admin-form, #printReportBtn { display: none !important; }
+    body.admin-dashboard .main-content { margin: 0; padding: 0; }
+}
+</style>
+{% endblock %}
+
+{% block sidebar_navigation %}
+    <li class="nav-item"><a class="nav-link {% if view == 'summary' %}active{% endif %}" href="{{ url_for('admin_dashboard', view='summary') }}"><i class="fas fa-chart-simple me-2"></i>Overview</a></li>
+    <li class="nav-item"><a class="nav-link {% if view == 'inventory' %}active{% endif %}" href="{{ url_for('admin_dashboard', view='inventory') }}"><i class="fas fa-boxes-stacked me-2"></i>Inventory</a></li>
+    <li class="nav-item"><a class="nav-link" href="{{ url_for('staff_inventory') }}"><i class="fas fa-users me-2"></i>Staff workspace</a></li>
+    <li class="nav-item"><a class="nav-link" href="{{ url_for('export_logs') }}"><i class="fas fa-file-lines me-2"></i>Usage logs</a></li>
+    <li class="nav-item mt-auto"><a class="nav-link" href="{{ url_for('logout') }}"><i class="fas fa-arrow-right-from-bracket me-2"></i>Sign out</a></li>
+{% endblock %}
+
 {% block content %}
-<div class="d-flex min-vh-100">
-    <!-- Fixed Sidebar -->
-    <div class="sidebar bg-dark text-white p-4 d-flex flex-column" style="width: 250px; position: fixed; height: 100vh; top: 0; left: 0; z-index: 1000; box-shadow: 2px 0 10px rgba(0,0,0,0.3);">
-        <div class="sidebar-header text-center mb-5 py-4 border-bottom border-secondary">
-            <h3 class="fw-bold text-warning mb-0">🛩️ Aviation ERP</h3>
-            <small class="text-muted">Admin Panel</small>
-        </div>
-        
-        <nav class="nav nav-pills flex-column sidebar-nav mb-auto">
-            <a class="nav-link px-4 py-3 mb-2 rounded-3 sidebar-link {% if view == 'summary' %}active text-white bg-primary{% else %}text-white{% endif %}" href="{{ url_for('admin_dashboard', view='summary') }}">
-                <i class="fas fa-chart-bar me-3"></i>Summary
-            </a>
-            <a class="nav-link px-4 py-3 mb-2 rounded-3 sidebar-link {% if view == 'inventory' %}active text-white bg-primary{% else %}text-white{% endif %}" href="{{ url_for('admin_dashboard', view='inventory') }}">
-                <i class="fas fa-boxes me-3"></i>Inventory
-            </a>
-            <a class="nav-link text-white px-4 py-3 mb-2 rounded-3 sidebar-link" href="{{ url_for('staff_inventory') }}">
-                <i class="fas fa-users me-3"></i>Staff View
-            </a>
-            <a class="nav-link text-white px-4 py-3 mb-2 rounded-3 sidebar-link" href="{{ url_for('export_logs') }}">
-                <i class="fas fa-file-export me-3"></i>Usage Logs
-            </a>
-            <a class="nav-link px-4 py-3 mb-2 rounded-3 sidebar-link text-danger" href="{{ url_for('logout') }}">
-                <i class="fas fa-sign-out-alt me-3"></i>Logout
-            </a>
-        </nav>
-        
-        <div class="mt-auto pt-4">
-            <div class="dropdown">
-                <button class="btn btn-outline-light w-100 dropdown-toggle rounded-3 py-2" type="button" data-bs-toggle="dropdown">
-                    <i class="fas fa-user-circle me-2"></i>Admin
-                </button>
-                <ul class="dropdown-menu dropdown-menu-dark w-100">
-                    <li><a class="dropdown-item" href="#">Settings</a></li>
-                    <li><a class="dropdown-item" href="#">Logout</a></li>
-                </ul>
-            </div>
-        </div>
+<div class="admin-page">
+  <header class="admin-heading">
+    <div>
+      <div class="admin-eyebrow">Control room / {% if view == 'inventory' %}Inventory{% else %}Overview{% endif %}</div>
+    <h1>{% if view == 'inventory' %}Inventory management{% else %}Admin overview{% endif %}</h1>
+      <p class="mb-0">Inventory health, stock movement, and product management.</p>
     </div>
+    <button id="printReportBtn" class="btn btn-outline-secondary" type="button" onclick="window.print()" title="Print this view">
+      <i class="fas fa-print me-2" aria-hidden="true"></i>Print view
+    </button>
+  </header>
 
-    <!-- Main Content -->
-    <div class="flex-grow-1" style="margin-left: 250px; padding: 2rem;">
-        <div class="d-flex justify-content-center align-items-center mb-4 gap-3">
-            <h3 id="dynamic-greeting" class="text-white fw-bold mb-0 text-center" style="font-size: 2rem; text-shadow: 0 2px 4px rgba(0,0,0,0.5);">Welcome</h3>
-<button id="printReportBtn" class="btn btn-outline-light btn-lg px-4 py-2 fw-bold shadow-sm" style="border-color: #adb5bd; color: #adb5bd;" onclick="window.print()" title="Print Daily Report">
-                <i class="fas fa-print me-2"></i>Print Report
-            </button>
-        </div>
-        
-        <div class="container-fluid bg-gradient position-relative" style="min-height: 100vh; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
-            
-            {% if view == 'summary' %}
-                <!-- Summary View - Large Cards with High Contrast -->
-                <div class="row g-4 mb-5 justify-content-center">
-                    <div class="col-xl-3 col-lg-6 col-md-6">
-                        <div class="card h-100 border-0 shadow-lg summary-card">
-                            <div class="card-body p-5 text-center text-white">
-                                <i class="fas fa-boxes fa-4x text-primary mb-4"></i>
-                                <h1 class="fw-bold mb-2 fs-1">{{ total_items }}</h1>
-                                <p class="lead mb-0 summary-label">Total Items</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-xl-3 col-lg-6 col-md-6">
-                        <div class="card h-100 border-0 shadow-lg summary-card {% if low_stock_count > 0 %}border-warning shadow-warning{% endif %}">
-                            <div class="card-body p-5 text-center text-white">
-                                <i class="fas fa-exclamation-triangle fa-4x text-warning mb-4"></i>
-                                <h1 class="fw-bold mb-2 fs-1">{{ low_stock_count }}</h1>
-                                <p class="lead mb-0 summary-label">Low Stock Alert</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-xl-3 col-lg-6 col-md-6">
-                        <div class="card h-100 border-0 shadow-lg summary-card">
-                            <div class="card-body p-5 text-center text-white">
-                                <i class="fas fa-coins fa-4x text-success mb-4"></i>
-                                <h1 class="fw-bold mb-2 fs-display-4">{{ "%.2f"|format(total_inventory_value) }}</h1>
-                                <p class="lead mb-0 summary-label">Inventory Value</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-xl-3 col-lg-6 col-md-6">
-                        <div class="card h-100 border-0 shadow-lg summary-card">
-                            <div class="card-body p-5 text-center text-white">
-                                <i class="fas fa-history fa-4x text-info mb-4"></i>
-                                <h1 class="fw-bold mb-2 fs-1">{{ today_logs }}</h1>
-                                <p class="lead mb-0 summary-label">Today's Requests</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+  {% if view == 'summary' %}
+    <section class="row g-3 admin-metrics" aria-label="Inventory summary">
+      <div class="col-6 col-xl-3"><article class="card admin-metric h-100"><div class="card-body"><div><div class="admin-metric-label">Products</div><div class="admin-metric-value">{{ total_items }}</div></div><span class="admin-metric-icon"><i class="fas fa-boxes-stacked" aria-hidden="true"></i></span></div></article></div>
+      <div class="col-6 col-xl-3"><article class="card admin-metric h-100"><div class="card-body"><div><div class="admin-metric-label">Low stock</div><div class="admin-metric-value">{{ low_stock_count }}</div></div><span class="admin-metric-icon"><i class="fas fa-triangle-exclamation" aria-hidden="true"></i></span></div></article></div>
+      <div class="col-6 col-xl-3"><article class="card admin-metric h-100"><div class="card-body"><div><div class="admin-metric-label">Total stock quantity</div><div class="admin-metric-value">{{ "%.2f"|format(total_inventory_value) }}</div></div><span class="admin-metric-icon"><i class="fas fa-cubes" aria-hidden="true"></i></span></div></article></div>
+      <div class="col-6 col-xl-3"><article class="card admin-metric h-100"><div class="card-body"><div><div class="admin-metric-label">Issues today</div><div class="admin-metric-value">{{ today_logs }}</div></div><span class="admin-metric-icon"><i class="fas fa-arrow-right-arrow-left" aria-hidden="true"></i></span></div></article></div>
+    </section>
 
-                <!-- Quick Actions - High Contrast -->
-                <div class="row g-4">
-                    <div class="col-lg-4">
-                        <div class="card h-100 border-0 shadow-lg action-card">
-                            <div class="card-body p-4">
-                                <h4 class="card-title text-primary mb-3 fw-bold">📊 Recent Trends</h4>
-                                <p class="text-light lh-lg">Low stock items need attention. Check inventory for restock opportunities.</p>
-                                <a href="{{ url_for('admin_dashboard', view='inventory') }}" class="btn btn-primary fw-bold">View Inventory</a>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-lg-4">
-                        <div class="card h-100 border-0 shadow-lg action-card">
-                            <div class="card-body p-4">
-                                <h4 class="card-title text-success mb-3 fw-bold">💰 Value Summary</h4>
-                                <p class="text-light lh-lg">Total inventory valued at {{ "%.2f"|format(total_inventory_value) }} units.</p>
-                                <button id="exportFilteredBtn" class="btn btn-success fw-bold text-white" onclick="exportFilteredCSV()">📥 Export Filtered Results</button>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-lg-4">
-                        <div class="card h-100 border-0 shadow-lg action-card">
-                            <div class="card-body p-4">
-                                <h4 class="card-title text-info mb-3 fw-bold">📈 Activity Today</h4>
-                                <p class="text-light lh-lg">{{ today_logs }} requests processed today.</p>
-                                <a href="{{ url_for('export_logs') }}" class="btn btn-info fw-bold text-white">View Logs</a>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+    <section class="row g-3" aria-label="Admin shortcuts">
+      <div class="col-lg-7"><article class="card h-100"><div class="card-body p-4 d-flex flex-column align-items-start">
+        <div class="admin-eyebrow mb-2">Needs attention</div>
+        <h2 class="h5 fw-bold mb-2">{{ low_stock_count }} products below their minimum</h2>
+        <p class="mb-3 text-secondary">Review stock levels and transfer parent stock where available.</p>
+        <a href="{{ url_for('admin_dashboard', view='inventory') }}" class="btn admin-add-toggle mt-auto"><i class="fas fa-boxes-stacked me-2" aria-hidden="true"></i>Open inventory</a>
+      </div></article></div>
+      <div class="col-lg-5"><article class="card h-100"><div class="card-body p-4 d-flex flex-column align-items-start">
+        <div class="admin-eyebrow mb-2">Operations</div>
+        <h2 class="h5 fw-bold mb-2">Daily usage activity</h2>
+        <p class="mb-3 text-secondary">{{ today_logs }} requests recorded today.</p>
+        <a href="{{ url_for('export_logs') }}" class="btn btn-outline-secondary mt-auto"><i class="fas fa-file-export me-2" aria-hidden="true"></i>Export usage logs</a>
+      </div></article></div>
+    </section>
                 
             {% elif view == 'inventory' %}
-                <!-- Inventory View -->
-                <div class="row mb-4">
-                    <div class="col-12">
-                        <button class="btn btn-success btn-lg w-100 py-3 fs-4 fw-bold shadow-lg mb-4" type="button" data-bs-toggle="collapse" data-bs-target="#addProductForm">
-                            ➕ Add New Product
-                        </button>
+                <section class="card admin-form">
+                  <header class="admin-toolbar">
+                    <div><h2>Inventory list</h2><small class="text-secondary">{{ total_items }} products</small></div>
+                    <div class="d-flex flex-wrap align-items-center gap-2">
+                      <input type="search" id="tableSearch" class="form-control" placeholder="Search SKU or product name" aria-label="Search inventory">
+                      <a href="{{ url_for('export_products') }}" class="btn btn-outline-secondary"><i class="fas fa-download me-2" aria-hidden="true"></i>Export CSV</a>
+                      <button class="btn admin-add-toggle" type="button" data-bs-toggle="collapse" data-bs-target="#addProductForm" aria-expanded="false" aria-controls="addProductForm"><i class="fas fa-plus me-2" aria-hidden="true"></i>Add product</button>
                     </div>
-                </div>
+                  </header>
+                  <div class="collapse" id="addProductForm">
+                    <div class="card-body border-top">
+                      <h3 class="h6 fw-bold mb-3">New product details</h3>
+                      <form method="POST" action="{{ url_for('admin_add_product') }}">
+                        <div class="row g-3">
+                          <div class="col-sm-6 col-lg-2"><label class="form-label" for="newSku">SKU <span class="text-danger">*</span></label><input id="newSku" type="text" class="form-control" name="sku" required></div>
+                          <div class="col-sm-6 col-lg-3"><label class="form-label" for="newName">Product name <span class="text-danger">*</span></label><input id="newName" type="text" class="form-control" name="name" required></div>
+                          <div class="col-sm-6 col-lg-2"><label class="form-label" for="newUnit">Unit <span class="text-danger">*</span></label><input id="newUnit" type="text" class="form-control" name="unit_of_measure" placeholder="L, kg, m²" required></div>
+                          <div class="col-sm-6 col-lg-2"><label class="form-label" for="newStock">Current stock</label><input id="newStock" type="number" step="0.01" class="form-control" name="current_stock" value="0"></div>
+                          <div class="col-sm-6 col-lg-1"><label class="form-label" for="newParentStock">Parent</label><input id="newParentStock" type="number" step="0.01" class="form-control" name="parent_stock" value="0"></div>
+                          <div class="col-sm-6 col-lg-2"><label class="form-label" for="newMinStock">Min level</label><input id="newMinStock" type="number" step="0.01" class="form-control" name="min_stock_level" value="0"></div>
+                        </div>
+                        <div class="text-end mt-3"><button type="submit" class="btn admin-add-toggle"><i class="fas fa-plus me-2" aria-hidden="true"></i>Create product</button></div>
+                      </form>
+                    </div>
+                  </div>
+                </section>
 
-                <div class="collapse" id="addProductForm">
-                    <div class="card mb-5 shadow-lg">
-                        <div class="card-header bg-primary text-white">
-                            <h3 class="mb-0">➕ New Product Details</h3>
-                        </div>
-                        <div class="card-body p-5" style="background: linear-gradient(145deg, #2c3e50 0%, #34495e 100%); color: #ecf0f1;">
-                            <form method="POST" action="{{ url_for('admin_add_product') }}">
-                                <div class="row g-4">
-                                    <div class="col-md-3">
-                                        <label class="form-label fw-bold text-light" style="color: #ecf0f1 !important;">SKU <span class="text-danger">*</span></label>
-                                        <input type="text" class="form-control form-control-lg" name="sku" required style="background: #34495e; color: #ecf0f1; border: 2px solid transparent; transition: all 0.3s ease;" onfocus="this.style.borderColor='#3498db'; this.style.boxShadow='0 0 10px rgba(52, 152, 219, 0.3)'" onblur="this.style.borderColor='transparent'; this.style.boxShadow='none'">
-                                    </div>
-                                    <div class="col-md-4">
-                                        <label class="form-label fw-bold text-light" style="color: #ecf0f1 !important;">Name <span class="text-danger">*</span></label>
-                                        <input type="text" class="form-control form-control-lg" name="name" required style="background: #34495e; color: #ecf0f1; border: 2px solid transparent; transition: all 0.3s ease;" onfocus="this.style.borderColor='#3498db'; this.style.boxShadow='0 0 10px rgba(52, 152, 219, 0.3)'" onblur="this.style.borderColor='transparent'; this.style.boxShadow='none'">
-                                    </div>
-                                    <div class="col-md-2">
-                                        <label class="form-label fw-bold text-light" style="color: #ecf0f1 !important;">Unit <span class="text-danger">*</span></label>
-                                        <input type="text" class="form-control form-control-lg" name="unit_of_measure" required placeholder="L, KG" style="background: #34495e; color: #ecf0f1; border: 2px solid transparent; transition: all 0.3s ease;" onfocus="this.style.borderColor='#3498db'; this.style.boxShadow='0 0 10px rgba(52, 152, 219, 0.3)'" onblur="this.style.borderColor='transparent'; this.style.boxShadow='none'">
-                                    </div>
-                                    <div class="col-md-2">
-                                        <label class="form-label fw-bold text-light" style="color: #ecf0f1 !important;">Current Stock</label>
-                                        <input type="number" step="0.01" class="form-control form-control-lg" name="current_stock" value="0" style="background: #34495e; color: #ecf0f1; border: 2px solid transparent; transition: all 0.3s ease;" onfocus="this.style.borderColor='#3498db'; this.style.boxShadow='0 0 10px rgba(52, 152, 219, 0.3)'" onblur="this.style.borderColor='transparent'; this.style.boxShadow='none'">
-                                    </div>
-                                    <div class="col-md-1">
-                                        <label class="form-label fw-bold text-light" style="color: #ecf0f1 !important;">Parent Stock</label>
-                                        <input type="number" step="0.01" class="form-control form-control-lg" name="parent_stock" value="0" style="background: #34495e; color: #ecf0f1; border: 2px solid transparent; transition: all 0.3s ease;" onfocus="this.style.borderColor='#3498db'; this.style.boxShadow='0 0 10px rgba(52, 152, 219, 0.3)'" onblur="this.style.borderColor='transparent'; this.style.boxShadow='none'">
-                                    </div>
-                                    <div class="col-md-1">
-                                        <label class="form-label fw-bold text-light" style="color: #ecf0f1 !important;">Min Level</label>
-                                        <input type="number" step="0.01" class="form-control form-control-lg" name="min_stock_level" value="0" style="background: #34495e; color: #ecf0f1; border: 2px solid transparent; transition: all 0.3s ease;" onfocus="this.style.borderColor='#3498db'; this.style.boxShadow='0 0 10px rgba(52, 152, 219, 0.3)'" onblur="this.style.borderColor='transparent'; this.style.boxShadow='none'">
-                                    </div>
-                                </div>
-                                <div class="text-end mt-4">
-                                    <button type="submit" class="btn btn-primary btn-lg px-5 py-2 fw-bold">Add Product</button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Products Table -->
-                <div class="card shadow-lg border-0">
-                    <div class="card-header bg-dark text-white">
-                        <div class="row align-items-center">
-                            <div class="col">
-                                <h2 class="mb-0 fw-bold">📦 Inventory Management</h2>
-                            </div>
-                            <div class="col-auto">
-                                <input type="text" id="tableSearch" class="form-control form-control-lg" placeholder="Search SKU or Name...">
-                                <button id="exportFilteredBtnInventory" class="btn btn-success ms-2 fw-bold" onclick="exportFilteredCSV()">📥 Export Filtered</button>
-                            </div>
-                        </div>
-                    </div>
+                <div class="card">
                     <div class="card-body p-0">
                         <div class="table-responsive">
-                            <table class="table table-hover mb-0">
-                                <thead class="table-dark">
+                            <table class="table admin-table table-hover mb-0">
+                                <thead>
                                     <tr>
                                         <th>SKU</th>
                                         <th>Name</th>
@@ -210,12 +173,12 @@
                                 </thead>
                                 <tbody id="productsTable">
                                     {% for product in all_products %}
-                                    <tr class="product-row align-middle {% if view == 'inventory' and (product.current_stock or 0) > (product.min_stock_level or 0) %}hide-by-default{% endif %} low-stock-{{ (product.current_stock or 0) <= (product.min_stock_level or 0) }}">
+                                    <tr class="product-row align-middle">
                                         <td class="fw-bold">{{ product.sku or '-' }}</td>
                                         <td>{{ product.name or '-' }}</td>
                                         <td>{{ product.unit_of_measure or '-' }}</td>
                                         <td>
-                                            <span class="badge {% if (product.current_stock or 0) < (product.min_stock_level or 0) %}bg-danger{% else %}bg-success{% endif %} fs-6 px-3 py-2">
+                                            <span class="admin-stock {% if (product.current_stock or 0) < (product.min_stock_level or 0) %}low{% endif %}">
                                                 {{ "%.2f"|format(product.current_stock or 0) }}
                                             </span>
                                         </td>
@@ -223,21 +186,21 @@
                                         <td class="fw-semibold">{{ "%.2f"|format(product.min_stock_level or 0) }}</td>
                                         <td>
                                             {% if (product.current_stock or 0) < (product.min_stock_level or 0) %}
-                                                <span class="badge bg-warning text-dark px-3 py-2">⚠️ Low</span>
+                                                <span class="admin-status low">Low stock</span>
                                             {% else %}
-                                                <span class="badge bg-success px-3 py-2">✅ OK</span>
+                                                <span class="admin-status ok">In stock</span>
                                             {% endif %}
                                         </td>
                                         <td>
-                                            <div class="btn-group" role="group">
-                                                <a href="{{ url_for('edit_product', product_id=product.id) }}" class="btn btn-outline-primary btn-sm">
+                                            <div class="btn-group admin-actions" role="group" aria-label="Actions for {{ product.name }}">
+                                                <a href="{{ url_for('edit_product', product_id=product.id) }}" class="btn btn-outline-secondary btn-sm" title="Edit product" aria-label="Edit {{ product.name }}">
                                                     <i class="fas fa-edit"></i>
                                                 </a>
-                                                <button class="btn btn-outline-info btn-sm" onclick="openTransferModal('{{ product.id }}', '{{ product.name }}', {{ product.parent_stock or 0 }})">
+                                                <button type="button" class="btn btn-outline-secondary btn-sm" title="Transfer parent stock" aria-label="Transfer stock for {{ product.name }}" onclick="openTransferModal('{{ product.id }}', '{{ product.name }}', {{ product.parent_stock or 0 }})">
                                                     <i class="fas fa-exchange-alt"></i>
                                                 </button>
                                                 <form method="POST" action="{{ url_for('delete_product', product_id=product.id) }}" style="display: inline;" onsubmit="return confirm('Delete {{ product.name }}?');">
-                                                    <button type="submit" class="btn btn-outline-danger btn-sm">
+                                                    <button type="submit" class="btn btn-outline-danger btn-sm" title="Delete product" aria-label="Delete {{ product.name }}">
                                                         <i class="fas fa-trash"></i>
                                                     </button>
                                                 </form>
@@ -245,6 +208,10 @@
                                         </td>
                                     </tr>
                                     {% endfor %}
+                                    {% if not all_products %}
+                                    <tr><td colspan="8" class="py-5 text-center text-secondary">No inventory products yet. Add a product to get started.</td></tr>
+                                    {% endif %}
+                                    <tr id="emptySearchState" hidden><td colspan="8" class="py-4 text-center text-secondary">No products match this search.</td></tr>
                                 </tbody>
                             </table>
                         </div>
@@ -252,47 +219,45 @@
                 </div>
                 
             {% else %}
-                <div class="alert alert-info text-white">
-                    <i class="fas fa-info-circle me-2"></i>Select Summary or Inventory from the sidebar.
+                <div class="alert alert-light border">
+                    <i class="fas fa-circle-info me-2"></i>Select an admin view from the sidebar.
                 </div>
             {% endif %}
             
 
             <!-- Footer -->
-            <footer id="pageFooter" class="mt-5 pt-4 pb-3 border-top" style="color: #adb5bd; font-size: 0.875rem; text-align: center;">
-                System Live | Refreshes every 5 minutes | Last updated: <span id="lastUpdateTime"></span>
+            <footer id="pageFooter">
+                <i class="fas fa-shield-halved me-1" aria-hidden="true"></i>Administration <span class="mx-2">·</span>Last viewed <time id="lastUpdateTime"></time>
             </footer>
         </div>
-    </div>
-</div>
 
 <!-- Transfer to Staff Modal -->
 <div class="modal fade" id="transferModal" tabindex="-1" aria-labelledby="transferModalLabel">
   <div class="modal-dialog modal-sm">
     <div class="modal-content">
-      <div class="modal-header bg-info text-white">
-        <h5 class="modal-title" id="transferModalLabel">🔄 Transfer to Staff Stock</h5>
-        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold" id="transferModalLabel">Transfer parent stock</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <form method="POST" action="{{ url_for('admin_transfer_stock') }}">
         <div class="modal-body">
           <input type="hidden" id="transferProductId" name="product_id">
           <div class="mb-3">
-            <label class="form-label fw-bold">Product</label>
+            <label class="form-label fw-bold" for="transferProductName">Product</label>
             <input id="transferProductName" class="form-control" readonly>
           </div>
           <div class="mb-3">
-            <label class="form-label fw-bold">Available Parent Stock</label>
-            <input id="transferAvailableStock" class="form-control bg-secondary" readonly>
+            <label class="form-label fw-bold" for="transferAvailableStock">Available parent stock</label>
+            <input id="transferAvailableStock" class="form-control" readonly>
           </div>
           <div class="mb-3">
-            <label class="form-label fw-bold">Transfer Amount <span class="text-danger">*</span></label>
+            <label class="form-label fw-bold" for="transferQuantity">Transfer amount <span class="text-danger">*</span></label>
             <input type="number" name="quantity" id="transferQuantity" step="0.001" min="0.001" class="form-control" required>
           </div>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-          <button type="submit" class="btn btn-info text-white fw-bold">Transfer Now</button>
+          <button type="submit" class="btn admin-add-toggle fw-bold">Transfer stock</button>
         </div>
       </form>
     </div>
@@ -311,212 +276,27 @@ function openTransferModal(id, name, available) {
 }
 </script>
 
-<!-- Enhanced Styles for High Contrast -->
-<style>
-.sidebar-link:hover {
-    background: rgba(255,255,255,0.1) !important;
-    transform: translateX(5px);
-    transition: all 0.2s ease;
-}
-.glass-effect, .summary-card {
-    backdrop-filter: blur(10px);
-    background: rgba(0,0,0,0.4) !important;
-    border: 1px solid rgba(255,255,255,0.2) !important;
-    color: #ffffff !important;
-}
-.summary-card h1, .summary-card .summary-label {
-    color: #ffffff !important;
-    text-shadow: 0 1px 3px rgba(0,0,0,0.5);
-}
-.action-card {
-    backdrop-filter: blur(10px);
-    background: rgba(0,0,0,0.3) !important;
-    border: 1px solid rgba(255,255,255,0.2) !important;
-}
-.action-card h4, .action-card p {
-    color: #f8f9fa !important;
-    text-shadow: 0 1px 2px rgba(0,0,0,0.5);
-}
-.action-card .btn {
-    font-weight: 700 !important;
-    text-shadow: none;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-}
-.card:hover {
-    transform: translateY(-5px);
-    transition: all 0.3s ease;
-}
-.product-row:hover {
-    background-color: #fff3cd !important;
-    transform: scale(1.01);
-}
-
-/* Inventory view filtering */
-.inventory-view .hide-by-default {
-    display: none;
-}
-.inventory-view tr.low-stock-true {
-    display: table-row;
-}
-.inventory-view.search-active .hide-by-default {
-    display: table-row;
-}
-
-#tableSearch {
-    min-width: 300px;
-}
-.btn {
-    transition: all 0.2s ease;
-}
-.fs-display-4 { font-size: 3rem !important; }
-
-#pageFooter {
-    color: #adb5bd !important;
-    background: rgba(0,0,0,0.2);
-}
-.alert-info {
-    background: rgba(13, 202, 240, 0.2) !important;
-    border: 1px solid rgba(13, 202, 240, 0.5) !important;
-}
-.text-white { color: #ffffff !important; }
-.text-light { color: #f8f9fa !important; }
-#exportFilteredBtn {
-    font-weight: 700;
-}
-
-@media print {
-    * { color: #000 !important; }
-    .sidebar, #printReportBtn, #tableSearch, #exportFilteredBtnInventory, #addProductForm, .sidebar-link[href*='logout'] { display: none !important; }
-    th:last-child, td:last-child { display: none !important; }
-    body { margin-left: 0 !important; padding: 1rem !important; background: white !important; font-size: 12pt !important; }
-    .container-fluid, .table-responsive { width: 100% !important; background: white !important; }
-    .table { width: 100% !important; font-size: 11pt !important; }
-    .card-header { background: #f8f9fa !important; color: #000 !important; border-bottom: 2px solid #dee2e6 !important; }
-    .table-dark { background: white !important; color: #000 !important; }
-    .badge { -webkit-print-color-adjust: exact !important; color: black !important; border: 1px solid #000 !important; }
-    h1 { page-break-after: avoid; font-size: 18pt !important; }
-    h2, h3 { page-break-after: avoid; }
-}
-
-#dynamic-greeting { 
-    display: block !important; 
-    font-size: 24pt !important; 
-    text-align: center !important; 
-}
-</style>
-
-<!-- Smart Filtered Export Script -->
+<!-- Admin inventory interactions -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const searchInput = document.getElementById('tableSearch');
     const productsTable = document.getElementById('productsTable');
-    
     if (searchInput && productsTable) {
         const rows = document.querySelectorAll('.product-row');
-        
-        function filterTable(term) {
-            const lowerTerm = term.toLowerCase();
+        searchInput.addEventListener('input', function() {
+            const term = searchInput.value.toLowerCase().trim();
+        let visibleRows = 0;
             rows.forEach(row => {
-                const text = row.textContent.toLowerCase();
-                row.style.display = text.includes(lowerTerm) ? '' : 'none';
+                row.hidden = !row.textContent.toLowerCase().includes(term);
+          if (!row.hidden) visibleRows += 1;
             });
-        }
-        
-        searchInput.addEventListener('keyup', function() {
-            filterTable(this.value);
+        const emptySearchState = document.getElementById('emptySearchState');
+        if (emptySearchState) emptySearchState.hidden = term.length === 0 || visibleRows > 0;
         });
     }
-    
-    // Universal Filtered CSV Export
-    window.exportFilteredCSV = function() {
-        const rows = document.querySelectorAll('#productsTable .product-row');
-        const visibleRows = Array.from(rows).filter(row => row.style.display !== 'none');
-        
-        if (visibleRows.length === 0) {
-            alert('No matching results to export. Try a different search term.');
-            return;
-        }
-        
-        let csvContent = 'SKU,Name,Unit,Stock,Min Level,Status\n';
-        
-        visibleRows.forEach(row => {
-            const cells = row.querySelectorAll('td');
-            if (cells.length >= 6) {
-                const sku = cells[0].textContent.trim().replace(/"/g, '""');
-                const name = cells[1].textContent.trim().replace(/"/g, '""');
-                const unit = cells[2].textContent.trim().replace(/"/g, '""');
-                const stock = cells[3].textContent.trim();
-                const minLevel = cells[4].textContent.trim();
-                const status = cells[5].textContent.trim().replace(/"/g, '""');
-                
-                csvContent += `"${sku}","${name}","${unit}","${stock}","${minLevel}","${status}"\n`;
-            }
-        });
-        
-        // Create and trigger download
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement('a');
-        const url = URL.createObjectURL(blob);
-        link.setAttribute('href', url);
-        link.setAttribute('download', `filtered_inventory_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.csv`);
-        link.style.visibility = 'hidden';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-    };
-});
-
-// Enhanced 5-minute auto-refresh: Skip if typing in search bar or Add Product form
-let refreshInterval = 300000; // 5 minutes
-let refreshTimer = setTimeout(safeRefresh, refreshInterval);
-
-function safeRefresh() {
-    const searchInput = document.getElementById('tableSearch');
-    const formInputs = document.querySelectorAll('#addProductForm .form-control');
-    const activeElement = document.activeElement;
-    
-    // Skip if focused on search or any form input
-    if (activeElement === searchInput || Array.from(formInputs).includes(activeElement)) {
-        refreshTimer = setTimeout(safeRefresh, refreshInterval);
-        return;
-    }
-    
-    location.reload();
-}
-
-// Dynamic Greeting + Timestamp + Search
-document.addEventListener('DOMContentLoaded', function() {
-    // Greeting
-    const greetingEl = document.getElementById('dynamic-greeting');
-    if (greetingEl) {
-        const hour = new Date().getHours();
-        let greeting = 'Good Morning';
-        if (hour >= 12 && hour < 17) greeting = 'Good Afternoon';
-        else if (hour >= 17 || hour < 5) greeting = 'Good Evening';
-        greetingEl.textContent = `${greeting}!`;
-    }
-    
-    // Timestamp
     const timeSpan = document.getElementById('lastUpdateTime');
     if (timeSpan) {
         timeSpan.textContent = new Date().toLocaleString();
-    }
-    
-    // Search filter
-    const searchInput = document.getElementById('tableSearch');
-    const productsTable = document.getElementById('productsTable');
-    if (searchInput && productsTable) {
-        const rows = document.querySelectorAll('.product-row');
-        function filterTable(term) {
-            const lowerTerm = term.toLowerCase();
-            rows.forEach(row => {
-                const text = row.textContent.toLowerCase();
-                row.style.display = text.includes(lowerTerm) ? '' : 'none';
-            });
-        }
-        searchInput.addEventListener('keyup', function() {
-            filterTable(this.value);
-        });
     }
 });
 </script>
