@@ -8,7 +8,7 @@ from flask import Flask, render_template, request, redirect, url_for, flash, ses
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy import desc, text
+from sqlalchemy import desc, text, UniqueConstraint
 from sqlalchemy.engine import make_url
 from sqlalchemy.dialects.postgresql import UUID
 from datetime import datetime, timedelta
@@ -65,6 +65,52 @@ class UsageLog(db.Model):
     project_ref = db.Column(db.String(100))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
+class TintRecipe(db.Model):
+    __tablename__ = 'tint_recipes'
+
+    id = db.Column(db.Integer, primary_key=True)
+    project_ref = db.Column(db.String(100), nullable=False, unique=True, index=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+class TintRecipeIngredient(db.Model):
+    __tablename__ = 'tint_recipe_ingredients'
+
+    id = db.Column(db.Integer, primary_key=True)
+    recipe_id = db.Column(db.Integer, db.ForeignKey('tint_recipes.id', ondelete='CASCADE'), nullable=False, index=True)
+    product_id = db.Column(UUID(as_uuid=True), db.ForeignKey('products.id', ondelete='SET NULL'))
+    product_sku = db.Column(db.String(50))
+    product_name = db.Column(db.String(100), nullable=False)
+    unit_of_measure = db.Column(db.String(20))
+    quantity = db.Column(db.Float, nullable=False)
+
+    __table_args__ = (UniqueConstraint('recipe_id', 'product_id', name='uq_tint_recipe_product'),)
+
+_tint_recipe_schema_ready = False
+
+def ensure_tint_recipe_tables():
+    global _tint_recipe_schema_ready
+    if not _tint_recipe_schema_ready:
+        db.metadata.create_all(
+            bind=db.engine,
+            tables=[TintRecipe.__table__, TintRecipeIngredient.__table__],
+            checkfirst=True
+        )
+        _tint_recipe_schema_ready = True
+
+def get_product_units():
+    rows = db.session.query(Product.unit_of_measure).filter(
+        Product.unit_of_measure.isnot(None),
+        Product.unit_of_measure != ''
+    ).distinct().order_by(Product.unit_of_measure).all()
+    return [row[0] for row in rows]
+
+def get_submitted_unit():
+    selected_unit = request.form.get('unit_of_measure', '').strip()
+    if selected_unit == '__custom__':
+        return request.form.get('custom_unit_of_measure', '').strip()
+    return selected_unit
+
 CORS(app)
 
 USAGE_PERIOD_LABELS = {
@@ -98,6 +144,7 @@ def index():
 
 @app.route('/staff-inventory')
 def staff_inventory():
+    ensure_tint_recipe_tables()
     search_query = request.args.get('search', '')
     activity_filter = request.args.get('activity_filter', '')
     
@@ -123,9 +170,34 @@ def staff_inventory():
     recent_logs = logs_query.limit(10).all()
     
     all_items = paints + carpets + others
-    at_risk_count = len([p for p in all_items if (p.current_stock or 0) < 2 * (p.min_stock_level or 0)])
+    low_stock_products = [p for p in all_products if (p.current_stock or 0) < (p.min_stock_level or 0)]
+    low_stock_count = len(low_stock_products)
+    tint_projects = [row[0] for row in db.session.query(TintRecipe.project_ref).order_by(TintRecipe.project_ref).all()]
     
-    return render_template('staff_dashboard.html', paints=paints, carpets=carpets, others=others, recent_logs=recent_logs, search_query=search_query, activity_filter=activity_filter, at_risk_count=at_risk_count)
+    return render_template('staff_dashboard.html', paints=paints, carpets=carpets, others=others, recent_logs=recent_logs, search_query=search_query, activity_filter=activity_filter, low_stock_products=low_stock_products, low_stock_count=low_stock_count, tint_projects=tint_projects)
+
+@app.route('/api/tint-recipes')
+def api_tint_recipes():
+    project_ref = request.args.get('project_ref', '').strip()
+    if not project_ref:
+        return jsonify([])
+
+    ensure_tint_recipe_tables()
+    recipe = TintRecipe.query.filter(db.func.lower(TintRecipe.project_ref) == project_ref.lower()).first()
+    if not recipe:
+        return jsonify([])
+
+    ingredients = db.session.query(TintRecipeIngredient, Product).outerjoin(
+        Product, Product.id == TintRecipeIngredient.product_id
+    ).filter(TintRecipeIngredient.recipe_id == recipe.id).order_by(TintRecipeIngredient.product_name).all()
+    return jsonify([{
+        'product_id': str(ingredient.product_id or ''),
+        'sku': ingredient.product_sku or '-',
+        'name': ingredient.product_name,
+        'unit': ingredient.unit_of_measure or '',
+        'quantity': float(ingredient.quantity),
+        'available_stock': float(product.current_stock or 0) if product else 0
+    } for ingredient, product in ingredients])
 
 @app.route('/export-logs')
 def export_logs():
@@ -333,15 +405,15 @@ def admin_dashboard():
     # Today's usage logs count
     today_logs = UsageLog.query.filter(db.func.date(UsageLog.created_at) == datetime.now().date()).count()
     
-    return render_template('admin.html', view=view, display_products=display_products, all_products=all_products, total_items=total_items, low_stock_count=low_stock_count, total_inventory_value=total_inventory_value, today_logs=today_logs)
+    return render_template('admin.html', view=view, display_products=display_products, all_products=all_products, total_items=total_items, low_stock_count=low_stock_count, total_inventory_value=total_inventory_value, today_logs=today_logs, unit_options=get_product_units())
 
 @app.route('/admin/add-product', methods=['POST'])
 def admin_add_product():
     name = request.form['name'].strip()
     sku = request.form['sku'].strip()
-    unit_of_measure = request.form['unit_of_measure'].strip()
+    unit_of_measure = get_submitted_unit()
     
-    if not name or not sku or not unit_of_measure:
+    if not name or not sku or not unit_of_measure or len(unit_of_measure) > 20:
         flash('Please fill in all required fields: Name, SKU, Unit of Measure.', 'error')
         return redirect(url_for('admin_dashboard'))
     
@@ -374,7 +446,12 @@ def issue_item():
         product_id = request.form['product_id']
         quantity_used = float(request.form['quantity_used'])
         technician_name = request.form['technician_name']
-        project_ref = request.form.get('project_ref', '')
+        project_ref = request.form.get('project_ref', '').strip()
+        is_tinting = request.form.get('is_tinting') == 'on'
+
+        if len(project_ref) > 100 or (is_tinting and not project_ref):
+            flash('Tinting recipes require a project reference of no more than 100 characters.', 'error')
+            return redirect(url_for('staff_inventory'))
         
         product = Product.query.get(product_id)
         if not product:
@@ -401,8 +478,36 @@ def issue_item():
             product_sku=sku_to_save
         )
         db.session.add(usage_log)
+
+        if is_tinting:
+            ensure_tint_recipe_tables()
+            recipe = TintRecipe.query.filter(
+                db.func.lower(TintRecipe.project_ref) == project_ref.lower()
+            ).first()
+            if not recipe:
+                recipe = TintRecipe(project_ref=project_ref)
+                db.session.add(recipe)
+                db.session.flush()
+
+            ingredient = TintRecipeIngredient.query.filter_by(
+                recipe_id=recipe.id,
+                product_id=product.id
+            ).first()
+            if ingredient:
+                ingredient.quantity += quantity_used
+            else:
+                db.session.add(TintRecipeIngredient(
+                    recipe_id=recipe.id,
+                    product_id=product.id,
+                    product_sku=product.sku,
+                    product_name=product.name or 'Unnamed product',
+                    unit_of_measure=product.unit_of_measure,
+                    quantity=quantity_used
+                ))
+            recipe.updated_at = datetime.utcnow()
+
         db.session.commit()
-        flash('Successfully issued item', 'success')
+        flash('Item issued and added to the saved tint recipe.' if is_tinting else 'Successfully issued item', 'success')
     except Exception as e:
         db.session.rollback()
         flash(f'Database error occurred. Please try again. ({str(e)})', 'error')
@@ -466,9 +571,13 @@ def edit_product(product_id):
     product = Product.query.get_or_404(product_id)
     
     if request.method == 'POST':
+        unit_of_measure = get_submitted_unit()
+        if not unit_of_measure or len(unit_of_measure) > 20:
+            flash('Enter a unit of measure no longer than 20 characters.', 'error')
+            return render_template('edit_product.html', product=product, unit_options=get_product_units())
         product.sku = request.form['sku'].strip()
         product.name = request.form['name'].strip()
-        product.unit_of_measure = request.form['unit_of_measure'].strip()
+        product.unit_of_measure = unit_of_measure
         product.current_stock += float(request.form.get('current_stock') or 0)
         product.parent_stock += float(request.form.get('parent_stock') or 0)
         product.min_stock_level = float(request.form.get('min_stock_level', product.min_stock_level))
@@ -481,7 +590,7 @@ def edit_product(product_id):
             db.session.rollback()
             flash('SKU already exists. Please choose a unique SKU.', 'error')
     
-    return render_template('edit_product.html', product=product)
+    return render_template('edit_product.html', product=product, unit_options=get_product_units())
 
 port = int(os.environ.get('PORT', 10000))
 

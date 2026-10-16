@@ -38,6 +38,8 @@ body.admin-dashboard .modal-content { border: 1px solid var(--admin-line); borde
 .admin-heading p { margin: 4px 0 0; color: var(--admin-muted); }
 .admin-metrics { margin-bottom: 22px; }
 .admin-metric { min-height: 106px; border-left: 3px solid var(--admin-copper) !important; }
+.admin-metric-button { width: 100%; color: inherit; text-align: left; cursor: pointer; font: inherit; }
+.admin-metric-button:focus-visible { outline: 3px solid rgba(184,107,61,.3); outline-offset: 2px; }
 .admin-metric:nth-child(2) { border-left-color: #b24d3c !important; }
 .admin-metric:nth-child(3) { border-left-color: var(--admin-green) !important; }
 .admin-metric:nth-child(4) { border-left-color: #607b91 !important; }
@@ -109,7 +111,7 @@ body.admin-dashboard .modal-content { border: 1px solid var(--admin-line); borde
   {% if view == 'summary' %}
     <section class="row g-3 admin-metrics" aria-label="Inventory summary">
       <div class="col-6 col-xl-3"><article class="card admin-metric h-100"><div class="card-body"><div><div class="admin-metric-label">Products</div><div class="admin-metric-value">{{ total_items }}</div></div><span class="admin-metric-icon"><i class="fas fa-boxes-stacked" aria-hidden="true"></i></span></div></article></div>
-      <div class="col-6 col-xl-3"><article class="card admin-metric h-100"><div class="card-body"><div><div class="admin-metric-label">Low stock</div><div class="admin-metric-value">{{ low_stock_count }}</div></div><span class="admin-metric-icon"><i class="fas fa-triangle-exclamation" aria-hidden="true"></i></span></div></article></div>
+      <div class="col-6 col-xl-3"><button type="button" class="card admin-metric admin-metric-button h-100" data-bs-toggle="modal" data-bs-target="#adminLowStockModal" aria-label="View {{ low_stock_count }} low-stock products"><span class="card-body"><span><span class="admin-metric-label">Low stock</span><span class="admin-metric-value d-block">{{ low_stock_count }}</span></span><span class="admin-metric-icon"><i class="fas fa-triangle-exclamation" aria-hidden="true"></i></span></span></button></div>
       <div class="col-6 col-xl-3"><article class="card admin-metric h-100"><div class="card-body"><div><div class="admin-metric-label">Total stock quantity</div><div class="admin-metric-value">{{ "%.2f"|format(total_inventory_value) }}</div></div><span class="admin-metric-icon"><i class="fas fa-cubes" aria-hidden="true"></i></span></div></article></div>
       <div class="col-6 col-xl-3"><article class="card admin-metric h-100"><div class="card-body"><div><div class="admin-metric-label">Issues today</div><div class="admin-metric-value">{{ today_logs }}</div></div><span class="admin-metric-icon"><i class="fas fa-arrow-right-arrow-left" aria-hidden="true"></i></span></div></article></div>
     </section>
@@ -128,6 +130,22 @@ body.admin-dashboard .modal-content { border: 1px solid var(--admin-line); borde
         <a href="{{ url_for('admin_usage_logs') }}" class="btn btn-outline-secondary mt-auto"><i class="fas fa-file-lines me-2" aria-hidden="true"></i>Open usage logs</a>
       </div></article></div>
     </section>
+
+    <div class="modal fade" id="adminLowStockModal" tabindex="-1" aria-labelledby="adminLowStockTitle" aria-hidden="true">
+      <div class="modal-dialog modal-lg modal-dialog-scrollable"><div class="modal-content">
+        <div class="modal-header"><div><h2 id="adminLowStockTitle" class="modal-title h5 fw-bold">Low-stock products</h2><small class="text-secondary">{{ low_stock_count }} below minimum</small></div><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+        <div class="modal-body p-0"><div class="table-responsive"><table class="table admin-table mb-0">
+          <thead><tr><th>SKU</th><th>Product</th><th>Unit</th><th class="text-end">Stock</th><th class="text-end">Minimum</th></tr></thead>
+          <tbody>
+            {% for product in all_products if (product.current_stock or 0) < (product.min_stock_level or 0) %}
+            <tr><td>{{ product.sku or '-' }}</td><td>{{ product.name or '-' }}</td><td>{{ product.unit_of_measure or '-' }}</td><td class="text-end"><span class="admin-stock low">{{ "%.3f"|format(product.current_stock or 0) }}</span></td><td class="text-end">{{ "%.3f"|format(product.min_stock_level or 0) }}</td></tr>
+            {% else %}
+            <tr><td colspan="5" class="py-4 text-center text-secondary">All products are at or above their minimum stock.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table></div></div>
+      </div></div>
+    </div>
                 
             {% elif view == 'inventory' %}
                 <section class="card admin-form">
@@ -146,7 +164,15 @@ body.admin-dashboard .modal-content { border: 1px solid var(--admin-line); borde
                         <div class="row g-3">
                           <div class="col-sm-6 col-lg-2"><label class="form-label" for="newSku">SKU <span class="text-danger">*</span></label><input id="newSku" type="text" class="form-control" name="sku" required></div>
                           <div class="col-sm-6 col-lg-3"><label class="form-label" for="newName">Product name <span class="text-danger">*</span></label><input id="newName" type="text" class="form-control" name="name" required></div>
-                          <div class="col-sm-6 col-lg-2"><label class="form-label" for="newUnit">Unit <span class="text-danger">*</span></label><input id="newUnit" type="text" class="form-control" name="unit_of_measure" placeholder="L, kg, m²" required></div>
+                          <div class="col-sm-6 col-lg-2">
+                            <label class="form-label" for="newUnit">Unit <span class="text-danger">*</span></label>
+                            <select id="newUnit" class="form-select" name="unit_of_measure" required>
+                              <option value="" disabled selected>Select a unit</option>
+                              {% for unit in unit_options %}<option value="{{ unit }}">{{ unit }}</option>{% endfor %}
+                              <option value="__custom__">Other...</option>
+                            </select>
+                            <input id="customUnitOfMeasure" type="text" class="form-control mt-2" name="custom_unit_of_measure" placeholder="Enter a unit" maxlength="20" hidden>
+                          </div>
                           <div class="col-sm-6 col-lg-2"><label class="form-label" for="newStock">Current stock</label><input id="newStock" type="number" step="0.01" class="form-control" name="current_stock" value="0"></div>
                           <div class="col-sm-6 col-lg-1"><label class="form-label" for="newParentStock">Parent</label><input id="newParentStock" type="number" step="0.01" class="form-control" name="parent_stock" value="0"></div>
                           <div class="col-sm-6 col-lg-2"><label class="form-label" for="newMinStock">Min level</label><input id="newMinStock" type="number" step="0.01" class="form-control" name="min_stock_level" value="0"></div>
@@ -287,6 +313,19 @@ function openTransferModal(id, name, available) {
 <!-- Admin inventory interactions -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+  const unitSelect = document.getElementById('newUnit');
+  const customUnit = document.getElementById('customUnitOfMeasure');
+  if (unitSelect && customUnit) {
+    const syncCustomUnit = function() {
+      const showCustomUnit = unitSelect.value === '__custom__';
+      customUnit.hidden = !showCustomUnit;
+      customUnit.required = showCustomUnit;
+      if (!showCustomUnit) customUnit.value = '';
+    };
+    unitSelect.addEventListener('change', syncCustomUnit);
+    syncCustomUnit();
+  }
+
     const searchInput = document.getElementById('tableSearch');
     const productsTable = document.getElementById('productsTable');
     if (searchInput && productsTable) {

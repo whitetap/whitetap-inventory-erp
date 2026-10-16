@@ -37,6 +37,8 @@ body.staff-dashboard .card:hover { transform: none; }
 .dashboard-heading h1 { margin: 0; color: var(--staff-ink); font-size: 1.75rem; font-weight: 750; }
 .dashboard-heading p { margin: 5px 0 0; color: var(--staff-muted); }
 .metric-card { min-height: 112px; border-left: 3px solid var(--staff-green) !important; }
+.metric-card-button { width: 100%; text-align: left; cursor: pointer; font: inherit; }
+.metric-card-button:focus-visible { outline: 3px solid rgba(22,120,107,.3); outline-offset: 2px; }
 .metric-card.metric-warning { border-left-color: var(--staff-amber) !important; }
 .metric-card.metric-activity { border-left-color: #4478a0 !important; }
 .metric-card .card-body { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 19px; }
@@ -130,7 +132,7 @@ body.staff-dashboard .card:hover { transform: none; }
 
   <section class="row g-3 mb-1" aria-label="Inventory summary">
     <div class="col-6 col-xl-3"><article class="card metric-card h-100"><div class="card-body"><div><div class="metric-label">Inventory items</div><div class="metric-value">{{ paints|length + carpets|length + others|length }}</div></div><span class="metric-icon"><i class="fas fa-boxes-stacked" aria-hidden="true"></i></span></div></article></div>
-    <div class="col-6 col-xl-3"><article class="card metric-card metric-warning h-100"><div class="card-body"><div><div class="metric-label">Items to check</div><div class="metric-value">{{ at_risk_count }}</div></div><span class="metric-icon"><i class="fas fa-triangle-exclamation" aria-hidden="true"></i></span></div></article></div>
+    <div class="col-6 col-xl-3"><button type="button" class="card metric-card metric-warning metric-card-button h-100" data-bs-toggle="modal" data-bs-target="#staffLowStockModal" aria-label="View {{ low_stock_count }} low-stock products"><span class="card-body"><span><span class="metric-label">Low stock</span><span class="metric-value d-block">{{ low_stock_count }}</span></span><span class="metric-icon"><i class="fas fa-triangle-exclamation" aria-hidden="true"></i></span></span></button></div>
     <div class="col-6 col-xl-3"><article class="card metric-card metric-activity h-100"><div class="card-body"><div><div class="metric-label">Recent issues</div><div class="metric-value">{{ recent_logs|length }}</div></div><span class="metric-icon"><i class="fas fa-clock-rotate-left" aria-hidden="true"></i></span></div></article></div>
     <div class="col-6 col-xl-3"><article class="card metric-card h-100"><div class="card-body"><div><div class="metric-label">Carpet products</div><div class="metric-value">{{ carpets|length }}</div></div><span class="metric-icon"><i class="fas fa-layer-group" aria-hidden="true"></i></span></div></article></div>
   </section>
@@ -356,7 +358,7 @@ body.staff-dashboard .card:hover { transform: none; }
               <tr>
                 <td>{{ log.product_sku }}</td>
                 <td class="{{ 'stock-low' if log.quantity_used < 0 else 'stock-ok' }} fw-bold">
-                  {{ log.quantity_used|float|round(2) }}
+                  {{ "%.3f"|format(log.quantity_used or 0) }}
                 </td>
                 <td>{{ log.technician_name }}</td>
                 <td>{{ log.project_ref or '-' }}</td>
@@ -378,6 +380,29 @@ body.staff-dashboard .card:hover { transform: none; }
     </div>
   </div>
 
+<div class="modal fade" id="staffLowStockModal" tabindex="-1" aria-labelledby="staffLowStockTitle" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div><h2 class="modal-title h5 fw-bold" id="staffLowStockTitle">Low-stock products</h2><small class="text-muted">{{ low_stock_count }} below minimum stock</small></div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body p-0">
+        <div class="table-responsive"><table class="table table-hover mb-0">
+          <thead class="table-light"><tr><th>SKU</th><th>Product</th><th class="text-end">Stock</th><th class="text-end">Minimum</th><th></th></tr></thead>
+          <tbody>
+            {% for product in low_stock_products %}
+            <tr><td>{{ product.sku or '-' }}</td><td>{{ product.name }}</td><td class="text-end stock-low">{{ "%.3f"|format(product.current_stock or 0) }} {{ product.unit_of_measure or '' }}</td><td class="text-end">{{ "%.3f"|format(product.min_stock_level or 0) }} {{ product.unit_of_measure or '' }}</td><td><button type="button" class="btn btn-sm btn-outline-primary" data-bs-dismiss="modal" aria-label="Issue {{ product.name }}" onclick="openIssueModal('{{ product.id }}', '{{ product.name }}', {{ product.current_stock or 0 }}, '{{ product.unit_of_measure or '' }}')"><i class="fas fa-arrow-up-from-bracket" aria-hidden="true"></i></button></td></tr>
+            {% else %}
+            <tr><td colspan="5" class="py-4 text-center text-muted">All products are at or above their minimum stock.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table></div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Issue Modal -->
 <div class="modal fade" id="issueModal" tabindex="-1" aria-labelledby="issueModalLabel">
   <div class="modal-dialog modal-lg">
@@ -386,7 +411,7 @@ body.staff-dashboard .card:hover { transform: none; }
         <h5 class="modal-title fw-bold">📤 Issue Product</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
-      <form method="POST" action="{{ url_for('issue_item') }}">
+      <form id="issueForm" method="POST" action="{{ url_for('issue_item') }}">
         <div class="modal-body">
           <input type="hidden" id="modal-product-id" name="product_id">
           <div class="row g-3">
@@ -403,17 +428,30 @@ body.staff-dashboard .card:hover { transform: none; }
               <input id="modal-product-unit" class="form-control" readonly>
             </div>
             <div class="col-md-6">
-              <label class="form-label fw-semibold">Quantity <span class="text-danger">*</span></label>
+              <label class="form-label fw-semibold" for="issueQuantity">Quantity <span class="text-danger">*</span></label>
               <input name="quantity_used" id="issueQuantity" type="number" step="0.001" class="form-control" min="0.001" placeholder="0.000" required>
               <div id="remainingPreview" class="text-success fw-bold mt-1">0.000 remaining</div>
             </div>
             <div class="col-md-6">
-              <label class="form-label fw-semibold">Technician <span class="text-danger">*</span></label>
-              <input name="technician_name" class="form-control" required placeholder="John Doe">
+              <label class="form-label fw-semibold" for="issueTechnician">Technician <span class="text-danger">*</span></label>
+              <input id="issueTechnician" name="technician_name" class="form-control" required placeholder="John Doe">
             </div>
             <div class="col-12">
-              <label class="form-label">Project Ref</label>
-              <input name="project_ref" class="form-control" placeholder="A380-Refit">
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" role="switch" name="is_tinting" id="isTinting">
+                <label class="form-check-label fw-semibold" for="isTinting">Save this issue as part of a tinting recipe</label>
+              </div>
+            </div>
+            <div class="col-12">
+              <label class="form-label" for="issueProjectRef">Project / recipe reference</label>
+              <input id="issueProjectRef" name="project_ref" class="form-control" list="tintProjectList" maxlength="100" placeholder="e.g. AISL2 BIEG">
+              <datalist id="tintProjectList">{% for project in tint_projects %}<option value="{{ project }}">{% endfor %}</datalist>
+            </div>
+            <div class="col-12" id="savedTintRecipePanel" hidden>
+              <div class="p-3 border rounded bg-light">
+                <div class="fw-semibold mb-2" id="savedTintRecipeTitle">Saved recipe</div>
+                <div id="savedTintRecipeItems" class="d-flex flex-column gap-2" aria-live="polite"></div>
+              </div>
             </div>
           </div>
         </div>
@@ -479,10 +517,75 @@ document.addEventListener('DOMContentLoaded', function() {
     });
       updateCarpetCalculator();
 
+      const tintingToggle = document.getElementById('isTinting');
+      const projectRefInput = document.getElementById('issueProjectRef');
+      const recipePanel = document.getElementById('savedTintRecipePanel');
+      const recipeItems = document.getElementById('savedTintRecipeItems');
+      const recipeTitle = document.getElementById('savedTintRecipeTitle');
+      let recipeLookupTimer;
+      let recipeLookupId = 0;
+
+      function loadSavedTintRecipe() {
+        const projectRef = projectRefInput.value.trim();
+        const lookupId = ++recipeLookupId;
+        if (!tintingToggle.checked || !projectRef) {
+          recipePanel.hidden = true;
+          return;
+        }
+
+        projectRefInput.required = true;
+        recipePanel.hidden = false;
+        recipeTitle.textContent = `Saved recipe for ${projectRef}`;
+        recipeItems.textContent = 'Looking for saved ingredients...';
+        fetch(`/api/tint-recipes?project_ref=${encodeURIComponent(projectRef)}`)
+          .then(response => {
+            if (!response.ok) throw new Error('Unable to load saved recipe');
+            return response.json();
+          })
+          .then(ingredients => {
+            if (lookupId !== recipeLookupId) return;
+            recipeItems.replaceChildren();
+            if (!ingredients.length) {
+              recipeItems.textContent = 'No saved ingredients yet. Issues marked as tinting will be added to this recipe.';
+              return;
+            }
+            ingredients.forEach(ingredient => {
+              const button = document.createElement('button');
+              button.type = 'button';
+              button.className = 'btn btn-sm btn-outline-secondary text-start';
+              button.textContent = `${ingredient.name} (${ingredient.sku}) · ${ingredient.quantity.toFixed(3)} ${ingredient.unit} used · ${ingredient.available_stock.toFixed(3)} available`;
+              button.addEventListener('click', function() {
+                document.getElementById('modal-product-id').value = ingredient.product_id;
+                document.getElementById('modal-product-name').value = ingredient.name;
+                document.getElementById('modal-product-stock').value = ingredient.available_stock.toFixed(3);
+                document.getElementById('modal-product-unit').value = ingredient.unit;
+                document.getElementById('issueQuantity').value = ingredient.quantity.toFixed(3);
+                updateIssueRemainingPreview();
+              });
+              recipeItems.appendChild(button);
+            });
+          })
+          .catch(() => {
+            if (lookupId === recipeLookupId) recipeItems.textContent = 'Could not load this saved recipe. Try again in a moment.';
+          });
+      }
+
+      tintingToggle.addEventListener('change', function() {
+        projectRefInput.required = tintingToggle.checked;
+        loadSavedTintRecipe();
+      });
+      projectRefInput.addEventListener('input', function() {
+        window.clearTimeout(recipeLookupTimer);
+        recipeLookupTimer = window.setTimeout(loadSavedTintRecipe, 250);
+      });
+      document.getElementById('issueQuantity').addEventListener('input', updateIssueRemainingPreview);
+
 }); // <--- THIS CLOSES THE WRAPPER. DO NOT REMOVE.
 
 // === 3. OTHER FUNCTIONS (MODAL, GREETING, SCANNER) ===
 function openIssueModal(id, name, stock, unit) {
+  const issueForm = document.getElementById('issueForm');
+  if (issueForm) issueForm.reset();
     const idField = document.getElementById('modal-product-id') || document.getElementById('modal-id');
     const nameField = document.getElementById('modal-product-name') || document.getElementById('modal-name');
     const stockField = document.getElementById('modal-product-stock') || document.getElementById('modal-stock');
@@ -491,11 +594,25 @@ function openIssueModal(id, name, stock, unit) {
     if(nameField) nameField.value = name;
     if(stockField) stockField.value = parseFloat(stock).toFixed(3);
     if(unitField) unitField.value = unit;
+    document.getElementById('issueProjectRef').required = false;
+    document.getElementById('savedTintRecipePanel').hidden = true;
+    updateIssueRemainingPreview();
     const modalElement = document.getElementById('issueModal');
     if (modalElement) {
         const modal = new bootstrap.Modal(modalElement);
         modal.show();
     }
+}
+
+function updateIssueRemainingPreview() {
+  const stock = parseFloat(document.getElementById('modal-product-stock')?.value || 0);
+  const quantity = parseFloat(document.getElementById('issueQuantity')?.value || 0);
+  const preview = document.getElementById('remainingPreview');
+  if (!preview) return;
+  const remaining = stock - quantity;
+  preview.textContent = `${remaining.toFixed(3)} remaining`;
+  preview.classList.toggle('text-danger', remaining < 0);
+  preview.classList.toggle('text-success', remaining >= 0);
 }
 
 function updateGreeting() {
