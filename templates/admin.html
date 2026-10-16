@@ -59,6 +59,8 @@ body.admin-dashboard .modal-content { border: 1px solid var(--admin-line); borde
 .admin-status.low { color: #943e31; background: #f8e9e5; }
 .admin-status.ok { color: #315b42; background: #e9f1eb; }
 .admin-actions .btn { width: 32px; height: 32px; padding: 0; }
+.admin-list-toggle .fa-chevron-down { transition: transform .18s ease; }
+.admin-list-toggle[aria-expanded="true"] .fa-chevron-down { transform: rotate(180deg); }
 .admin-add-toggle { color: #fff; border-color: var(--admin-copper); background: var(--admin-copper); }
 .admin-add-toggle:hover { color: #fff; border-color: #9f572f; background: #9f572f; }
 .admin-form { margin-bottom: 18px; }
@@ -87,7 +89,7 @@ body.admin-dashboard .modal-content { border: 1px solid var(--admin-line); borde
     <li class="nav-item"><a class="nav-link {% if view == 'summary' %}active{% endif %}" href="{{ url_for('admin_dashboard', view='summary') }}"><i class="fas fa-chart-simple me-2"></i>Overview</a></li>
     <li class="nav-item"><a class="nav-link {% if view == 'inventory' %}active{% endif %}" href="{{ url_for('admin_dashboard', view='inventory') }}"><i class="fas fa-boxes-stacked me-2"></i>Inventory</a></li>
     <li class="nav-item"><a class="nav-link" href="{{ url_for('staff_inventory') }}"><i class="fas fa-users me-2"></i>Staff workspace</a></li>
-    <li class="nav-item"><a class="nav-link" href="{{ url_for('export_logs') }}"><i class="fas fa-file-lines me-2"></i>Usage logs</a></li>
+    <li class="nav-item"><a class="nav-link {% if request.endpoint == 'admin_usage_logs' %}active{% endif %}" href="{{ url_for('admin_usage_logs') }}"><i class="fas fa-file-lines me-2"></i>Usage logs</a></li>
     <li class="nav-item mt-auto"><a class="nav-link" href="{{ url_for('logout') }}"><i class="fas fa-arrow-right-from-bracket me-2"></i>Sign out</a></li>
 {% endblock %}
 
@@ -123,7 +125,7 @@ body.admin-dashboard .modal-content { border: 1px solid var(--admin-line); borde
         <div class="admin-eyebrow mb-2">Operations</div>
         <h2 class="h5 fw-bold mb-2">Daily usage activity</h2>
         <p class="mb-3 text-secondary">{{ today_logs }} requests recorded today.</p>
-        <a href="{{ url_for('export_logs') }}" class="btn btn-outline-secondary mt-auto"><i class="fas fa-file-export me-2" aria-hidden="true"></i>Export usage logs</a>
+        <a href="{{ url_for('admin_usage_logs') }}" class="btn btn-outline-secondary mt-auto"><i class="fas fa-file-lines me-2" aria-hidden="true"></i>Open usage logs</a>
       </div></article></div>
     </section>
                 
@@ -156,6 +158,11 @@ body.admin-dashboard .modal-content { border: 1px solid var(--admin-line); borde
                 </section>
 
                 <div class="card">
+                    <header class="admin-toolbar">
+                      <div><h2>Products</h2><small class="text-secondary">{{ total_items }} records</small></div>
+                      <button class="btn btn-outline-secondary admin-list-toggle" type="button" data-bs-toggle="collapse" data-bs-target="#inventoryListContent" aria-expanded="true" aria-controls="inventoryListContent" aria-label="Collapse inventory list" title="Collapse inventory list"><i class="fas fa-chevron-down" aria-hidden="true"></i></button>
+                    </header>
+                    <div id="inventoryListContent" class="collapse show">
                     <div class="card-body p-0">
                         <div class="table-responsive">
                             <table class="table admin-table table-hover mb-0">
@@ -215,6 +222,7 @@ body.admin-dashboard .modal-content { border: 1px solid var(--admin-line); borde
                                 </tbody>
                             </table>
                         </div>
+                    </div>
                     </div>
                 </div>
                 
@@ -292,6 +300,9 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         const emptySearchState = document.getElementById('emptySearchState');
         if (emptySearchState) emptySearchState.hidden = term.length === 0 || visibleRows > 0;
+        if (term.length > 0 && visibleRows > 0) {
+          bootstrap.Collapse.getOrCreateInstance(document.getElementById('inventoryListContent'), { toggle: false }).show();
+        }
         });
     }
     const timeSpan = document.getElementById('lastUpdateTime');

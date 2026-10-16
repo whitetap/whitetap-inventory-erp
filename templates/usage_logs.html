@@ -1,88 +1,93 @@
 {% extends "base.html" %}
 {% block title %}Usage Logs - Aviation ERP{% endblock %}
-{% block page_title %}Inventory Audit Log{% endblock %}
+{% block page_title %}Usage Logs{% endblock %}
+{% block body_class %}admin-dashboard{% endblock %}
 
 {% block extra_styles %}
 <style>
-.container-fluid { max-width: 1400px; }
-.table-dark th { background: #1a1a1a; border-color: #495057; }
-.table-hover tbody tr:hover { background-color: rgba(255,255,255,0.05); }
-.badge { font-size: 0.8em; }
-.text-success { font-weight: bold; }
-.small { font-size: 0.85em; }
+:root { --admin-ink: #252c2a; --admin-muted: #707a76; --admin-paper: #f4f5f3; --admin-line: #dfe3df; --admin-copper: #b86b3d; }
+body.admin-dashboard { background: var(--admin-paper); color: var(--admin-ink); }
+body.admin-dashboard .sidebar { width: 260px; background: #252c2a; border-right: 1px solid #39413d; }
+body.admin-dashboard .sidebar .nav-link { margin: 3px 0; padding: 11px 12px !important; border-radius: 5px; color: #c0c9c4 !important; font-size: .9rem; }
+body.admin-dashboard .sidebar .nav-link:hover, body.admin-dashboard .sidebar .nav-link.active { color: #fff !important; background: #3b4540; transform: none; }
+body.admin-dashboard .sidebar .nav-link.active { box-shadow: inset 3px 0 #d69a68; }
+body.admin-dashboard .topbar { position: sticky; top: 0; z-index: 900; width: calc(100% - 260px); margin-left: 260px; padding: 14px 28px; background: rgba(255,255,255,.97); border-bottom: 1px solid var(--admin-line); }
+body.admin-dashboard .topbar h4 { color: var(--admin-ink) !important; font-size: 1rem; font-weight: 700; }
+body.admin-dashboard .topbar .fa-user-circle, body.admin-dashboard #sidebarToggle { color: var(--admin-copper) !important; }
+body.admin-dashboard .main-content { min-height: calc(100vh - 62px); margin-left: 260px; padding: 26px clamp(18px, 3vw, 42px); background: var(--admin-paper); }
+.usage-page { max-width: 1560px; margin: 0 auto; }
+.usage-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 18px; margin-bottom: 22px; }
+.usage-heading h1 { margin: 4px 0; color: var(--admin-ink); font-size: 1.65rem; font-weight: 750; }
+.usage-heading p { margin: 0; color: var(--admin-muted); }
+.usage-eyebrow { color: var(--admin-copper); font-size: .72rem; font-weight: 700; text-transform: uppercase; }
+.usage-filter { display: flex; align-items: end; flex-wrap: wrap; gap: 10px; }
+.usage-filter label { display: block; margin-bottom: 4px; color: #535e59; font-size: .78rem; font-weight: 650; }
+.usage-filter select { min-width: 175px; border-color: var(--admin-line); }
+.usage-filter select:focus { border-color: var(--admin-copper); box-shadow: 0 0 0 3px rgba(184,107,61,.12); }
+.usage-apply { color: #fff; border-color: var(--admin-copper); background: var(--admin-copper); }
+.usage-apply:hover { color: #fff; border-color: #9f572f; background: #9f572f; }
+.usage-table { margin: 0; color: var(--admin-ink); font-size: .88rem; }
+.usage-table th { padding: 11px 14px; border-bottom: 1px solid var(--admin-line); background: #f6f7f5; color: #5f6965; font-size: .72rem; text-transform: uppercase; }
+.usage-table td { padding: 12px 14px; border-color: #edf0ed; vertical-align: middle; }
+.usage-table tbody tr:hover { background: #f8f9f7; }
+.usage-card { overflow: hidden; border: 1px solid var(--admin-line); border-radius: 6px; background: #fff; box-shadow: 0 2px 8px rgba(35,44,39,.045); }
+.usage-meta { padding: 14px 18px; border-bottom: 1px solid var(--admin-line); color: var(--admin-muted); font-size: .84rem; }
+.usage-qty { color: #943e31; font-weight: 700; }
+@media (max-width: 992px) { body.admin-dashboard .topbar { width: 100%; margin-left: 0; } body.admin-dashboard .main-content { margin-left: 0; padding: 20px 16px; } }
+@media (max-width: 575px) { .usage-heading { align-items: flex-start; flex-direction: column; } .usage-heading h1 { font-size: 1.4rem; } .usage-filter { width: 100%; } .usage-filter > div { flex: 1; } .usage-filter select { width: 100%; } }
 </style>
 {% endblock %}
 
+{% block sidebar_navigation %}
+<li class="nav-item"><a class="nav-link" href="{{ url_for('admin_dashboard', view='summary') }}"><i class="fas fa-chart-simple me-2"></i>Overview</a></li>
+<li class="nav-item"><a class="nav-link" href="{{ url_for('admin_dashboard', view='inventory') }}"><i class="fas fa-boxes-stacked me-2"></i>Inventory</a></li>
+<li class="nav-item"><a class="nav-link" href="{{ url_for('staff_inventory') }}"><i class="fas fa-users me-2"></i>Staff workspace</a></li>
+<li class="nav-item"><a class="nav-link active" href="{{ url_for('admin_usage_logs') }}"><i class="fas fa-file-lines me-2"></i>Usage logs</a></li>
+<li class="nav-item mt-auto"><a class="nav-link" href="{{ url_for('logout') }}"><i class="fas fa-arrow-right-from-bracket me-2"></i>Sign out</a></li>
+{% endblock %}
+
 {% block content %}
-<div class="container-fluid py-4 bg-dark min-vh-100">
-    <div class="row mb-4">
-        <div class="col">
-            <h1 class="text-light mb-2"><i class="fas fa-history me-2 text-info"></i>Inventory Audit Log</h1>
-            <p class="text-muted lead mb-0">Complete transfer & usage history from Supabase inventory_logs</p>
+<div class="usage-page">
+    <header class="usage-heading">
+        <div>
+            <div class="usage-eyebrow">Control room / Operations</div>
+            <h1>Usage logs</h1>
+            <p>Review inventory issues by reporting period.</p>
         </div>
-        <div class="col-auto">
-            <a href="{{ url_for('admin_dashboard') }}" class="btn btn-outline-light btn-lg">
-                <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
-            </a>
-        </div>
-    </div>
-    
-    {% if logs %}
-    <div class="card bg-dark border-0 shadow-lg">
-        <div class="card-header bg-dark text-light border-bottom">
-            <div class="row align-items-center">
-                <div class="col">
-                    <h5 class="mb-0"><i class="fas fa-list me-2"></i>{{ logs|length }} total entries</h5>
-                </div>
-                <div class="col-auto">
-                    <a href="{{ url_for('export_logs_supabase') }}" class="btn btn-outline-info btn-sm">
-                        <i class="fas fa-download me-1"></i>Export CSV
-                    </a>
-                </div>
+        <form class="usage-filter" method="get" action="{{ url_for('admin_usage_logs') }}">
+            <div>
+                <label for="logPeriod">Reporting period</label>
+                <select id="logPeriod" class="form-select" name="period">
+                    {% for value, label in period_options.items() %}
+                    <option value="{{ value }}" {% if period == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
             </div>
+            <button type="submit" class="btn usage-apply"><i class="fas fa-filter me-2" aria-hidden="true"></i>Apply</button>
+            <a class="btn btn-outline-secondary" href="{{ url_for('export_logs', period=period) }}" title="Download this period as CSV"><i class="fas fa-download me-2" aria-hidden="true"></i>Export CSV</a>
+        </form>
+    </header>
+
+    <section class="usage-card" aria-label="Filtered usage logs">
+        <div class="usage-meta"><strong>{{ period_label }}</strong><span class="mx-2">·</span>{{ logs|length }} entries</div>
+        <div class="table-responsive">
+            <table class="table usage-table table-hover">
+                <thead><tr><th>Date &amp; time</th><th>Product</th><th>Quantity</th><th>Technician</th><th>Project</th></tr></thead>
+                <tbody>
+                    {% for log in logs %}
+                    <tr>
+                        <td>{{ log.created_at.strftime('%Y-%m-%d %H:%M') if log.created_at else 'N/A' }}</td>
+                        <td><strong>{{ log.product_name }}</strong><br><small class="text-secondary">{{ log.product_sku }}</small></td>
+                        <td class="usage-qty">{{ "%.3f"|format(log.quantity_used or 0) }}</td>
+                        <td>{{ log.technician_name }}</td>
+                        <td>{{ log.project_ref }}</td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="5" class="py-5 text-center text-secondary">No usage entries for {{ period_label|lower }}.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
-        <div class="card-body p-0">
-            <div class="table-responsive">
-                <table class="table table-dark table-hover mb-0">
-                    <thead class="table-dark">
-                        <tr>
-                            <th>Date & Time</th>
-                            <th>User</th>
-                            <th>Product (SKU)</th>
-                            <th>Action</th>
-                            <th>Qty Moved</th>
-                            <th>New Warehouse Bal</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for log in logs %}
-                        <tr>
-                            <td>{{ log.created_at or 'N/A' }}</td>
-                            <td><span class="badge bg-info">{{ log.performed_by }}</span></td>
-                            <td>
-                                <strong>{{ log.product_name }}</strong>
-                                <br><small class="text-muted">{{ log.sku }}</small>
-                            </td>
-                            <td>
-                                <span class="badge {{ 'bg-success' if 'Transfer' in log.action_type else 'bg-warning' }}">
-                                    {{ log.action_type }}
-                                </span>
-                            </td>
-                            <td class="fw-bold text-success">{{ "%.3f"|format(log.quantity) if log.quantity else '0.000' }}</td>
-                            <td class="fw-bold">{{ "%.3f"|format(log.new_parent_stock or 0) }}</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-    {% else %}
-    <div class="text-center py-8">
-        <i class="fas fa-inbox fa-5x text-muted mb-4"></i>
-        <h3 class="text-muted">No audit logs yet</h3>
-        <p class="text-muted">Transfers and usage will appear here once recorded.</p>
-    </div>
-    {% endif %}
+    </section>
 </div>
 {% endblock %}

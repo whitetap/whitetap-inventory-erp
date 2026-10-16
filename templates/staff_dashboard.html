@@ -69,6 +69,8 @@ body.staff-dashboard .card:hover { transform: none; }
 .carpet-result { margin-top: 12px; padding: 10px; border-radius: 5px; background: #102522; color: #f0c66b; text-align: center; }
 .inventory-section .btn-outline-primary { color: var(--staff-green); border-color: #a8c9c1; }
 .inventory-section .btn-outline-primary:hover { color: white; border-color: var(--staff-green); background: var(--staff-green); }
+.section-toggle .fa-chevron-down { transition: transform .18s ease; }
+.section-toggle[aria-expanded="true"] .fa-chevron-down { transform: rotate(180deg); }
 #issueModal .modal-content { border: 1px solid var(--staff-line); border-radius: 7px; color: var(--staff-ink); }
 @media (max-width: 992px) {
   body.staff-dashboard .topbar { width: 100%; margin-left: 0; }
@@ -148,13 +150,14 @@ body.staff-dashboard .card:hover { transform: none; }
           <h2><i class="fas fa-fill-drip me-2" aria-hidden="true"></i>Aviation paints &amp; pigments</h2>
         <small class="text-muted">({{ paints|length }} items)</small>
       </div>
-      <a href="{{ url_for('export_paints') }}" class="btn btn-outline-primary btn-sm">
-        <i class="fas fa-download"></i> CSV
-      </a>
+      <div class="d-flex align-items-center gap-2">
+        <a href="{{ url_for('export_paints') }}" class="btn btn-outline-primary btn-sm" aria-label="Export paints CSV" title="Export paints CSV"><i class="fas fa-download" aria-hidden="true"></i></a>
+        <button class="btn btn-outline-secondary btn-sm section-toggle" type="button" data-bs-toggle="collapse" data-bs-target="#paintsCollapse" aria-expanded="false" aria-controls="paintsCollapse" aria-label="Show paints and pigments" title="Show paints and pigments"><i class="fas fa-chevron-down" aria-hidden="true"></i></button>
+      </div>
     </div>
   </div>
 
-  <div class="collapse show" id="paintsCollapse">
+  <div class="collapse" id="paintsCollapse">
     <div class="card-body p-0">
       <div class="table-responsive">
         <table class="table table-hover mb-0">
@@ -208,11 +211,13 @@ body.staff-dashboard .card:hover { transform: none; }
             <h2><i class="fas fa-layer-group me-2" aria-hidden="true"></i>Carpets &amp; textiles</h2>
             <small class="text-muted">({{ carpets|length }} items)</small>
           </div>
-          <a href="{{ url_for('export_carpets') }}" class="btn btn-outline-primary btn-sm">
-            <i class="fas fa-download"></i> CSV
-          </a>
+          <div class="d-flex align-items-center gap-2">
+            <a href="{{ url_for('export_carpets') }}" class="btn btn-outline-primary btn-sm" aria-label="Export carpets CSV" title="Export carpets CSV"><i class="fas fa-download" aria-hidden="true"></i></a>
+            <button class="btn btn-outline-secondary btn-sm section-toggle" type="button" data-bs-toggle="collapse" data-bs-target="#carpetInventoryContent" aria-expanded="false" aria-controls="carpetInventoryContent" aria-label="Show carpets and textiles" title="Show carpets and textiles"><i class="fas fa-chevron-down" aria-hidden="true"></i></button>
+          </div>
         </div>
       </div>
+      <div id="carpetInventoryContent" class="collapse">
       <div class="card-body p-0">
         <div class="table-responsive">
           <table class="table table-hover mb-0">
@@ -254,6 +259,7 @@ body.staff-dashboard .card:hover { transform: none; }
             </tbody>
           </table>
         </div>
+      </div>
       </div>
     </div>
 
@@ -323,8 +329,8 @@ body.staff-dashboard .card:hover { transform: none; }
             <small class="text-muted">{{ recent_logs|length }} latest events</small>
           </div>
           <div class="d-flex align-items-center gap-2">
-            <button id="activityToggle" type="button" class="btn btn-outline-secondary btn-sm" aria-label="Collapse recent activity" aria-expanded="true" aria-controls="recentActivityContent" title="Collapse recent activity">
-              <i class="fas fa-chevron-up" aria-hidden="true"></i>
+            <button id="activityToggle" type="button" class="btn btn-outline-secondary btn-sm section-toggle" data-bs-toggle="collapse" data-bs-target="#recentActivityContent" aria-label="Show recent activity" aria-expanded="false" aria-controls="recentActivityContent" title="Show recent activity">
+              <i class="fas fa-chevron-down" aria-hidden="true"></i>
             </button>
             <a href="{{ url_for('export_logs') }}" class="btn btn-outline-primary btn-sm">
               <i class="fas fa-download"></i> Export
@@ -332,7 +338,8 @@ body.staff-dashboard .card:hover { transform: none; }
           </div>
         </div>
       </div>
-      <div id="recentActivityContent" class="card-body p-0">
+      <div id="recentActivityContent" class="collapse">
+      <div class="card-body p-0">
         <div class="table-responsive">
           <table class="table table-hover mb-0">
             <thead class="table-light">
@@ -366,6 +373,7 @@ body.staff-dashboard .card:hover { transform: none; }
             </tbody>
           </table>
         </div>
+      </div>
       </div>
     </div>
   </div>
@@ -432,6 +440,15 @@ document.addEventListener('DOMContentLoaded', function() {
                     row.style.setProperty('display', 'none', 'important');
                 }
             });
+              if (term.length > 0) {
+                document.querySelectorAll('.inventory-section').forEach(section => {
+                  const panel = section.querySelector('.collapse');
+                  const hasVisibleRows = Array.from(section.querySelectorAll('.inventory-row')).some(row => row.style.display !== 'none');
+                  if (panel && hasVisibleRows) {
+                    bootstrap.Collapse.getOrCreateInstance(panel, { toggle: false }).show();
+                  }
+                });
+              }
         }
     });
 
@@ -441,30 +458,14 @@ document.addEventListener('DOMContentLoaded', function() {
         const inputLen = parseFloat(document.getElementById('carpetLen').value || 0);
         const inputWid = parseFloat(document.getElementById('carpetWid').value || 0);
         const resultDisplay = document.getElementById('carpetResult');
-      const unitLabels = { meters: 'm', yards: 'yd', inches: 'in' };
-      document.getElementById('carpetLenLabel').textContent = `Length (${unitLabels[unit]})`;
-      document.getElementById('carpetWidLabel').textContent = `Width (${unitLabels[unit]})`;
+        const unitLabels = { meters: 'm', yards: 'yd', inches: 'in' };
+        document.getElementById('carpetLenLabel').textContent = `Length (${unitLabels[unit]})`;
+        document.getElementById('carpetWidLabel').textContent = `Width (${unitLabels[unit]})`;
+        document.getElementById('carpetUnitLabel').textContent = `${unitLabels[unit]}²`;
 
-        let lengthInMeters = 0;
-        let widthInMeters = 0;
-
-        const INCH_TO_METER = 0.0254;
-        const YARD_TO_METER = 0.9144;
-
-        if (unit === 'inches') {
-            lengthInMeters = inputLen * INCH_TO_METER;
-            widthInMeters = inputWid * INCH_TO_METER;
-        } else if (unit === 'yards') {
-            lengthInMeters = inputLen * YARD_TO_METER;
-            widthInMeters = inputWid * YARD_TO_METER;
-        } else {
-            lengthInMeters = inputLen;
-            widthInMeters = inputWid;
-        }
-
-        const areaM2 = lengthInMeters * widthInMeters;
+        const area = inputLen * inputWid;
         if (resultDisplay) {
-            resultDisplay.textContent = areaM2.toFixed(3);
+          resultDisplay.textContent = area.toFixed(3);
         }
     }
 
@@ -477,19 +478,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
       updateCarpetCalculator();
-
-      const activityToggle = document.getElementById('activityToggle');
-      const activityContent = document.getElementById('recentActivityContent');
-      if (activityToggle && activityContent) {
-        activityToggle.addEventListener('click', function() {
-          const isExpanded = activityToggle.getAttribute('aria-expanded') === 'true';
-          activityToggle.setAttribute('aria-expanded', String(!isExpanded));
-          activityToggle.setAttribute('aria-label', isExpanded ? 'Expand recent activity' : 'Collapse recent activity');
-          activityToggle.title = isExpanded ? 'Expand recent activity' : 'Collapse recent activity';
-          activityToggle.querySelector('i').className = isExpanded ? 'fas fa-chevron-down' : 'fas fa-chevron-up';
-          activityContent.hidden = isExpanded;
-        });
-      }
 
 }); // <--- THIS CLOSES THE WRAPPER. DO NOT REMOVE.
 

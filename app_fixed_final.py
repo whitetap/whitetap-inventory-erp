@@ -11,7 +11,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy import desc, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.dialects.postgresql import UUID
-from datetime import datetime
+from datetime import datetime, timedelta
 
 def get_database_url(drivername):
     database_url = os.getenv('DATABASE_URL')
@@ -67,6 +67,31 @@ class UsageLog(db.Model):
 
 CORS(app)
 
+USAGE_PERIOD_LABELS = {
+    'daily': 'Today',
+    'weekly': 'This week',
+    'monthly': 'This month',
+    'quarterly': 'This quarter',
+    'yearly': 'This year',
+    'all': 'All time'
+}
+
+def get_usage_period_start(period, today=None):
+    today = today or datetime.now().date()
+    if period == 'daily':
+        start_date = today
+    elif period == 'weekly':
+        start_date = today - timedelta(days=today.weekday())
+    elif period == 'monthly':
+        start_date = today.replace(day=1)
+    elif period == 'quarterly':
+        start_date = today.replace(month=((today.month - 1) // 3) * 3 + 1, day=1)
+    elif period == 'yearly':
+        start_date = today.replace(month=1, day=1)
+    else:
+        return None
+    return datetime.combine(start_date, datetime.min.time())
+
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -104,19 +129,24 @@ def staff_inventory():
 
 @app.route('/export-logs')
 def export_logs():
-    logs = UsageLog.query.order_by(desc(UsageLog.created_at)).all()
+    period = request.args.get('period', 'all')
+    if period not in USAGE_PERIOD_LABELS:
+        period = 'all'
+    start = get_usage_period_start(period)
+    logs_query = db.session.query(UsageLog, Product.name).outerjoin(Product, Product.id == UsageLog.product_id)
+    if start:
+        logs_query = logs_query.filter(UsageLog.created_at >= start)
+    logs = logs_query.order_by(desc(UsageLog.created_at)).all()
     
     output = StringIO()
     writer = csv.writer(output)
     
     writer.writerow(['Date', 'Product Name', 'Quantity', 'Technician', 'Project Reference'])
     
-    for log in logs:
-        product = Product.query.get(log.product_id)
-        product_name = product.name if product else 'Deleted'
+    for log, product_name in logs:
         writer.writerow([
             log.created_at.strftime('%Y-%m-%d %H:%M:%S') if log.created_at else '',
-            product_name,
+            product_name or 'Deleted',
             log.quantity_used,
             log.technician_name,
             log.project_ref or ''
@@ -127,7 +157,37 @@ def export_logs():
     return Response(
         output.getvalue(),
         mimetype='text/csv',
-        headers={'Content-Disposition': 'attachment; filename=usage_report.csv'}
+        headers={'Content-Disposition': f'attachment; filename=usage_report_{period}.csv'}
+    )
+
+@app.route('/admin/usage-logs')
+def admin_usage_logs():
+    if not session.get('logged_in'):
+        return redirect(url_for('login'))
+
+    period = request.args.get('period', 'daily')
+    if period not in USAGE_PERIOD_LABELS:
+        period = 'daily'
+    start = get_usage_period_start(period)
+    logs_query = db.session.query(UsageLog, Product.name).outerjoin(Product, Product.id == UsageLog.product_id)
+    if start:
+        logs_query = logs_query.filter(UsageLog.created_at >= start)
+    rows = logs_query.order_by(desc(UsageLog.created_at)).all()
+    logs = [{
+        'created_at': log.created_at,
+        'product_name': product_name or 'Deleted product',
+        'product_sku': log.product_sku or '-',
+        'quantity_used': log.quantity_used,
+        'technician_name': log.technician_name,
+        'project_ref': log.project_ref or '-'
+    } for log, product_name in rows]
+
+    return render_template(
+        'usage_logs.html',
+        logs=logs,
+        period=period,
+        period_label=USAGE_PERIOD_LABELS[period],
+        period_options=USAGE_PERIOD_LABELS
     )
 
 @app.route('/export-products')
