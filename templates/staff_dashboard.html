@@ -36,6 +36,12 @@ body.staff-dashboard .card:hover { transform: none; }
 .dashboard-kicker { margin-bottom: 6px; color: var(--staff-green); font-size: .72rem; font-weight: 700; text-transform: uppercase; }
 .dashboard-heading h1 { margin: 0; color: var(--staff-ink); font-size: 1.75rem; font-weight: 750; }
 .dashboard-heading p { margin: 5px 0 0; color: var(--staff-muted); }
+.dashboard-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+.recipe-project-list { max-height: 55vh; overflow-y: auto; }
+.recipe-project-button { width: 100%; padding: 11px 12px; border: 0; border-bottom: 1px solid var(--staff-line); background: #fff; color: var(--staff-ink); text-align: left; }
+.recipe-project-button:hover, .recipe-project-button.active { background: var(--staff-green-soft); color: var(--staff-green); }
+.recipe-details { min-height: 180px; }
+.recipe-details .table { color: var(--staff-ink); }
 .metric-card { min-height: 112px; border-left: 3px solid var(--staff-green) !important; }
 .metric-card-button { width: 100%; text-align: left; cursor: pointer; font: inherit; }
 .metric-card-button:focus-visible { outline: 3px solid rgba(22,120,107,.3); outline-offset: 2px; }
@@ -127,7 +133,10 @@ body.staff-dashboard .card:hover { transform: none; }
       <h1 id="greeting">Good day, AISL staff</h1>
       <p id="current-date" class="mb-0"></p>
     </div>
-    <span class="badge rounded-pill text-bg-light border px-3 py-2"><i class="fas fa-circle text-success me-2" style="font-size:.55rem" aria-hidden="true"></i>Inventory overview</span>
+    <div class="dashboard-actions">
+      <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#recipeBookModal"><i class="fas fa-book-open me-2" aria-hidden="true"></i>Saved recipes <span class="badge text-bg-light ms-1">{{ tint_projects|length }}</span></button>
+      <span class="badge rounded-pill text-bg-light border px-3 py-2"><i class="fas fa-circle text-success me-2" style="font-size:.55rem" aria-hidden="true"></i>Inventory overview</span>
+    </div>
   </header>
 
   <section class="row g-3 mb-1" aria-label="Inventory summary">
@@ -380,6 +389,31 @@ body.staff-dashboard .card:hover { transform: none; }
     </div>
   </div>
 
+<div class="modal fade" id="recipeBookModal" tabindex="-1" aria-labelledby="recipeBookTitle" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div><h2 class="modal-title h5 fw-bold" id="recipeBookTitle">Saved tint recipes</h2><small class="text-muted">Select a project to view its saved ingredients.</small></div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        {% if tint_projects %}
+        <div class="row g-0 border rounded overflow-hidden">
+          <div class="col-md-4 recipe-project-list" role="list" aria-label="Saved projects">
+            {% for project in tint_projects %}
+            <button type="button" class="recipe-project-button" data-project-ref="{{ project }}" aria-pressed="false">{{ project }}<i class="fas fa-chevron-right float-end mt-1" aria-hidden="true"></i></button>
+            {% endfor %}
+          </div>
+          <section class="col-md-8 recipe-details p-3" id="recipeBookDetails" aria-live="polite">Choose a project to view its recipe.</section>
+        </div>
+        {% else %}
+        <div class="py-5 text-center text-muted">No saved recipes yet. Mark an issue as tinting and enter a project reference to start one.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="modal fade" id="staffLowStockModal" tabindex="-1" aria-labelledby="staffLowStockTitle" aria-hidden="true">
   <div class="modal-dialog modal-lg modal-dialog-scrollable">
     <div class="modal-content">
@@ -522,8 +556,67 @@ document.addEventListener('DOMContentLoaded', function() {
       const recipePanel = document.getElementById('savedTintRecipePanel');
       const recipeItems = document.getElementById('savedTintRecipeItems');
       const recipeTitle = document.getElementById('savedTintRecipeTitle');
+      const recipeBookDetails = document.getElementById('recipeBookDetails');
       let recipeLookupTimer;
       let recipeLookupId = 0;
+      let recipeBookRequestId = 0;
+
+      function fetchTintRecipe(projectRef) {
+        return fetch(`/api/tint-recipes?project_ref=${encodeURIComponent(projectRef)}`)
+          .then(response => {
+            if (!response.ok) throw new Error('Unable to load saved recipe');
+            return response.json();
+          });
+      }
+
+      function renderRecipeTable(container, ingredients) {
+        container.replaceChildren();
+        if (!ingredients.length) {
+          container.textContent = 'This recipe has no saved ingredients.';
+          return;
+        }
+
+        const table = document.createElement('table');
+        table.className = 'table table-sm mb-0';
+        const head = document.createElement('thead');
+        head.innerHTML = '<tr><th>SKU</th><th>Ingredient</th><th class="text-end">Recipe qty</th><th class="text-end">Available</th></tr>';
+        const body = document.createElement('tbody');
+        ingredients.forEach(ingredient => {
+          const row = document.createElement('tr');
+          [ingredient.sku, ingredient.name, `${ingredient.quantity.toFixed(3)} ${ingredient.unit}`, `${ingredient.available_stock.toFixed(3)} ${ingredient.unit}`].forEach((value, index) => {
+            const cell = document.createElement('td');
+            cell.textContent = value;
+            if (index > 1) cell.className = 'text-end';
+            row.appendChild(cell);
+          });
+          body.appendChild(row);
+        });
+        table.append(head, body);
+        container.appendChild(table);
+      }
+
+      if (recipeBookDetails) {
+        document.querySelectorAll('.recipe-project-button').forEach(button => {
+          button.addEventListener('click', function() {
+            const requestId = ++recipeBookRequestId;
+            document.querySelectorAll('.recipe-project-button').forEach(item => {
+              item.classList.remove('active');
+              item.setAttribute('aria-pressed', 'false');
+            });
+            button.classList.add('active');
+            button.setAttribute('aria-pressed', 'true');
+            const projectRef = button.dataset.projectRef;
+            recipeBookDetails.textContent = `Loading recipe for ${projectRef}...`;
+            fetchTintRecipe(projectRef)
+              .then(ingredients => {
+                if (requestId === recipeBookRequestId) renderRecipeTable(recipeBookDetails, ingredients);
+              })
+              .catch(() => {
+                if (requestId === recipeBookRequestId) recipeBookDetails.textContent = 'Could not load this recipe. Try again in a moment.';
+              });
+          });
+        });
+      }
 
       function loadSavedTintRecipe() {
         const projectRef = projectRefInput.value.trim();
@@ -537,11 +630,7 @@ document.addEventListener('DOMContentLoaded', function() {
         recipePanel.hidden = false;
         recipeTitle.textContent = `Saved recipe for ${projectRef}`;
         recipeItems.textContent = 'Looking for saved ingredients...';
-        fetch(`/api/tint-recipes?project_ref=${encodeURIComponent(projectRef)}`)
-          .then(response => {
-            if (!response.ok) throw new Error('Unable to load saved recipe');
-            return response.json();
-          })
+        fetchTintRecipe(projectRef)
           .then(ingredients => {
             if (lookupId !== recipeLookupId) return;
             recipeItems.replaceChildren();
