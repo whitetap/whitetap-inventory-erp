@@ -72,6 +72,7 @@ class UsageLog(db.Model):
     technician_name = db.Column(db.String(100), nullable=False)
     project_ref = db.Column(db.String(100))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    product = db.relationship('Product', lazy='joined')
 
 class TintRecipe(db.Model):
     __tablename__ = 'tint_recipes'
@@ -399,7 +400,7 @@ def admin_usage_logs():
     logs = [{
         'created_at': log.created_at,
         'product_name': product_name or 'Deleted product',
-        'product_sku': log.product_sku or '-',
+        'product_sku': log.product_sku or (log.product.sku if log.product else '-') or '-',
         'quantity_used': log.quantity_used,
         'technician_name': log.technician_name,
         'project_ref': log.project_ref or '-'
@@ -842,6 +843,7 @@ def admin_transfer_stock():
         # Log the action in your existing UsageLog table
         usage_log = UsageLog(
             product_id=product_id,
+            product_sku=product.sku,
             quantity_used=quantity,
             technician_name='TRANSFER_TO_STAFF',
             project_ref=f'Transfer to Staff: {product.name}'

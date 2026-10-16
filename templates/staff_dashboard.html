@@ -198,7 +198,7 @@ body.staff-dashboard .card:hover { transform: none; }
                 {% else %}
                   <span class="status-badge ok">In stock</span>
                 {% endif %}
-                <button class="btn btn-sm btn-outline-primary ms-1" aria-label="Issue {{ product.name }}" onclick="openIssueModal('{{ product.id }}', '{{ product.name }}', {{ product.current_stock }}, '{{ product.unit_of_measure }}')">
+                <button type="button" class="btn btn-sm btn-outline-primary ms-1 issue-product-button" aria-label="Issue {{ product.name }}" data-product-id="{{ product.id }}" data-product-name="{{ product.name }}" data-product-stock="{{ product.current_stock or 0 }}" data-product-unit="{{ product.unit_of_measure or '' }}">
                   <i class="fas fa-arrow-up-from-bracket me-1" aria-hidden="true"></i>Issue
                 </button>
               </td>
@@ -258,7 +258,7 @@ body.staff-dashboard .card:hover { transform: none; }
                   {% else %}
                     <span class="status-badge ok">In stock</span>
                   {% endif %}
-                  <button class="btn btn-sm btn-outline-primary ms-1" aria-label="Issue {{ product.name }}" onclick="openIssueModal('{{ product.id }}', '{{ product.name }}', {{ product.current_stock }}, '{{ product.unit_of_measure }}')">
+                  <button type="button" class="btn btn-sm btn-outline-primary ms-1 issue-product-button" aria-label="Issue {{ product.name }}" data-product-id="{{ product.id }}" data-product-name="{{ product.name }}" data-product-stock="{{ product.current_stock or 0 }}" data-product-unit="{{ product.unit_of_measure or '' }}">
                     <i class="fas fa-arrow-up-from-bracket me-1" aria-hidden="true"></i>Issue
                   </button>
                 </td>
@@ -316,7 +316,7 @@ body.staff-dashboard .card:hover { transform: none; }
                   {% else %}
                     <span class="status-badge ok">In stock</span>
                   {% endif %}
-                  <button class="btn btn-sm btn-outline-primary ms-1" aria-label="Issue {{ product.name }}" onclick="openIssueModal('{{ product.id }}', '{{ product.name }}', {{ product.current_stock }}, '{{ product.unit_of_measure }}')">
+                  <button type="button" class="btn btn-sm btn-outline-primary ms-1 issue-product-button" aria-label="Issue {{ product.name }}" data-product-id="{{ product.id }}" data-product-name="{{ product.name }}" data-product-stock="{{ product.current_stock or 0 }}" data-product-unit="{{ product.unit_of_measure or '' }}">
                     <i class="fas fa-arrow-up-from-bracket me-1" aria-hidden="true"></i>Issue
                   </button>
                 </td>
@@ -365,7 +365,7 @@ body.staff-dashboard .card:hover { transform: none; }
             <tbody>
               {% for log in recent_logs %}
               <tr>
-                <td>{{ log.product_sku }}</td>
+                <td>{{ log.product_sku or (log.product.sku if log.product else '-') }}</td>
                 <td class="{{ 'stock-low' if log.quantity_used < 0 else 'stock-ok' }} fw-bold">
                   {{ "%.3f"|format(log.quantity_used or 0) }}
                 </td>
@@ -426,7 +426,7 @@ body.staff-dashboard .card:hover { transform: none; }
           <thead class="table-light"><tr><th>SKU</th><th>Product</th><th class="text-end">Stock</th><th class="text-end">Minimum</th><th></th></tr></thead>
           <tbody>
             {% for product in low_stock_products %}
-            <tr><td>{{ product.sku or '-' }}</td><td>{{ product.name }}</td><td class="text-end stock-low">{{ "%.3f"|format(product.current_stock or 0) }} {{ product.unit_of_measure or '' }}</td><td class="text-end">{{ "%.3f"|format(product.min_stock_level or 0) }} {{ product.unit_of_measure or '' }}</td><td><button type="button" class="btn btn-sm btn-outline-primary" data-bs-dismiss="modal" aria-label="Issue {{ product.name }}" onclick="openIssueModal('{{ product.id }}', '{{ product.name }}', {{ product.current_stock or 0 }}, '{{ product.unit_of_measure or '' }}')"><i class="fas fa-arrow-up-from-bracket" aria-hidden="true"></i></button></td></tr>
+            <tr><td>{{ product.sku or '-' }}</td><td>{{ product.name }}</td><td class="text-end stock-low">{{ "%.3f"|format(product.current_stock or 0) }} {{ product.unit_of_measure or '' }}</td><td class="text-end">{{ "%.3f"|format(product.min_stock_level or 0) }} {{ product.unit_of_measure or '' }}</td><td><button type="button" class="btn btn-sm btn-outline-primary issue-product-button" aria-label="Issue {{ product.name }}" data-product-id="{{ product.id }}" data-product-name="{{ product.name }}" data-product-stock="{{ product.current_stock or 0 }}" data-product-unit="{{ product.unit_of_measure or '' }}"><i class="fas fa-arrow-up-from-bracket" aria-hidden="true"></i></button></td></tr>
             {% else %}
             <tr><td colspan="5" class="py-4 text-center text-muted">All products are at or above their minimum stock.</td></tr>
             {% endfor %}
@@ -523,6 +523,30 @@ document.addEventListener('DOMContentLoaded', function() {
               }
         }
     });
+    document.addEventListener('click', function(e) {
+      const button = e.target.closest('.issue-product-button');
+      if (!button) return;
+      const productData = {
+        id: button.dataset.productId,
+        name: button.dataset.productName,
+        stock: button.dataset.productStock,
+        unit: button.dataset.productUnit
+      };
+      const lowStockModal = button.closest('#staffLowStockModal');
+      if (lowStockModal) {
+        lowStockModal.addEventListener('hidden.bs.modal', function() {
+          openIssueModal(productData.id, productData.name, productData.stock, productData.unit);
+        }, { once: true });
+        bootstrap.Modal.getOrCreateInstance(lowStockModal).hide();
+        return;
+      }
+      openIssueModal(
+        productData.id,
+        productData.name,
+        productData.stock,
+        productData.unit
+      );
+    });
 
     // === 2. DYNAMIC CARPET CALCULATOR (THE MAGIC) ===
     function updateCarpetCalculator() {
@@ -574,8 +598,8 @@ document.addEventListener('DOMContentLoaded', function() {
           });
       }
       function renderRecipeTable(container, recipe) {
-      function renderRecipeTable(container, ingredients) {
-        const ingredients = recipe.items;
+        container.replaceChildren();
+        const ingredients = recipe.items || [];
         const heading = document.createElement('h3');
         heading.className = 'h6 fw-bold mb-3';
         heading.textContent = recipe.recipe.recipe_name;
@@ -609,12 +633,11 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         container.appendChild(deleteButton);
 
-        container.replaceChildren();
+        if (!ingredients.length) {
           const emptyState = document.createElement('p');
           emptyState.className = 'text-secondary';
           emptyState.textContent = 'This recipe has no saved ingredients.';
           container.appendChild(emptyState);
-          container.textContent = 'This recipe has no saved ingredients.';
           return;
         }
 
