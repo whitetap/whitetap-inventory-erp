@@ -56,6 +56,10 @@ body.staff-dashboard .card:hover { transform: none; }
 .inventory-search { margin: 22px 0 28px; }
 .inventory-search .input-group-text, .inventory-search .form-control { min-height: 46px; border-color: var(--staff-line); background: #fff; }
 .inventory-search .form-control:focus { border-color: var(--staff-green); box-shadow: 0 0 0 3px rgba(22,120,107,.12); }
+.inventory-search .qr-scan-toggle { border-color: var(--staff-green); color: var(--staff-green); background: #fff; }
+.inventory-search .qr-scan-toggle:hover { color: #fff; background: var(--staff-green); }
+.qr-scanner-panel { margin-top: 10px; padding: 14px; border: 1px solid var(--staff-line); border-radius: 6px; background: #fff; }
+.qr-reader { width: min(100%, 420px); margin: 0 auto; }
 .inventory-section { margin-bottom: 22px; overflow: hidden; }
 .inventory-section .card-header { padding: 16px 19px; background: #fff !important; }
 .inventory-section .card-header h2 { margin: 0; color: var(--staff-ink); font-size: 1.02rem; font-weight: 700; }
@@ -150,6 +154,11 @@ body.staff-dashboard .card:hover { transform: none; }
     <div class="input-group">
       <span class="input-group-text"><i class="fas fa-search text-muted" aria-hidden="true"></i></span>
       <input type="text" id="staffSearch" class="form-control border-start-0" value="{{ search_query }}" placeholder="Search SKU or product name" aria-label="Search inventory">
+      <button type="button" id="qrScannerToggle" class="btn qr-scan-toggle" aria-expanded="false" aria-controls="qrScannerPanel"><i class="fas fa-qrcode me-2" aria-hidden="true"></i>Scan QR</button>
+    </div>
+    <div id="qrScannerPanel" class="qr-scanner-panel" hidden>
+      <div id="qrReader" class="qr-reader"></div>
+      <div id="qrScannerStatus" class="small text-muted mt-2 text-center" role="status" aria-live="polite">Camera is closed.</div>
     </div>
   </div>
 
@@ -184,7 +193,7 @@ body.staff-dashboard .card:hover { transform: none; }
           </thead>
           <tbody>
             {% for product in paints %}
-            <tr class="inventory-row">
+            <tr class="inventory-row" data-product-id="{{ product.id }}">
               <td class="fw-semibold">{{ product.sku or '-' }}</td>
               <td>{{ product.name }}</td>
               <td>{{ product.unit_of_measure or '-' }}</td>
@@ -244,7 +253,7 @@ body.staff-dashboard .card:hover { transform: none; }
             </thead>
             <tbody>
               {% for product in carpets %}
-              <tr class="inventory-row">
+              <tr class="inventory-row" data-product-id="{{ product.id }}">
                 <td class="fw-semibold">{{ product.sku or '-' }}</td>
                 <td>{{ product.name }}</td>
                 <td>{{ product.unit_of_measure or '-' }}</td>
@@ -302,7 +311,7 @@ body.staff-dashboard .card:hover { transform: none; }
             </thead>
             <tbody>
               {% for product in others %}
-              <tr class="inventory-row">
+              <tr class="inventory-row" data-product-id="{{ product.id }}">
                 <td class="fw-semibold">{{ product.sku or '-' }}</td>
                 <td>{{ product.name }}</td>
                 <td>{{ product.unit_of_measure or '-' }}</td>
@@ -498,6 +507,7 @@ body.staff-dashboard .card:hover { transform: none; }
   </div>
  </div>
 
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     // === 1. SEARCH LOGIC (KEEPING IT WORKING) ===
@@ -546,6 +556,90 @@ document.addEventListener('DOMContentLoaded', function() {
         productData.stock,
         productData.unit
       );
+    });
+
+    const qrScannerToggle = document.getElementById('qrScannerToggle');
+    const qrScannerPanel = document.getElementById('qrScannerPanel');
+    const qrScannerStatus = document.getElementById('qrScannerStatus');
+    const staffSearchInput = document.getElementById('staffSearch');
+    let html5QrScanner = null;
+    let qrLookupPending = false;
+
+    async function stopQrCamera(keepPanelOpen) {
+      const scanner = html5QrScanner;
+      html5QrScanner = null;
+      if (scanner) {
+        try {
+          if (scanner.isScanning) await scanner.stop();
+          await scanner.clear();
+        } catch (error) {
+          console.warn('QR scanner shutdown failed:', error);
+        }
+      }
+      if (keepPanelOpen) {
+        qrScannerStatus.textContent = 'Camera paused.';
+        qrScannerToggle.innerHTML = '<i class="fas fa-xmark me-2" aria-hidden="true"></i>Close scanner';
+        qrScannerToggle.setAttribute('aria-expanded', 'true');
+      } else {
+        qrScannerPanel.hidden = true;
+        qrScannerStatus.textContent = 'Camera is closed.';
+        qrScannerToggle.innerHTML = '<i class="fas fa-qrcode me-2" aria-hidden="true"></i>Scan QR';
+        qrScannerToggle.setAttribute('aria-expanded', 'false');
+      }
+    }
+
+    async function lookupScannedProduct(decodedText) {
+      if (qrLookupPending) return;
+      qrLookupPending = true;
+      qrScannerStatus.textContent = 'Looking up product...';
+      try {
+        const response = await fetch(`/api/products/lookup?identifier=${encodeURIComponent(decodedText.trim())}`);
+        const payload = await response.json();
+        if (!response.ok || !payload.success) throw new Error(payload.error || 'Product not found.');
+
+        const product = payload.product;
+        staffSearchInput.value = product.sku || product.name;
+        staffSearchInput.dispatchEvent(new Event('input', { bubbles: true }));
+        const productRow = document.querySelector(`.inventory-row[data-product-id="${product.id}"]`);
+        if (productRow) productRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        qrScannerStatus.textContent = `Found ${product.name}${product.sku ? ` (${product.sku})` : ''}.`;
+        await stopQrCamera(true);
+      } catch (error) {
+        qrScannerStatus.textContent = error.message || 'Could not look up this QR code.';
+        await stopQrCamera(true);
+      } finally {
+        qrLookupPending = false;
+      }
+    }
+
+    qrScannerToggle.addEventListener('click', async function() {
+      if (!qrScannerPanel.hidden) {
+        await stopQrCamera(false);
+        return;
+      }
+
+      qrScannerPanel.hidden = false;
+      qrScannerToggle.innerHTML = '<i class="fas fa-xmark me-2" aria-hidden="true"></i>Close scanner';
+      qrScannerToggle.setAttribute('aria-expanded', 'true');
+      if (!window.Html5Qrcode) {
+        qrScannerStatus.textContent = 'QR scanner could not load. Check your internet connection and try again.';
+        return;
+      }
+
+      qrScannerStatus.textContent = 'Starting camera...';
+      try {
+        html5QrScanner = new Html5Qrcode('qrReader');
+        await html5QrScanner.start(
+          { facingMode: 'environment' },
+          { fps: 10, qrbox: { width: 230, height: 230 } },
+          lookupScannedProduct,
+          function() {}
+        );
+        qrScannerStatus.textContent = 'Point the camera at a product QR label.';
+      } catch (error) {
+        qrScannerStatus.textContent = 'Camera unavailable. Allow camera access and use this page over HTTPS.';
+        await stopQrCamera(true);
+      }
     });
 
     // === 2. DYNAMIC CARPET CALCULATOR (THE MAGIC) ===

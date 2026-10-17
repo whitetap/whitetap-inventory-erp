@@ -40,11 +40,15 @@ app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {'creator': get_conn}
 
 db = SQLAlchemy(app)
 
+def generate_product_qr_code():
+    return f'WTI-{uuid4().hex.upper()}'
+
 class Product(db.Model):
     __tablename__ = 'products'
 
     id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid4)
     sku = db.Column(db.String(50))
+    qr_code = db.Column(db.String(64), nullable=False, unique=True, default=generate_product_qr_code)
     name = db.Column(db.String(100))
     unit_of_measure = db.Column(db.String(20))
     category_id = db.Column(UUID(as_uuid=True), db.ForeignKey('product_categories.id', ondelete='SET NULL'))
@@ -282,6 +286,31 @@ def staff_inventory():
     tint_projects = [row[0] for row in db.session.query(TintRecipe.project_ref).filter(TintRecipe.project_ref.isnot(None)).order_by(TintRecipe.project_ref).all()]
     
     return render_template('staff_dashboard.html', paints=paints, carpets=carpets, others=others, recent_logs=recent_logs, search_query=search_query, activity_filter=activity_filter, low_stock_products=low_stock_products, low_stock_count=low_stock_count, tint_projects=tint_projects, category_name_by_id=category_names)
+
+@app.route('/api/products/lookup')
+def api_product_lookup():
+    identifier = request.args.get('identifier', '').strip()
+    if not identifier:
+        return jsonify({'success': False, 'error': 'Provide a QR code or SKU.'}), 400
+
+    product = Product.query.filter(db.or_(
+        db.func.lower(Product.qr_code) == identifier.casefold(),
+        db.func.lower(Product.sku) == identifier.casefold()
+    )).first()
+    if not product:
+        return jsonify({'success': False, 'error': 'No product matches this QR code or SKU.'}), 404
+
+    return jsonify({
+        'success': True,
+        'product': {
+            'id': str(product.id),
+            'qr_code': product.qr_code,
+            'sku': product.sku or '',
+            'name': product.name or '',
+            'current_stock': float(product.current_stock or 0),
+            'unit_of_measure': product.unit_of_measure or ''
+        }
+    })
 
 @app.route('/api/tint-recipes')
 def api_tint_recipes():
@@ -714,6 +743,7 @@ def admin_add_product():
     
     new_product = Product(
         sku=sku,
+        qr_code=generate_product_qr_code(),
         name=name,
         unit_of_measure=unit_of_measure,
         category_id=category.id,

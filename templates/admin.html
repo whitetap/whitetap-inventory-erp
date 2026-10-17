@@ -61,6 +61,10 @@ body.admin-dashboard .modal-content { border: 1px solid var(--admin-line); borde
 .admin-status.low { color: #943e31; background: #f8e9e5; }
 .admin-status.ok { color: #315b42; background: #e9f1eb; }
 .admin-actions .btn { width: 32px; height: 32px; padding: 0; }
+.qr-label-card { width: 64mm; min-height: 42mm; margin: 0 auto; padding: 5mm; border: 1px solid #dfe3df; background: #fff; color: #252c2a; text-align: center; }
+.qr-label-card canvas { display: block; width: 26mm; height: 26mm; margin: 0 auto 2mm; }
+.qr-label-name { overflow-wrap: anywhere; font-size: 10pt; font-weight: 700; }
+.qr-label-sku, .qr-label-token { font-size: 8pt; }
 .admin-list-toggle .fa-chevron-down { transition: transform .18s ease; }
 .admin-list-toggle[aria-expanded="true"] .fa-chevron-down { transform: rotate(180deg); }
 .admin-add-toggle { color: #fff; border-color: var(--admin-copper); background: var(--admin-copper); }
@@ -83,6 +87,14 @@ body.admin-dashboard .modal-content { border: 1px solid var(--admin-line); borde
 @media print {
     body.admin-dashboard .sidebar, body.admin-dashboard .topbar, .admin-toolbar, .admin-actions, .admin-form, #printReportBtn { display: none !important; }
     body.admin-dashboard .main-content { margin: 0; padding: 0; }
+  body * { visibility: hidden !important; }
+  #qrLabelModal.show, #qrLabelModal.show * { visibility: visible !important; }
+  #qrLabelModal.show { position: fixed !important; inset: 0 !important; display: block !important; overflow: visible !important; background: #fff !important; }
+  #qrLabelModal .modal-dialog { width: 64mm !important; max-width: 64mm !important; margin: 0 !important; }
+  #qrLabelModal .modal-content { border: 0 !important; box-shadow: none !important; }
+  #qrLabelModal .modal-header, #qrLabelModal .modal-footer, #qrLabelModal .btn-close, .modal-backdrop { display: none !important; }
+  #qrLabelModal .modal-body { padding: 0 !important; }
+  .qr-label-card { width: 64mm; min-height: 42mm; border: 0; }
 }
 </style>
 {% endblock %}
@@ -212,6 +224,7 @@ body.admin-dashboard .modal-content { border: 1px solid var(--admin-line); borde
                                         <th>Parent Stock</th>
                                         <th>Min Level</th>
                                         <th>Status</th>
+                                        <th>QR label</th>
                                         <th>Actions</th>
                                     </tr>
                                 </thead>
@@ -236,6 +249,7 @@ body.admin-dashboard .modal-content { border: 1px solid var(--admin-line); borde
                                                 <span class="admin-status ok">In stock</span>
                                             {% endif %}
                                         </td>
+                                          <td><button type="button" class="btn btn-outline-secondary btn-sm product-qr-button" data-product-name="{{ product.name or '' }}" data-product-sku="{{ product.sku or '' }}" data-qr-code="{{ product.qr_code }}" title="Show and print QR label" aria-label="Show QR label for {{ product.name or product.sku }}"><i class="fas fa-qrcode" aria-hidden="true"></i></button></td>
                                         <td>
                                             <div class="btn-group admin-actions" role="group" aria-label="Actions for {{ product.name }}">
                                                 <a href="{{ url_for('edit_product', product_id=product.id) }}" class="btn btn-outline-secondary btn-sm" title="Edit product" aria-label="Edit {{ product.name }}">
@@ -254,9 +268,9 @@ body.admin-dashboard .modal-content { border: 1px solid var(--admin-line); borde
                                     </tr>
                                     {% endfor %}
                                     {% if not all_products %}
-                                    <tr><td colspan="9" class="py-5 text-center text-secondary">No inventory products yet. Add a product to get started.</td></tr>
+                                    <tr><td colspan="10" class="py-5 text-center text-secondary">No inventory products yet. Add a product to get started.</td></tr>
                                     {% endif %}
-                                    <tr id="emptySearchState" hidden><td colspan="9" class="py-4 text-center text-secondary">No products match this search.</td></tr>
+                                    <tr id="emptySearchState" hidden><td colspan="10" class="py-4 text-center text-secondary">No products match this search.</td></tr>
                                 </tbody>
                             </table>
                         </div>
@@ -310,6 +324,17 @@ body.admin-dashboard .modal-content { border: 1px solid var(--admin-line); borde
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/qrious@4.0.2/dist/qrious.min.js"></script>
+<div class="modal fade" id="qrLabelModal" tabindex="-1" aria-labelledby="qrLabelTitle" aria-hidden="true">
+  <div class="modal-dialog modal-sm modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header"><h2 class="modal-title h6 fw-bold" id="qrLabelTitle">Product QR label</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+      <div class="modal-body"><div class="qr-label-card"><canvas id="productQrCanvas" width="260" height="260" aria-label="Product QR code"></canvas><div id="qrLabelProductName" class="qr-label-name"></div><div id="qrLabelSku" class="qr-label-sku"></div><div id="qrLabelToken" class="qr-label-token"></div></div></div>
+      <div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button><button type="button" class="btn admin-add-toggle" id="printQrLabel"><i class="fas fa-print me-2" aria-hidden="true"></i>Print label</button></div>
+    </div>
+  </div>
+</div>
+
 <script>
 function openTransferModal(id, name, available) {
     document.getElementById('transferProductId').value = id;
@@ -320,6 +345,22 @@ function openTransferModal(id, name, available) {
     const modal = new bootstrap.Modal(document.getElementById('transferModal'));
     modal.show();
 }
+
+document.addEventListener('DOMContentLoaded', function() {
+  const qrModalElement = document.getElementById('qrLabelModal');
+  document.addEventListener('click', function(event) {
+    const button = event.target.closest('.product-qr-button');
+    if (!button) return;
+    document.getElementById('qrLabelProductName').textContent = button.dataset.productName;
+    document.getElementById('qrLabelSku').textContent = `SKU: ${button.dataset.productSku || '-'}`;
+    document.getElementById('qrLabelToken').textContent = button.dataset.qrCode;
+    if (window.QRious) {
+      new QRious({ element: document.getElementById('productQrCanvas'), value: button.dataset.qrCode, size: 260, level: 'H' });
+    }
+    bootstrap.Modal.getOrCreateInstance(qrModalElement).show();
+  });
+  document.getElementById('printQrLabel').addEventListener('click', function() { window.print(); });
+});
 </script>
 
 <!-- Admin inventory interactions -->
