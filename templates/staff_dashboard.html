@@ -186,9 +186,7 @@ body.staff-dashboard .card:hover { transform: none; }
               <th>SKU</th>
               <th>Name</th>
               <th>Unit</th>
-              <th class="text-end">Parent</th>
-              <th class="text-end">Staff stock</th>
-              <th class="text-end">Combined</th>
+              <th class="text-end">Stock</th>
               <th class="text-end">Min Level</th>
               <th>Status</th>
             </tr>
@@ -199,9 +197,7 @@ body.staff-dashboard .card:hover { transform: none; }
               <td class="fw-semibold">{{ product.sku or '-' }}</td>
               <td>{{ product.name }}</td>
               <td>{{ product.unit_of_measure or '-' }}</td>
-              <td class="text-end">{{ "%.3f"|format(product.parent_stock or 0) }}</td>
               <td class="fw-bold text-end {{ 'stock-low' if (product.current_stock or 0) < (product.min_stock_level or 0) else 'stock-ok' }}">{{ "%.3f"|format(product.current_stock or 0) }}</td>
-              <td class="fw-semibold text-end">{{ "%.3f"|format((product.parent_stock or 0) + (product.current_stock or 0)) }}</td>
               <td class="text-end">{{ "%.3f"|format(product.min_stock_level or 0) }}</td>
               <td>
                 {% if (product.current_stock or 0) < (product.min_stock_level or 0) %}
@@ -216,7 +212,7 @@ body.staff-dashboard .card:hover { transform: none; }
             </tr>
             {% endfor %}
             {% if not paints %}
-            <tr><td colspan="8" class="py-4 text-center text-muted">No paint products found.</td></tr>
+            <tr><td colspan="6" class="py-4 text-center text-muted">No paint products found.</td></tr>
             {% endif %}
           </tbody>
         </table>
@@ -248,9 +244,7 @@ body.staff-dashboard .card:hover { transform: none; }
                 <th>SKU</th>
                 <th>Name</th>
                 <th>Unit</th>
-                <th class="text-end">Parent</th>
-                <th class="text-end">Staff stock</th>
-                <th class="text-end">Combined</th>
+                <th class="text-end">Stock</th>
                 <th class="text-end">Min Level</th>
                 <th>Status</th>
               </tr>
@@ -261,9 +255,7 @@ body.staff-dashboard .card:hover { transform: none; }
                 <td class="fw-semibold">{{ product.sku or '-' }}</td>
                 <td>{{ product.name }}</td>
                 <td>{{ product.unit_of_measure or '-' }}</td>
-                <td class="text-end">{{ "%.3f"|format(product.parent_stock or 0) }}</td>
                 <td class="fw-bold text-end {{ 'stock-low' if (product.current_stock or 0) < (product.min_stock_level or 0) else 'stock-ok' }}">{{ "%.3f"|format(product.current_stock or 0) }}</td>
-                <td class="fw-semibold text-end">{{ "%.3f"|format((product.parent_stock or 0) + (product.current_stock or 0)) }}</td>
                 <td class="text-end">{{ "%.3f"|format(product.min_stock_level or 0) }}</td>
                 <td>
                   {% if (product.current_stock or 0) < (product.min_stock_level or 0) %}
@@ -278,7 +270,7 @@ body.staff-dashboard .card:hover { transform: none; }
               </tr>
               {% endfor %}
               {% if not carpets %}
-              <tr><td colspan="8" class="py-4 text-center text-muted">No carpet products found.</td></tr>
+              <tr><td colspan="6" class="py-4 text-center text-muted">No carpet products found.</td></tr>
               {% endif %}
             </tbody>
           </table>
@@ -308,9 +300,7 @@ body.staff-dashboard .card:hover { transform: none; }
                 <th>SKU</th>
                 <th>Name</th>
                 <th>Unit</th>
-                <th class="text-end">Parent</th>
-                <th class="text-end">Staff stock</th>
-                <th class="text-end">Combined</th>
+                <th class="text-end">Stock</th>
                 <th class="text-end">Min Level</th>
                 <th>Status</th>
               </tr>
@@ -321,9 +311,7 @@ body.staff-dashboard .card:hover { transform: none; }
                 <td class="fw-semibold">{{ product.sku or '-' }}</td>
                 <td>{{ product.name }}</td>
                 <td>{{ product.unit_of_measure or '-' }}</td>
-                <td class="text-end">{{ "%.3f"|format(product.parent_stock or 0) }}</td>
                 <td class="fw-bold text-end {{ 'stock-low' if (product.current_stock or 0) < (product.min_stock_level or 0) else 'stock-ok' }}">{{ "%.3f"|format(product.current_stock or 0) }}</td>
-                <td class="fw-semibold text-end">{{ "%.3f"|format((product.parent_stock or 0) + (product.current_stock or 0)) }}</td>
                 <td class="text-end">{{ "%.3f"|format(product.min_stock_level or 0) }}</td>
                 <td>
                   {% if (product.current_stock or 0) < (product.min_stock_level or 0) %}
@@ -338,7 +326,7 @@ body.staff-dashboard .card:hover { transform: none; }
               </tr>
               {% endfor %}
               {% if not others %}
-              <tr><td colspan="8" class="py-4 text-center text-muted">No other supplies found.</td></tr>
+              <tr><td colspan="6" class="py-4 text-center text-muted">No other supplies found.</td></tr>
               {% endif %}
             </tbody>
           </table>
