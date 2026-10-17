@@ -23,6 +23,22 @@
                             <input type="text" name="name" class="form-control" value="{{ product.name }}" required>
                         </div>
                         <div class="mb-4">
+                            <label class="form-label fw-bold" for="editSupplier">Supplier</label>
+                            <input id="editSupplier" type="text" name="supplier" class="form-control" value="{{ product.supplier or '' }}" maxlength="250">
+                        </div>
+                        <div class="mb-4">
+                            <label class="form-label fw-bold" for="editInvoiceNumber">Invoice number</label>
+                            <input id="editInvoiceNumber" type="text" name="invoice_number" class="form-control" value="{{ product.invoice_number or '' }}" maxlength="100">
+                        </div>
+                        <div class="mb-4">
+                            <label class="form-label fw-bold" for="editSupplier">Supplier</label>
+                            <input id="editSupplier" type="text" name="supplier" class="form-control" value="{{ product.supplier or '' }}" maxlength="250">
+                        </div>
+                        <div class="mb-4">
+                            <label class="form-label fw-bold" for="editInvoiceNumber">Invoice number</label>
+                            <input id="editInvoiceNumber" type="text" name="invoice_number" class="form-control" value="{{ product.invoice_number or '' }}" maxlength="100">
+                        </div>
+                        <div class="mb-4">
                             <label class="form-label fw-bold">Unit of Measure</label>
                             <select id="editUnit" name="unit_of_measure" class="form-select" required>
                                 {% for unit in unit_options %}
@@ -48,15 +64,15 @@
                         </div>
                         <div class="mb-4">
                             <label class="form-label fw-bold">Parent Stock</label>
-                            <input type="number" name="parent_stock" step="0.01" class="form-control" value="{{ product.parent_stock or 0 }}" min="0">
+                            <input type="number" name="parent_stock" step="0.001" class="form-control" value="{{ product.parent_stock or 0 }}" min="0">
                         </div>
                         <div class="mb-4">
                             <label class="form-label fw-bold">Current Stock</label>
-                            <input type="number" name="current_stock" step="0.01" class="form-control" value="{{ product.current_stock }}" min="0">
+                            <input type="number" name="current_stock" step="0.001" class="form-control" value="{{ product.current_stock }}" min="0">
                         </div>
                         <div class="mb-4">
                             <label class="form-label fw-bold">Min Stock Level</label>
-                            <input type="number" name="min_stock_level" step="0.01" class="form-control" value="{{ product.min_stock_level }}" min="0">
+                            <input type="number" name="min_stock_level" step="0.001" class="form-control" value="{{ product.min_stock_level }}" min="0">
                         </div>
                         <div class="d-flex gap-3">
                             <button type="submit" class="btn btn-success flex-fill">💾 Update Product</button>

@@ -42,6 +42,7 @@ body.admin-dashboard .main-content { min-height: calc(100vh - 62px); margin-left
 {% block sidebar_navigation %}
 <li class="nav-item"><a class="nav-link" href="{{ url_for('admin_dashboard', view='summary') }}"><i class="fas fa-chart-simple me-2"></i>Overview</a></li>
 <li class="nav-item"><a class="nav-link" href="{{ url_for('admin_dashboard', view='inventory') }}"><i class="fas fa-boxes-stacked me-2"></i>Inventory</a></li>
+<li class="nav-item"><a class="nav-link" href="{{ url_for('admin_added_products') }}"><i class="fas fa-calendar-plus me-2"></i>Added products</a></li>
 <li class="nav-item"><a class="nav-link" href="{{ url_for('admin_proforma_invoices') }}"><i class="fas fa-file-invoice-dollar me-2"></i>Proforma invoices</a></li>
 <li class="nav-item"><a class="nav-link" href="{{ url_for('staff_inventory') }}"><i class="fas fa-users me-2"></i>Staff workspace</a></li>
 <li class="nav-item"><a class="nav-link active" href="{{ url_for('admin_usage_logs') }}"><i class="fas fa-file-lines me-2"></i>Usage logs</a></li>

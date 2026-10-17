@@ -50,11 +50,14 @@ class Product(db.Model):
     sku = db.Column(db.String(50))
     qr_code = db.Column(db.String(64), nullable=False, unique=True, default=generate_product_qr_code)
     name = db.Column(db.String(100))
+    supplier = db.Column(db.Text)
+    invoice_number = db.Column(db.Text)
     unit_of_measure = db.Column(db.String(20))
     category_id = db.Column(UUID(as_uuid=True), db.ForeignKey('product_categories.id', ondelete='SET NULL'))
-    current_stock = db.Column(db.Float, default=0.0)
-    parent_stock = db.Column(db.Float, default=0.0)
-    min_stock_level = db.Column(db.Float, default=0.0)
+    current_stock = db.Column(db.Numeric, nullable=False, default=Decimal('0'))
+    parent_stock = db.Column(db.Numeric, nullable=False, default=Decimal('0'))
+    min_stock_level = db.Column(db.Numeric, nullable=False, default=Decimal('0'))
+    created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
 
     def __repr__(self):
         return f'<Product {self.name} ({self.sku})>'
@@ -307,7 +310,9 @@ def api_product_lookup():
             'qr_code': product.qr_code,
             'sku': product.sku or '',
             'name': product.name or '',
-            'current_stock': float(product.current_stock or 0),
+            'parent_stock': float(product.parent_stock or 0),
+            'staff_stock': float(product.current_stock or 0),
+            'combined_stock': float(product.parent_stock or 0) + float(product.current_stock or 0),
             'unit_of_measure': product.unit_of_measure or ''
         }
     })
@@ -721,11 +726,44 @@ def admin_dashboard():
     
     return render_template('admin.html', view=view, display_products=display_products, all_products=all_products, total_items=total_items, low_stock_count=low_stock_count, total_inventory_value=total_inventory_value, today_logs=today_logs, unit_options=get_product_units(), product_categories=ProductCategory.query.order_by(ProductCategory.name).all(), category_name_by_id=get_product_category_name_map())
 
+@app.route('/admin/added-products')
+def admin_added_products():
+    if not session.get('logged_in'):
+        return redirect(url_for('login'))
+
+    ensure_tint_recipe_tables()
+    period = request.args.get('period', 'all')
+    if period not in ('7', '30', '90', '365', 'all'):
+        period = 'all'
+    supplier = request.args.get('supplier', '').strip()
+    invoice_number = request.args.get('invoice_number', '').strip()
+
+    products_query = Product.query
+    if period != 'all':
+        start_at = datetime.now(timezone.utc) - timedelta(days=int(period))
+        products_query = products_query.filter(Product.created_at >= start_at)
+    if supplier:
+        products_query = products_query.filter(Product.supplier.ilike(f'%{supplier}%'))
+    if invoice_number:
+        products_query = products_query.filter(Product.invoice_number.ilike(f'%{invoice_number}%'))
+
+    products = products_query.order_by(Product.created_at.desc(), Product.name).all()
+    return render_template(
+        'added_products.html',
+        products=products,
+        period=period,
+        supplier=supplier,
+        invoice_number=invoice_number,
+        category_name_by_id=get_product_category_name_map()
+    )
+
 @app.route('/admin/add-product', methods=['POST'])
 def admin_add_product():
     ensure_tint_recipe_tables()
     name = request.form['name'].strip()
     sku = request.form['sku'].strip()
+    supplier = request.form.get('supplier', '').strip() or None
+    invoice_number = request.form.get('invoice_number', '').strip() or None
     unit_of_measure = get_submitted_unit()
     
     if not name or not sku or not unit_of_measure or len(unit_of_measure) > 20:
@@ -737,14 +775,16 @@ def admin_add_product():
         flash('Please choose a valid category or enter a new category name.', 'error')
         return redirect(url_for('admin_dashboard', view='inventory'))
     
-    current_stock = float(request.form.get('current_stock', 0))
-    parent_stock = float(request.form.get('parent_stock', 0))
-    min_stock_level = float(request.form.get('min_stock_level', 0))
+    current_stock = Decimal(request.form.get('current_stock', '0') or '0')
+    parent_stock = Decimal(request.form.get('parent_stock', '0') or '0')
+    min_stock_level = Decimal(request.form.get('min_stock_level', '0') or '0')
     
     new_product = Product(
         sku=sku,
         qr_code=generate_product_qr_code(),
         name=name,
+        supplier=supplier,
+        invoice_number=invoice_number,
         unit_of_measure=unit_of_measure,
         category_id=category.id,
         current_stock=current_stock,
@@ -766,7 +806,7 @@ def admin_add_product():
 def issue_item():
     try:
         product_id = request.form['product_id']
-        quantity_used = float(request.form['quantity_used'])
+        quantity_used = Decimal(request.form['quantity_used'])
         technician_name = request.form['technician_name']
         project_ref = request.form.get('project_ref', '').strip()
         is_tinting = request.form.get('is_tinting') == 'on'
@@ -788,7 +828,7 @@ def issue_item():
             flash(f'Insufficient stock! Required: {quantity_used}, Available: {product.current_stock}', 'error')
             return redirect(url_for('staff_inventory'))
         
-        product.current_stock -= quantity_used
+        product.current_stock = Decimal(product.current_stock or 0) - quantity_used
         
         sku_to_save = product.sku
         
@@ -854,7 +894,7 @@ def delete_product(product_id):
 def admin_transfer_stock():
     try:
         product_id = request.form['product_id']
-        quantity = float(request.form['quantity'])
+        quantity = Decimal(request.form['quantity'])
         
         product = Product.query.get_or_404(product_id)
         
@@ -867,8 +907,8 @@ def admin_transfer_stock():
             return redirect(url_for('admin_dashboard'))
         
         # Perform the transfer
-        product.parent_stock -= quantity
-        product.current_stock += quantity
+        product.parent_stock = Decimal(product.parent_stock or 0) - quantity
+        product.current_stock = Decimal(product.current_stock or 0) + quantity
         
         # Log the action in your existing UsageLog table
         usage_log = UsageLog(
@@ -905,11 +945,13 @@ def edit_product(product_id):
             return render_template('edit_product.html', product=product, unit_options=get_product_units(), product_categories=ProductCategory.query.order_by(ProductCategory.name).all(), category_name_by_id=get_product_category_name_map())
         product.sku = request.form['sku'].strip()
         product.name = request.form['name'].strip()
+        product.supplier = request.form.get('supplier', '').strip() or None
+        product.invoice_number = request.form.get('invoice_number', '').strip() or None
         product.unit_of_measure = unit_of_measure
         product.category_id = category.id
-        product.current_stock += float(request.form.get('current_stock') or 0)
-        product.parent_stock += float(request.form.get('parent_stock') or 0)
-        product.min_stock_level = float(request.form.get('min_stock_level', product.min_stock_level))
+        product.current_stock = Decimal(product.current_stock or 0) + Decimal(request.form.get('current_stock') or '0')
+        product.parent_stock = Decimal(product.parent_stock or 0) + Decimal(request.form.get('parent_stock') or '0')
+        product.min_stock_level = Decimal(request.form.get('min_stock_level', str(product.min_stock_level or 0)) or '0')
         
         try:
             db.session.commit()

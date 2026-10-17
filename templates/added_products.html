@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}Added Products - Aviation ERP{% endblock %}
+{% block page_title %}Added Products{% endblock %}
+{% block body_class %}admin-dashboard{% endblock %}
+
+{% block extra_styles %}
+<style>
+:root { --admin-ink:#252c2a; --admin-muted:#707a76; --admin-paper:#f4f5f3; --admin-line:#dfe3df; --admin-copper:#b86b3d; }
+body.admin-dashboard { background:var(--admin-paper); color:var(--admin-ink); }
+body.admin-dashboard .sidebar { width:260px; background:#252c2a; border-right:1px solid #39413d; }
+body.admin-dashboard .sidebar .nav-link { margin:3px 0; padding:11px 12px !important; border-radius:5px; color:#c0c9c4 !important; font-size:.9rem; }
+body.admin-dashboard .sidebar .nav-link:hover, body.admin-dashboard .sidebar .nav-link.active { color:#fff !important; background:#3b4540; transform:none; }
+body.admin-dashboard .sidebar .nav-link.active { box-shadow:inset 3px 0 #d69a68; }
+body.admin-dashboard .topbar { position:sticky; top:0; z-index:900; width:calc(100% - 260px); margin-left:260px; padding:14px 28px; background:rgba(255,255,255,.97); border-bottom:1px solid var(--admin-line); }
+body.admin-dashboard .topbar h4 { color:var(--admin-ink) !important; font-size:1rem; font-weight:700; }
+body.admin-dashboard .main-content { min-height:calc(100vh - 62px); margin-left:260px; padding:26px clamp(18px, 3vw, 42px); background:var(--admin-paper); }
+.added-page { max-width:1560px; margin:0 auto; }
+.added-heading { margin-bottom:22px; }
+.added-heading h1 { margin:4px 0; color:var(--admin-ink); font-size:1.65rem; font-weight:750; }
+.added-heading p { margin:0; color:var(--admin-muted); }
+.added-eyebrow { color:var(--admin-copper); font-size:.72rem; font-weight:700; text-transform:uppercase; }
+.added-filter { display:flex; align-items:flex-end; flex-wrap:wrap; gap:12px; padding:16px; border:1px solid var(--admin-line); border-radius:6px; background:#fff; }
+.added-filter .field { flex:1 1 190px; }
+.added-filter label { display:block; margin-bottom:5px; color:#535e59; font-size:.78rem; font-weight:650; }
+.added-filter .form-control, .added-filter .form-select { border-color:var(--admin-line); }
+.added-filter .form-control:focus, .added-filter .form-select:focus { border-color:var(--admin-copper); box-shadow:0 0 0 3px rgba(184,107,61,.12); }
+.added-table { margin-top:18px; border:1px solid var(--admin-line); border-radius:6px; background:#fff; overflow:hidden; }
+.added-table th { padding:11px 13px; background:#f6f7f5; color:#5f6965; font-size:.72rem; text-transform:uppercase; }
+.added-table td { padding:12px 13px; border-color:#edf0ed; vertical-align:middle; }
+.stock-pair { display:flex; gap:12px; white-space:nowrap; }
+.stock-pair span { color:var(--admin-muted); font-size:.77rem; }
+body.admin-dashboard .added-table .card { box-shadow:none !important; }
+@media(max-width:992px) { body.admin-dashboard .topbar { width:100%; margin-left:0; } body.admin-dashboard .main-content { margin-left:0; padding:20px 16px; } }
+@media(max-width:575px) { .added-heading h1 { font-size:1.4rem; } }
+</style>
+{% endblock %}
+
+{% block sidebar_navigation %}
+<li class="nav-item"><a class="nav-link" href="{{ url_for('admin_dashboard', view='summary') }}"><i class="fas fa-chart-simple me-2"></i>Overview</a></li>
+<li class="nav-item"><a class="nav-link" href="{{ url_for('admin_dashboard', view='inventory') }}"><i class="fas fa-boxes-stacked me-2"></i>Inventory</a></li>
+<li class="nav-item"><a class="nav-link active" href="{{ url_for('admin_added_products') }}"><i class="fas fa-calendar-plus me-2"></i>Added products</a></li>
+<li class="nav-item"><a class="nav-link" href="{{ url_for('admin_proforma_invoices') }}"><i class="fas fa-file-invoice-dollar me-2"></i>Proforma invoices</a></li>
+<li class="nav-item"><a class="nav-link" href="{{ url_for('admin_usage_logs') }}"><i class="fas fa-file-lines me-2"></i>Usage logs</a></li>
+<li class="nav-item"><a class="nav-link" href="{{ url_for('staff_inventory') }}"><i class="fas fa-users me-2"></i>Staff workspace</a></li>
+<li class="nav-item mt-auto"><a class="nav-link" href="{{ url_for('logout') }}"><i class="fas fa-arrow-right-from-bracket me-2"></i>Sign out</a></li>
+{% endblock %}
+
+{% block content %}
+<div class="added-page">
+  <header class="added-heading"><div class="added-eyebrow">Control room / Inventory history</div><h1>Added products</h1><p>Find stock entries by date, supplier, or invoice.</p></header>
+  <form method="get" action="{{ url_for('admin_added_products') }}" class="added-filter">
+    <div class="field"><label for="addedPeriod">Date period</label><select id="addedPeriod" name="period" class="form-select"><option value="7" {% if period == '7' %}selected{% endif %}>Last 7 days</option><option value="30" {% if period == '30' %}selected{% endif %}>Last 30 days</option><option value="90" {% if period == '90' %}selected{% endif %}>Last 90 days</option><option value="365" {% if period == '365' %}selected{% endif %}>Last 365 days</option><option value="all" {% if period == 'all' %}selected{% endif %}>All time</option></select></div>
+    <div class="field"><label for="supplierFilter">Supplier</label><input id="supplierFilter" name="supplier" class="form-control" type="search" value="{{ supplier }}" placeholder="Any supplier"></div>
+    <div class="field"><label for="invoiceFilter">Invoice number</label><input id="invoiceFilter" name="invoice_number" class="form-control" type="search" value="{{ invoice_number }}" placeholder="Any invoice"></div>
+    <button type="submit" class="btn" style="color:#fff;border-color:#b86b3d;background:#b86b3d"><i class="fas fa-filter me-2" aria-hidden="true"></i>Filter</button>
+    <a class="btn btn-outline-secondary" href="{{ url_for('admin_added_products') }}">Clear</a>
+  </form>
+  <section class="added-table" aria-label="Added products results">
+    <div class="table-responsive"><table class="table table-hover mb-0">
+      <thead><tr><th>Date added</th><th>SKU</th><th>Product</th><th>Category</th><th>Supplier</th><th>Invoice</th><th>Unit</th><th>Parent / staff stock</th></tr></thead>
+      <tbody>
+        {% for product in products %}
+        <tr>
+          <td>{% if product.created_at %}<time data-utc-timestamp="{{ product.created_at.isoformat() }}">{{ product.created_at.strftime('%Y-%m-%d %H:%M') }}</time>{% else %}-{% endif %}</td>
+          <td>{{ product.sku or '-' }}</td>
+          <td>{{ product.name or '-' }}</td>
+          <td>{{ category_name_by_id.get(product.category_id|string) if product.category_id else 'Other supplies' }}</td>
+          <td>{{ product.supplier or '-' }}</td>
+          <td>{{ product.invoice_number or '-' }}</td>
+          <td>{{ product.unit_of_measure or '-' }}</td>
+          <td><div class="stock-pair"><div><span>Parent</span><br><strong>{{ '%.3f'|format(product.parent_stock or 0) }}</strong></div><div><span>Staff</span><br><strong>{{ '%.3f'|format(product.current_stock or 0) }}</strong></div></div></td>
+        </tr>
+        {% else %}
+        <tr><td colspan="8" class="py-5 text-center text-secondary">No products match these filters.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table></div>
+  </section>
+</div>
+{% endblock %}

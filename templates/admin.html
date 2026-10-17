@@ -102,6 +102,7 @@ body.admin-dashboard .modal-content { border: 1px solid var(--admin-line); borde
 {% block sidebar_navigation %}
     <li class="nav-item"><a class="nav-link {% if view == 'summary' %}active{% endif %}" href="{{ url_for('admin_dashboard', view='summary') }}"><i class="fas fa-chart-simple me-2"></i>Overview</a></li>
     <li class="nav-item"><a class="nav-link {% if view == 'inventory' %}active{% endif %}" href="{{ url_for('admin_dashboard', view='inventory') }}"><i class="fas fa-boxes-stacked me-2"></i>Inventory</a></li>
+    <li class="nav-item"><a class="nav-link" href="{{ url_for('admin_added_products') }}"><i class="fas fa-calendar-plus me-2"></i>Added products</a></li>
     <li class="nav-item"><a class="nav-link" href="{{ url_for('admin_proforma_invoices') }}"><i class="fas fa-file-invoice-dollar me-2"></i>Proforma invoices</a></li>
     <li class="nav-item"><a class="nav-link" href="{{ url_for('staff_inventory') }}"><i class="fas fa-users me-2"></i>Staff workspace</a></li>
     <li class="nav-item"><a class="nav-link {% if request.endpoint == 'admin_usage_logs' %}active{% endif %}" href="{{ url_for('admin_usage_logs') }}"><i class="fas fa-file-lines me-2"></i>Usage logs</a></li>
@@ -177,6 +178,8 @@ body.admin-dashboard .modal-content { border: 1px solid var(--admin-line); borde
                         <div class="row g-3">
                           <div class="col-sm-6 col-lg-2"><label class="form-label" for="newSku">SKU <span class="text-danger">*</span></label><input id="newSku" type="text" class="form-control" name="sku" required></div>
                           <div class="col-sm-6 col-lg-3"><label class="form-label" for="newName">Product name <span class="text-danger">*</span></label><input id="newName" type="text" class="form-control" name="name" required></div>
+                          <div class="col-sm-6 col-lg-2"><label class="form-label" for="newSupplier">Supplier</label><input id="newSupplier" type="text" class="form-control" name="supplier" maxlength="250"></div>
+                          <div class="col-sm-6 col-lg-2"><label class="form-label" for="newInvoiceNumber">Invoice number</label><input id="newInvoiceNumber" type="text" class="form-control" name="invoice_number" maxlength="100"></div>
                           <div class="col-sm-6 col-lg-2">
                             <label class="form-label" for="newUnit">Unit <span class="text-danger">*</span></label>
                             <select id="newUnit" class="form-select" name="unit_of_measure" required>
@@ -196,7 +199,7 @@ body.admin-dashboard .modal-content { border: 1px solid var(--admin-line); borde
                             <input id="customCategoryName" type="text" class="form-control mt-2" name="custom_category_name" placeholder="New category name" maxlength="100" hidden>
                           </div>
                           <div class="col-sm-6 col-lg-2"><label class="form-label" for="newStock">Current stock</label><input id="newStock" type="number" step="0.001" class="form-control" name="current_stock" value="0"></div>
-                          <div class="col-sm-6 col-lg-1"><label class="form-label" for="newParentStock">Parent</label><input id="newParentStock" type="number" step="0.01" class="form-control" name="parent_stock" value="0"></div>
+                          <div class="col-sm-6 col-lg-1"><label class="form-label" for="newParentStock">Parent</label><input id="newParentStock" type="number" step="0.001" class="form-control" name="parent_stock" value="0"></div>
                           <div class="col-sm-6 col-lg-1"><label class="form-label" for="newMinStock">Min level</label><input id="newMinStock" type="number" step="0.001" class="form-control" name="min_stock_level" value="0"></div>
                         </div>
                         <div class="text-end mt-3"><button type="submit" class="btn admin-add-toggle"><i class="fas fa-plus me-2" aria-hidden="true"></i>Create product</button></div>
@@ -219,6 +222,8 @@ body.admin-dashboard .modal-content { border: 1px solid var(--admin-line); borde
                                         <th>SKU</th>
                                         <th>Name</th>
                                         <th>Category</th>
+                                        <th>Supplier</th>
+                                        <th>Invoice</th>
                                         <th>Unit</th>
                                         <th>Stock</th>
                                         <th>Parent Stock</th>
@@ -234,14 +239,16 @@ body.admin-dashboard .modal-content { border: 1px solid var(--admin-line); borde
                                         <td class="fw-bold">{{ product.sku or '-' }}</td>
                                         <td>{{ product.name or '-' }}</td>
                                         <td>{{ (category_name_by_id.get(product.category_id|string) if product.category_id else none) or ('Aviation paints &amp; pigments' if 'PNT' in (product.sku or '').upper() else 'Carpet &amp; textile' if 'CRP' in (product.sku or '').upper() else 'Other supplies') }}</td>
+                                        <td>{{ product.supplier or '-' }}</td>
+                                        <td>{{ product.invoice_number or '-' }}</td>
                                         <td>{{ product.unit_of_measure or '-' }}</td>
                                         <td>
                                             <span class="admin-stock {% if (product.current_stock or 0) < (product.min_stock_level or 0) %}low{% endif %}">
-                                                {{ "%.2f"|format(product.current_stock or 0) }}
+                                                {{ "%.3f"|format(product.current_stock or 0) }}
                                             </span>
                                         </td>
-                                        <td class="fw-bold">{{ "%.2f"|format(product.parent_stock or 0) }}</td>
-                                        <td class="fw-semibold">{{ "%.2f"|format(product.min_stock_level or 0) }}</td>
+                                        <td class="fw-bold">{{ "%.3f"|format(product.parent_stock or 0) }}</td>
+                                        <td class="fw-semibold">{{ "%.3f"|format(product.min_stock_level or 0) }}</td>
                                         <td>
                                             {% if (product.current_stock or 0) < (product.min_stock_level or 0) %}
                                                 <span class="admin-status low">Low stock</span>
@@ -268,9 +275,9 @@ body.admin-dashboard .modal-content { border: 1px solid var(--admin-line); borde
                                     </tr>
                                     {% endfor %}
                                     {% if not all_products %}
-                                    <tr><td colspan="10" class="py-5 text-center text-secondary">No inventory products yet. Add a product to get started.</td></tr>
+                                    <tr><td colspan="12" class="py-5 text-center text-secondary">No inventory products yet. Add a product to get started.</td></tr>
                                     {% endif %}
-                                    <tr id="emptySearchState" hidden><td colspan="10" class="py-4 text-center text-secondary">No products match this search.</td></tr>
+                                    <tr id="emptySearchState" hidden><td colspan="12" class="py-4 text-center text-secondary">No products match this search.</td></tr>
                                 </tbody>
                             </table>
                         </div>
@@ -353,9 +360,10 @@ document.addEventListener('DOMContentLoaded', function() {
     if (!button) return;
     document.getElementById('qrLabelProductName').textContent = button.dataset.productName;
     document.getElementById('qrLabelSku').textContent = `SKU: ${button.dataset.productSku || '-'}`;
-    document.getElementById('qrLabelToken').textContent = button.dataset.qrCode;
+    const qrIdentifier = button.dataset.qrCode;
+    document.getElementById('qrLabelToken').textContent = qrIdentifier;
     if (window.QRious) {
-      new QRious({ element: document.getElementById('productQrCanvas'), value: button.dataset.qrCode, size: 260, level: 'H' });
+      new QRious({ element: document.getElementById('productQrCanvas'), value: qrIdentifier, size: 260, level: 'H' });
     }
     bootstrap.Modal.getOrCreateInstance(qrModalElement).show();
   });
