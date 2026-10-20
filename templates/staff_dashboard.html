@@ -76,6 +76,15 @@ body.staff-dashboard .card:hover { transform:none; }
 .status-badge { display:inline-block; min-width:68px; padding:4px 7px; border-radius:4px; font-size:.7rem; font-weight:650; text-align:center; }
 .status-badge.low { color:#8d4339; background:#f4e9e6; }
 .status-badge.ok { color:#4e6255; background:#e9eeea; }
+.low-stock-list { max-height:65vh; overflow-y:auto; }
+.low-stock-row { display:grid; grid-template-columns:minmax(0, 1.5fr) minmax(150px, 1fr) auto; align-items:center; gap:16px; padding:14px 18px; border-bottom:1px solid var(--staff-line); }
+.low-stock-row:last-child { border-bottom:0; }
+.low-stock-product { min-width:0; }
+.low-stock-product strong { display:block; color:var(--staff-ink); font-weight:650; }
+.low-stock-product small { color:var(--staff-muted); }
+.low-stock-amount { color:#8d4339; font-weight:700; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.low-stock-minimum { display:block; color:var(--staff-muted); font-size:.78rem; font-weight:500; }
+.low-stock-row .issue-product-button { grid-column:3; }
 .carpet-calculator { margin:12px 4px 0; padding:14px; border:1px solid #464d48; border-radius:5px; background:#303632; }
 .carpet-calculator h2 { margin:0 0 12px; color:#f1f2ef; font-size:.88rem; font-weight:650; }
 .carpet-calculator .form-label { color:#e0e3df; font-size:.74rem; }
@@ -100,6 +109,9 @@ body.staff-dashboard .btn-warning:hover { border-color:#806d4b; background:#806d
   .dashboard-actions { width:100%; }
   .inventory-section .card-header { padding:12px; }
   .inventory-section .table th, .inventory-section .table td { padding:9px 10px; }
+  .low-stock-row { grid-template-columns:minmax(0, 1fr) auto; gap:8px 12px; padding:12px; }
+  .low-stock-product, .low-stock-summary { grid-column:1; }
+  .low-stock-row .issue-product-button { grid-column:2; grid-row:1 / span 2; }
 }
 </style>
 {% endblock %}
@@ -431,16 +443,17 @@ body.staff-dashboard .btn-warning:hover { border-color:#806d4b; background:#806d
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body p-0">
-        <div class="table-responsive"><table class="table table-hover mb-0">
-          <thead class="table-light"><tr><th>SKU</th><th>Product</th><th class="text-end">Stock</th><th class="text-end">Minimum</th><th></th></tr></thead>
-          <tbody>
+        <div class="low-stock-list">
             {% for product in low_stock_products %}
-            <tr><td>{{ product.sku or '-' }}</td><td>{{ product.name }}</td><td class="text-end stock-low">{{ "%.3f"|format(product.current_stock or 0) }} {{ product.unit_of_measure or '' }}</td><td class="text-end">{{ "%.3f"|format(product.min_stock_level or 0) }} {{ product.unit_of_measure or '' }}</td><td><button type="button" class="btn btn-sm btn-outline-primary issue-product-button" aria-label="Issue {{ product.name }}" data-product-id="{{ product.id }}" data-product-name="{{ product.name }}" data-product-stock="{{ product.current_stock or 0 }}" data-product-unit="{{ product.unit_of_measure or '' }}"><i class="fas fa-arrow-up-from-bracket" aria-hidden="true"></i></button></td></tr>
+            <div class="low-stock-row">
+              <div class="low-stock-product"><strong>{{ product.name }}</strong><small>{{ product.sku or 'No SKU' }}</small></div>
+              <div class="low-stock-summary"><span class="low-stock-amount">{{ "%.3f"|format(product.current_stock or 0) }} {{ product.unit_of_measure or '' }}</span><span class="low-stock-minimum">Minimum {{ "%.3f"|format(product.min_stock_level or 0) }} {{ product.unit_of_measure or '' }}</span></div>
+              <button type="button" class="btn btn-sm btn-outline-primary issue-product-button" aria-label="Issue {{ product.name }}" data-product-id="{{ product.id }}" data-product-name="{{ product.name }}" data-product-stock="{{ product.current_stock or 0 }}" data-product-unit="{{ product.unit_of_measure or '' }}"><i class="fas fa-arrow-up-from-bracket" aria-hidden="true"></i><span class="visually-hidden">Issue</span></button>
+            </div>
             {% else %}
-            <tr><td colspan="5" class="py-4 text-center text-muted">All products are at or above their minimum stock.</td></tr>
+            <div class="p-4 text-center text-muted">All products are at or above their minimum stock.</div>
             {% endfor %}
-          </tbody>
-        </table></div>
+        </div>
       </div>
     </div>
   </div>
