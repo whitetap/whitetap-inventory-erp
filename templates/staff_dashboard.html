@@ -63,6 +63,10 @@ body.staff-dashboard .card:hover { transform:none; }
 .inventory-search .qr-scan-toggle:hover { color:#fff; border-color:#435047; background:#435047; }
 .qr-scanner-panel { margin-top:10px; padding:14px; border:1px solid var(--staff-line); border-radius:5px; background:#fff; }
 .qr-reader { width:min(100%, 420px); margin:0 auto; }
+.qr-scan-result { display:grid; grid-template-columns:minmax(0, 1fr) auto; align-items:center; gap:12px; margin-top:12px; padding:13px 15px; border:1px solid #cfd7d0; border-radius:5px; background:#f1f4f1; }
+.qr-scan-result h3 { margin:0 0 3px; color:var(--staff-ink); font-size:.95rem; font-weight:700; }
+.qr-scan-result p { margin:0; color:var(--staff-muted); font-size:.82rem; }
+.qr-scan-balances { display:flex; flex-wrap:wrap; gap:7px 16px; margin-top:8px; color:#4e5a52; font-size:.8rem; font-variant-numeric:tabular-nums; }
 .inventory-section { margin-bottom:18px; overflow:hidden; }
 .inventory-section .card-header { padding:14px 17px; border-bottom:1px solid var(--staff-line) !important; background:#f7f8f6 !important; }
 .inventory-section .card-header h2 { margin:0; color:var(--staff-ink); font-size:.98rem; font-weight:680; }
@@ -177,6 +181,18 @@ body.staff-dashboard .btn-warning:hover { border-color:#806d4b; background:#806d
     <div id="qrScannerPanel" class="qr-scanner-panel" hidden>
       <div id="qrReader" class="qr-reader"></div>
       <div id="qrScannerStatus" class="small text-muted mt-2 text-center" role="status" aria-live="polite">Camera is closed.</div>
+      <div id="qrScanResult" class="qr-scan-result" hidden>
+        <div>
+          <h3 id="qrScanProductName"></h3>
+          <p id="qrScanProductSku"></p>
+          <div class="qr-scan-balances">
+            <span>Parent <strong id="qrParentBalance"></strong></span>
+            <span>Staff <strong id="qrStaffBalance"></strong></span>
+            <span>Combined <strong id="qrCombinedBalance"></strong></span>
+          </div>
+        </div>
+        <button type="button" id="qrScanIssueButton" class="btn btn-warning btn-sm issue-product-button" aria-label="Issue scanned product"><i class="fas fa-arrow-up-from-bracket me-1" aria-hidden="true"></i>Issue</button>
+      </div>
     </div>
   </div>
 
@@ -574,11 +590,13 @@ document.addEventListener('DOMContentLoaded', function() {
     const qrScannerToggle = document.getElementById('qrScannerToggle');
     const qrScannerPanel = document.getElementById('qrScannerPanel');
     const qrScannerStatus = document.getElementById('qrScannerStatus');
+    const qrScanResult = document.getElementById('qrScanResult');
+    const qrScanIssueButton = document.getElementById('qrScanIssueButton');
     const staffSearchInput = document.getElementById('staffSearch');
     let html5QrScanner = null;
     let qrLookupPending = false;
 
-    async function stopQrCamera(keepPanelOpen) {
+    async function stopQrCamera(keepPanelOpen, statusMessage = 'Camera paused.') {
       const scanner = html5QrScanner;
       html5QrScanner = null;
       if (scanner) {
@@ -590,7 +608,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
       }
       if (keepPanelOpen) {
-        qrScannerStatus.textContent = 'Camera paused.';
+        qrScannerStatus.textContent = statusMessage;
         qrScannerToggle.innerHTML = '<i class="fas fa-xmark me-2" aria-hidden="true"></i>Close scanner';
         qrScannerToggle.setAttribute('aria-expanded', 'true');
       } else {
@@ -615,11 +633,20 @@ document.addEventListener('DOMContentLoaded', function() {
         staffSearchInput.dispatchEvent(new Event('input', { bubbles: true }));
         const productRow = document.querySelector(`.inventory-row[data-product-id="${product.id}"]`);
         if (productRow) productRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        qrScannerStatus.textContent = `Found ${product.name}${product.sku ? ` (${product.sku})` : ''}. Parent: ${product.parent_stock.toFixed(3)} ${product.unit_of_measure}; staff: ${product.staff_stock.toFixed(3)} ${product.unit_of_measure}; combined: ${product.combined_stock.toFixed(3)} ${product.unit_of_measure}. Use the Issue button in the matching row.`;
-        await stopQrCamera(true);
+        document.getElementById('qrScanProductName').textContent = product.name;
+        document.getElementById('qrScanProductSku').textContent = `SKU ${product.sku || '-'}`;
+        document.getElementById('qrParentBalance').textContent = `${product.parent_stock.toFixed(3)} ${product.unit_of_measure}`;
+        document.getElementById('qrStaffBalance').textContent = `${product.staff_stock.toFixed(3)} ${product.unit_of_measure}`;
+        document.getElementById('qrCombinedBalance').textContent = `${product.combined_stock.toFixed(3)} ${product.unit_of_measure}`;
+        qrScanIssueButton.dataset.productId = product.id;
+        qrScanIssueButton.dataset.productName = product.name;
+        qrScanIssueButton.dataset.productStock = product.staff_stock;
+        qrScanIssueButton.dataset.productUnit = product.unit_of_measure;
+        qrScanIssueButton.setAttribute('aria-label', `Issue ${product.name}`);
+        qrScanResult.hidden = false;
+        await stopQrCamera(true, `Product found: ${product.sku || product.name}.`);
       } catch (error) {
-        qrScannerStatus.textContent = error.message || 'Could not look up this QR code.';
-        await stopQrCamera(true);
+        await stopQrCamera(true, error.message || 'Could not look up this QR code.');
       } finally {
         qrLookupPending = false;
       }
@@ -632,6 +659,7 @@ document.addEventListener('DOMContentLoaded', function() {
       }
 
       qrScannerPanel.hidden = false;
+      qrScanResult.hidden = true;
       qrScannerToggle.innerHTML = '<i class="fas fa-xmark me-2" aria-hidden="true"></i>Close scanner';
       qrScannerToggle.setAttribute('aria-expanded', 'true');
       if (!window.Html5Qrcode) {
