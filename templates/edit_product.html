@@ -4,11 +4,22 @@
 
 {% block page_title %}Edit Product{% endblock %}
 
+{% block extra_styles %}
+<style>
+.edit-product-card .form-label { color: #f8fafc; }
+.edit-product-card .form-control,
+.edit-product-card .form-select { color: #212529; background-color: #fff; border-color: #cbd5e1; }
+.edit-product-card .form-control::placeholder { color: #64748b; opacity: 1; }
+.edit-product-card .form-control:focus,
+.edit-product-card .form-select:focus { border-color: #86b7fe; box-shadow: 0 0 0 .2rem rgba(13,110,253,.25); }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="container">
     <div class="row justify-content-center">
         <div class="col-md-8 col-lg-6">
-            <div class="card bg-dark">
+            <div class="card bg-dark edit-product-card">
                 <div class="card-header bg-primary text-white">
                     <h2 class="mb-0">✏️ Edit {{ product.name }}</h2>
                 </div>
