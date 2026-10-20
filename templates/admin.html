@@ -55,6 +55,13 @@ body.admin-dashboard .modal-content { border: 1px solid var(--admin-line); borde
 .admin-table th { padding: 11px 13px; border-bottom: 1px solid var(--admin-line); background: #f6f7f5; color: #5f6965; font-size: .72rem; text-transform: uppercase; }
 .admin-table td { padding: 11px 13px; border-color: #edf0ed; vertical-align: middle; }
 .admin-table tbody tr:hover { background: #f8f9f7; }
+.product-source { min-width:120px; }
+.product-source summary { color:#53635a; cursor:pointer; font-size:.8rem; font-weight:650; list-style:none; white-space:nowrap; }
+.product-source summary::-webkit-details-marker { display:none; }
+.product-source summary i { margin-right:5px; color:var(--admin-copper); }
+.product-source-content { display:grid; gap:7px; min-width:170px; margin-top:8px; padding:9px 10px; border:1px solid var(--admin-line); border-radius:5px; background:#f7f8f6; }
+.product-source-content span { display:block; color:var(--admin-muted); font-size:.68rem; font-weight:700; text-transform:uppercase; }
+.product-source-content strong { display:block; overflow-wrap:anywhere; color:var(--admin-ink); font-size:.8rem; font-weight:600; }
 .admin-stock { display: inline-block; min-width: 66px; padding: 5px 8px; border-radius: 4px; background: #e9f1eb; color: #315b42; text-align: right; font-weight: 700; }
 .admin-stock.low { background: #f8e9e5; color: #943e31; }
 .admin-status { display: inline-block; padding: 4px 7px; border-radius: 4px; font-size: .72rem; font-weight: 700; }
@@ -222,8 +229,7 @@ body.admin-dashboard .modal-content { border: 1px solid var(--admin-line); borde
                                         <th>SKU</th>
                                         <th>Name</th>
                                         <th>Category</th>
-                                        <th>Supplier</th>
-                                        <th>Invoice</th>
+                                        <th>Source details</th>
                                         <th>Unit</th>
                                         <th>Staff Stock</th>
                                         <th>Parent Stock</th>
@@ -240,8 +246,15 @@ body.admin-dashboard .modal-content { border: 1px solid var(--admin-line); borde
                                         <td class="fw-bold">{{ product.sku or '-' }}</td>
                                         <td>{{ product.name or '-' }}</td>
                                         <td>{{ (category_name_by_id.get(product.category_id|string) if product.category_id else none) or ('Aviation paints &amp; pigments' if 'PNT' in (product.sku or '').upper() else 'Carpet &amp; textile' if 'CRP' in (product.sku or '').upper() else 'Other supplies') }}</td>
-                                        <td>{{ product.supplier or '-' }}</td>
-                                        <td>{{ product.invoice_number or '-' }}</td>
+                                        <td>
+                                          <details class="product-source">
+                                            <summary><i class="fas fa-circle-info" aria-hidden="true"></i>Supplier / invoice</summary>
+                                            <div class="product-source-content">
+                                              <div><span>Supplier</span><strong>{{ product.supplier or 'Not recorded' }}</strong></div>
+                                              <div><span>Invoice</span><strong>{{ product.invoice_number or 'Not recorded' }}</strong></div>
+                                            </div>
+                                          </details>
+                                        </td>
                                         <td>{{ product.unit_of_measure or '-' }}</td>
                                         <td>
                                             <span class="admin-stock {% if (product.current_stock or 0) < (product.min_stock_level or 0) %}low{% endif %}">
@@ -277,9 +290,9 @@ body.admin-dashboard .modal-content { border: 1px solid var(--admin-line); borde
                                     </tr>
                                     {% endfor %}
                                     {% if not all_products %}
-                                    <tr><td colspan="13" class="py-5 text-center text-secondary">No inventory products yet. Add a product to get started.</td></tr>
+                                    <tr><td colspan="12" class="py-5 text-center text-secondary">No inventory products yet. Add a product to get started.</td></tr>
                                     {% endif %}
-                                    <tr id="emptySearchState" hidden><td colspan="13" class="py-4 text-center text-secondary">No products match this search.</td></tr>
+                                    <tr id="emptySearchState" hidden><td colspan="12" class="py-4 text-center text-secondary">No products match this search.</td></tr>
                                 </tbody>
                             </table>
                         </div>
