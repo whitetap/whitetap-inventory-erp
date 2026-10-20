@@ -51,10 +51,17 @@ body.admin-dashboard .modal-content { border: 1px solid var(--admin-line); borde
 .admin-toolbar h2 { margin: 0; color: var(--admin-ink); font-size: 1rem; font-weight: 700; }
 .admin-toolbar .form-control { width: min(300px, 60vw); min-height: 38px; border-color: var(--admin-line); }
 .admin-toolbar .form-control:focus, .admin-form .form-control:focus { border-color: var(--admin-copper); box-shadow: 0 0 0 3px rgba(184,107,61,.12); }
-.admin-table { margin: 0; color: var(--admin-ink); font-size: .87rem; }
-.admin-table th { padding: 11px 13px; border-bottom: 1px solid var(--admin-line); background: #f6f7f5; color: #5f6965; font-size: .72rem; text-transform: uppercase; }
-.admin-table td { padding: 11px 13px; border-color: #edf0ed; vertical-align: middle; }
+.admin-table { min-width: 1120px; margin: 0; color: var(--admin-ink); font-size: .84rem; font-variant-numeric: tabular-nums; }
+.admin-table th { position: sticky; top: 0; z-index: 2; padding: 10px 11px; border-bottom: 1px solid var(--admin-line); background: #eef0ed; color: #5f6965; font-size: .69rem; white-space: nowrap; text-transform: uppercase; }
+.admin-table td { padding: 9px 11px; border-color: #e9ece9; vertical-align: middle; }
 .admin-table tbody tr:hover { background: #f8f9f7; }
+.inventory-table-scroll { max-height: min(68vh, 760px); overflow: auto; }
+.inventory-table-scroll .admin-table td:nth-child(1) { color:#606a63; font-family:ui-monospace, SFMono-Regular, Consolas, monospace; font-size:.78rem; }
+.inventory-table-scroll .admin-table td:nth-child(6), .inventory-table-scroll .admin-table td:nth-child(7), .inventory-table-scroll .admin-table td:nth-child(8), .inventory-table-scroll .admin-table td:nth-child(9) { text-align:right; white-space:nowrap; }
+.inventory-table-scroll .admin-table td:nth-child(8) { border-left:1px solid #e2e6e2; background:#f3f5f2; color:#334a3c; font-weight:750; }
+.inventory-table-scroll .admin-table th:nth-child(8) { border-left:1px solid #d9ded9; }
+.inventory-table-scroll .admin-table td:last-child, .inventory-table-scroll .admin-table th:last-child { position:sticky; right:0; z-index:1; background:#fff; }
+.inventory-table-scroll .admin-table th:last-child { z-index:3; background:#eef0ed; }
 .product-source { min-width:120px; }
 .product-source summary { color:#53635a; cursor:pointer; font-size:.8rem; font-weight:650; list-style:none; white-space:nowrap; }
 .product-source summary::-webkit-details-marker { display:none; }
@@ -215,14 +222,14 @@ body.admin-dashboard .modal-content { border: 1px solid var(--admin-line); borde
                   </div>
                 </section>
 
-                <div class="card">
+                <div class="card inventory-table-card">
                     <header class="admin-toolbar">
                       <div><h2>Products</h2><small class="text-secondary">{{ total_items }} records</small></div>
                       <button class="btn btn-outline-secondary admin-list-toggle" type="button" data-bs-toggle="collapse" data-bs-target="#inventoryListContent" aria-expanded="true" aria-controls="inventoryListContent" aria-label="Collapse inventory list" title="Collapse inventory list"><i class="fas fa-chevron-down" aria-hidden="true"></i></button>
                     </header>
                     <div id="inventoryListContent" class="collapse show">
                     <div class="card-body p-0">
-                        <div class="table-responsive">
+                        <div class="table-responsive inventory-table-scroll">
                             <table class="table admin-table table-hover mb-0">
                                 <thead>
                                     <tr>
