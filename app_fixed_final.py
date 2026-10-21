@@ -366,6 +366,19 @@ def po_log_event(order, status, actor, note=None):
     order.status_updated_at = datetime.now(timezone.utc)
     db.session.add(PurchaseOrderEvent(purchase_order_id=order.id, status=status, actor=actor, note=(note or None)))
 
+def po_sync_status(order):
+    # Event history is the source of truth; repair a stale status without touching other data.
+    latest = PurchaseOrderEvent.query.filter_by(purchase_order_id=order.id).order_by(
+        PurchaseOrderEvent.created_at.desc(), PurchaseOrderEvent.id.desc()).first()
+    if latest and latest.status != order.status:
+        order.status = latest.status
+        order.status_updated_at = latest.created_at
+        try:
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            app.logger.exception('Unable to sync purchase order status')
+
 def po_recalculate(order, items):
     subtotal = sum((i.line_total for i in items), Decimal('0.00'))
     order.subtotal = subtotal
@@ -1116,6 +1129,7 @@ def staff_purchase_orders():
 def staff_purchase_order_detail(order_id):
     ensure_tint_recipe_tables()
     order = PurchaseOrder.query.get_or_404(order_id)
+    po_sync_status(order)
     items = PurchaseOrderItem.query.filter_by(purchase_order_id=order.id).order_by(PurchaseOrderItem.product_name).all()
     events = PurchaseOrderEvent.query.filter_by(purchase_order_id=order.id).order_by(PurchaseOrderEvent.created_at, PurchaseOrderEvent.id).all()
     link = po_public_link(order) if order.approval_token else None
@@ -1203,6 +1217,7 @@ def supplier_po_response(token):
     order = PurchaseOrder.query.filter_by(approval_token=token).first()
     if not order:
         return render_template('supplier_po_response.html', order=None), 404
+    po_sync_status(order)
     items = PurchaseOrderItem.query.filter_by(purchase_order_id=order.id).order_by(PurchaseOrderItem.product_name).all()
     error = None
     if request.method == 'POST':
