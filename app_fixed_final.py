@@ -158,7 +158,7 @@ class PurchaseOrderItem(db.Model):
 
     id = db.Column(db.BigInteger, primary_key=True, autoincrement=True)
     purchase_order_id = db.Column(db.BigInteger, db.ForeignKey('purchase_orders.id', ondelete='CASCADE'), nullable=False, index=True)
-    product_id = db.Column(UUID(as_uuid=True), nullable=True)
+    product_id = db.Column(UUID(as_uuid=False), nullable=True)
     product_sku = db.Column(db.Text, nullable=True)
     product_name = db.Column(db.Text, nullable=False)
     quantity = db.Column(db.Numeric(14, 3), nullable=False)
@@ -252,6 +252,11 @@ def get_usage_period_start(period, today=None):
 
 def normalize_client_name(name):
     return ' '.join(name.casefold().split())
+
+def normalize_product_uuid(value):
+    if value is None or value == '':
+        return None
+    return str(PythonUUID(str(value)))
 
 def get_project_invoice_lines(project_ref):
     rows = db.session.query(
@@ -792,36 +797,61 @@ def staff_purchase_orders():
     ensure_tint_recipe_tables()
 
     if request.method == 'POST':
-        supplier = ' '.join(request.form.get('supplier', '').split())
-        currency = request.form.get('currency', '').upper()
-        vat_mode = request.form.get('vat_mode', '')
+        json_request = request.is_json
+        payload = request.get_json(silent=True) if json_request else None
+        form_data = payload if isinstance(payload, dict) else request.form
+        supplier = ' '.join(str(form_data.get('supplier', '')).split())
+        currency = str(form_data.get('currency', '')).upper()
+        vat_mode = str(form_data.get('vat_mode', ''))
+
+        def request_error(message, status=400):
+            if json_request:
+                return jsonify({'success': False, 'error': message}), status
+            flash(message, 'error')
+            return redirect(url_for('staff_purchase_orders', supplier=supplier, currency=currency, vat_mode=vat_mode))
+
         if not supplier or len(supplier) > 250:
-            flash('Choose a supplier before creating a purchase order.', 'error')
-            return redirect(url_for('staff_purchase_orders'))
+            return request_error('Choose a supplier before creating a purchase order.')
         if currency not in ('USD', 'KES') or vat_mode not in ('standard', 'exempt'):
-            flash('Choose USD or KES and a valid VAT option.', 'error')
-            return redirect(url_for('staff_purchase_orders', supplier=supplier))
+            return request_error('Choose USD or KES and a valid VAT option.')
 
         supplier_products = Product.query.filter(
             db.func.lower(Product.supplier) == supplier.casefold()
         ).all()
-        products_by_id = {str(product.id): product for product in supplier_products}
-        selected_ids = set(request.form.getlist('product_id'))
-        if not selected_ids or not selected_ids.issubset(products_by_id):
-            flash('Select at least one product supplied by this supplier.', 'error')
-            return redirect(url_for('staff_purchase_orders', supplier=supplier, currency=currency, vat_mode=vat_mode))
+        products_by_id = {normalize_product_uuid(product.id): product for product in supplier_products}
+        try:
+            if json_request:
+                raw_items = form_data.get('items', [])
+                if not isinstance(raw_items, list):
+                    return request_error('Purchase-order items must be provided as a list.')
+                submitted_items = [
+                    (normalize_product_uuid(item.get('product_id')), item.get('quantity'), item.get('unit_cost'))
+                    for item in raw_items if isinstance(item, dict)
+                ]
+                if len(submitted_items) != len(raw_items):
+                    return request_error('Each purchase-order item must be an object.')
+            else:
+                selected_ids = [normalize_product_uuid(value) for value in request.form.getlist('product_id')]
+                submitted_items = [
+                    (product_id, request.form.get(f'quantity_{product_id}', ''), request.form.get(f'unit_cost_{product_id}', ''))
+                    for product_id in selected_ids
+                ]
+        except (ValueError, TypeError, AttributeError):
+            return request_error('One or more selected products have an invalid UUID.')
+
+        submitted_ids = [product_id for product_id, _, _ in submitted_items]
+        if not submitted_ids or len(submitted_ids) != len(set(submitted_ids)) or not set(submitted_ids).issubset(products_by_id):
+            return request_error('Select valid, unique products supplied by this supplier.')
 
         line_items = []
-        for product_id in selected_ids:
+        for product_id, raw_quantity, raw_unit_cost in submitted_items:
             try:
-                quantity = Decimal(request.form.get(f'quantity_{product_id}', '').strip())
-                unit_cost = Decimal(request.form.get(f'unit_cost_{product_id}', '').strip())
+                quantity = Decimal(str(raw_quantity).strip())
+                unit_cost = Decimal(str(raw_unit_cost).strip())
             except Exception:
-                flash('Enter a valid quantity and unit cost for each selected product.', 'error')
-                return redirect(url_for('staff_purchase_orders', supplier=supplier, currency=currency, vat_mode=vat_mode))
+                return request_error('Enter a valid quantity and unit cost for each selected product.')
             if not quantity.is_finite() or quantity <= 0 or not unit_cost.is_finite() or unit_cost < 0:
-                flash('Quantities must be greater than zero and unit costs cannot be negative.', 'error')
-                return redirect(url_for('staff_purchase_orders', supplier=supplier, currency=currency, vat_mode=vat_mode))
+                return request_error('Quantities must be greater than zero and unit costs cannot be negative.')
             quantity = quantity.quantize(Decimal('0.001'), rounding=ROUND_HALF_UP)
             unit_cost = unit_cost.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
             line_total = (quantity * unit_cost).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
@@ -846,7 +876,7 @@ def staff_purchase_orders():
             for product, quantity, unit_cost, line_total in line_items:
                 db.session.add(PurchaseOrderItem(
                     purchase_order_id=order.id,
-                    product_id=product.id,
+                    product_id=normalize_product_uuid(product.id),
                     product_sku=product.sku,
                     product_name=product.name or 'Unnamed product',
                     quantity=quantity,
@@ -856,10 +886,26 @@ def staff_purchase_orders():
                 ))
             db.session.commit()
             flash(f'Purchase order {order.po_number} created. Inventory balances were not changed.', 'success')
+            if json_request:
+                return jsonify({
+                    'success': True,
+                    'purchase_order': {
+                        'id': order.id,
+                        'po_number': order.po_number,
+                        'supplier': order.supplier,
+                        'currency': order.currency,
+                        'subtotal': format(order.subtotal, 'f'),
+                        'vat_amount': format(order.vat_amount, 'f'),
+                        'total': format(order.total, 'f')
+                    },
+                    'url': url_for('staff_purchase_order_detail', order_id=order.id)
+                }), 201
             return redirect(url_for('staff_purchase_order_detail', order_id=order.id))
         except Exception:
             db.session.rollback()
             app.logger.exception('Unable to create staff purchase order')
+            if json_request:
+                return jsonify({'success': False, 'error': 'Unable to save the purchase order. Please try again.'}), 500
             flash('Unable to save the purchase order. Please try again.', 'error')
             return redirect(url_for('staff_purchase_orders', supplier=supplier, currency=currency, vat_mode=vat_mode))
 
