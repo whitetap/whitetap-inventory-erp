@@ -901,12 +901,14 @@ def staff_purchase_orders():
                     'url': url_for('staff_purchase_order_detail', order_id=order.id)
                 }), 201
             return redirect(url_for('staff_purchase_order_detail', order_id=order.id))
-        except Exception:
+        except Exception as exc:
             db.session.rollback()
             app.logger.exception('Unable to create staff purchase order')
+            detail = str(getattr(exc, 'orig', exc)).strip().splitlines()[0][:300]
+            message = f'Unable to save the purchase order: {detail}'
             if json_request:
-                return jsonify({'success': False, 'error': 'Unable to save the purchase order. Please try again.'}), 500
-            flash('Unable to save the purchase order. Please try again.', 'error')
+                return jsonify({'success': False, 'error': message}), 500
+            flash(message, 'error')
             return redirect(url_for('staff_purchase_orders', supplier=supplier, currency=currency, vat_mode=vat_mode))
 
     suppliers = [row[0] for row in db.session.query(Product.supplier).filter(
