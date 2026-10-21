@@ -50,7 +50,11 @@ th { font-size:.72rem; text-transform:uppercase; }
       {% endfor %}
       </tbody>
     </table></div>
-    <p class="text-end">Ordered total: <strong>{{ order.currency }} {{ '%.2f'|format(order.total) }}</strong></p>
+    <div class="text-end">
+      <div>Subtotal: {{ order.currency }} {{ order.subtotal|money }}</div>
+      {% if order.vat_mode != 'exempt' %}<div>VAT (16%): {{ order.currency }} {{ order.vat_amount|money }}</div>{% endif %}
+      <div>Ordered total: <strong>{{ order.currency }} {{ order.total|money }}</strong></div>
+    </div>
     <div class="mb-3"><label class="form-label small" for="comment">Comment (optional)</label><textarea id="comment" name="comment" maxlength="1000" rows="2" class="form-control"></textarea></div>
     <div class="d-flex flex-wrap gap-2 align-items-center">
       <button class="btn btn-success" type="submit" name="action" value="submit" id="submitBtn"><span id="submitIcon" aria-hidden="true">&#10003;</span> <span id="submitLabel">Approve order</span></button>
@@ -82,9 +86,13 @@ th { font-size:.72rem; text-transform:uppercase; }
   {% else %}
   <div class="table-responsive"><table class="table table-sm">
     <thead><tr><th>Product</th><th class="text-end">Qty</th><th>Unit</th><th class="text-end">Unit price</th><th class="text-end">Line total</th></tr></thead>
-    <tbody>{% for item in items %}<tr><td>{{ item.product_name }}</td><td class="text-end">{{ '%.3f'|format(item.quantity) }}</td><td>{{ item.unit or '-' }}</td><td class="text-end">{{ '%.2f'|format(item.unit_cost) }}</td><td class="text-end">{{ '%.2f'|format(item.line_total) }}</td></tr>{% endfor %}</tbody>
+    <tbody>{% for item in items %}<tr><td>{{ item.product_name }}</td><td class="text-end">{{ '%.3f'|format(item.quantity) }}</td><td>{{ item.unit or '-' }}</td><td class="text-end">{{ item.unit_cost|money }}</td><td class="text-end">{{ item.line_total|money }}</td></tr>{% endfor %}</tbody>
   </table></div>
-  <p class="text-end">Total: <strong>{{ order.currency }} {{ '%.2f'|format(order.total) }}</strong></p>
+  <div class="text-end">
+    <div>Subtotal: {{ order.currency }} {{ order.subtotal|money }}</div>
+    {% if order.vat_mode != 'exempt' %}<div>VAT (16%): {{ order.currency }} {{ order.vat_amount|money }}</div>{% endif %}
+    <div>Total: <strong>{{ order.currency }} {{ order.total|money }}</strong></div>
+  </div>
 
   {% if st == 'revision_requested' %}
   <div class="alert alert-warning">Your proposed changes were sent to the buyer for confirmation.</div>

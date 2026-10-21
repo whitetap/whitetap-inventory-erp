@@ -104,14 +104,14 @@ body.staff-dashboard .main-content { min-height:calc(100vh - 60px); padding:28px
       <thead><tr><th>SKU</th><th>Product</th><th class="text-end">Qty</th><th>Unit</th><th class="text-end">Unit cost</th><th class="text-end">Line total</th></tr></thead>
       <tbody>
         {% for item in items %}
-        <tr><td>{{ item.product_sku or '-' }}</td><td>{{ item.product_name }}</td><td class="text-end">{{ '%.3f'|format(item.quantity) }}</td><td>{{ item.unit or '-' }}</td><td class="text-end">{{ order.currency }} {{ '%.2f'|format(item.unit_cost) }}</td><td class="text-end">{{ order.currency }} {{ '%.2f'|format(item.line_total) }}</td></tr>
+        <tr><td>{{ item.product_sku or '-' }}</td><td>{{ item.product_name }}</td><td class="text-end">{{ '%.3f'|format(item.quantity) }}</td><td>{{ item.unit or '-' }}</td><td class="text-end">{{ order.currency }} {{ item.unit_cost|money }}</td><td class="text-end">{{ order.currency }} {{ item.line_total|money }}</td></tr>
         {% endfor %}
       </tbody>
     </table></div>
     <div class="purchase-order-totals">
-      <div><span>Subtotal</span><strong>{{ order.currency }} {{ '%.2f'|format(order.subtotal) }}</strong></div>
-      <div><span>VAT ({{ 'Exempt' if order.vat_mode == 'exempt' else '16%' }})</span><strong>{{ order.currency }} {{ '%.2f'|format(order.vat_amount) }}</strong></div>
-      <div class="grand"><span>Total</span><strong>{{ order.currency }} {{ '%.2f'|format(order.total) }}</strong></div>
+      <div><span>Subtotal</span><strong>{{ order.currency }} {{ order.subtotal|money }}</strong></div>
+      <div><span>VAT ({{ 'Exempt' if order.vat_mode == 'exempt' else '16%' }})</span><strong>{{ order.currency }} {{ order.vat_amount|money }}</strong></div>
+      <div class="grand"><span>Total</span><strong>{{ order.currency }} {{ order.total|money }}</strong></div>
     </div>
 
     <div class="po-box mt-4">

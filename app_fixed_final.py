@@ -212,6 +212,10 @@ PO_NEXT_STEPS = {
 }
 PO_TRACK_ORDER = ['sent', 'approved', 'awaiting_payment', 'payment_received', 'preparing', 'packing', 'out_for_delivery', 'delivered']
 
+@app.template_filter('money')
+def money_filter(value):
+    return '{:,.2f}'.format(value or 0)
+
 @app.context_processor
 def inject_po_labels():
     return {'po_status_labels': PO_STATUS_LABELS}
@@ -396,14 +400,14 @@ def send_po_email(order, items, link, recipients):
     body = (
         f'<p>A purchase order <strong>{htmllib.escape(order.po_number)}</strong> is awaiting your response.</p>'
         f'<table cellpadding="6" border="1" style="border-collapse:collapse"><tr><th>Item</th><th>Qty</th><th>Unit cost</th></tr>{rows}</table>'
-        f'<p>Total: <strong>{order.currency} {order.total:.2f}</strong></p>'
+        f'<p>Total: <strong>{order.currency} {order.total:,.2f}</strong></p>'
         f'<p><a href="{htmllib.escape(link)}">Review, approve or decline this purchase order</a></p>'
         f'<p>If the link does not open, copy it: {htmllib.escape(link)}</p>')
     message = EmailMessage()
     message['Subject'] = f'Purchase order {order.po_number} - approval requested'
     message['From'] = sender
     message['To'] = ', '.join(recipients)
-    message.set_content(f'Purchase order {order.po_number} total {order.currency} {order.total:.2f}. Respond here: {link}')
+    message.set_content(f'Purchase order {order.po_number} total {order.currency} {order.total:,.2f}. Respond here: {link}')
     message.add_alternative(body, subtype='html')
     try:
         port = int(os.environ.get('SMTP_PORT', '587'))

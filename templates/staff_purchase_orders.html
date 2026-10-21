@@ -151,7 +151,7 @@ body.staff-dashboard .main-content { min-height:calc(100vh - 60px); padding:28px
       <thead><tr><th>PO number</th><th>Supplier</th><th>Created</th><th>Currency</th><th>Status</th><th class="text-end">Total</th></tr></thead>
       <tbody>
         {% for order in orders %}
-        <tr><td><a href="{{ url_for('staff_purchase_order_detail', order_id=order.id) }}">{{ order.po_number }}</a></td><td>{{ order.supplier }}</td><td><time data-utc-timestamp="{{ order.created_at.isoformat() }}">{{ order.created_at.strftime('%Y-%m-%d') }}</time></td><td>{{ order.currency }}</td><td>{{ po_status_labels.get(order.status, order.status|title) }}</td><td class="text-end">{{ order.currency }} {{ '%.2f'|format(order.total) }}</td></tr>
+        <tr><td><a href="{{ url_for('staff_purchase_order_detail', order_id=order.id) }}">{{ order.po_number }}</a></td><td>{{ order.supplier }}</td><td><time data-utc-timestamp="{{ order.created_at.isoformat() }}">{{ order.created_at.strftime('%Y-%m-%d') }}</time></td><td>{{ order.currency }}</td><td>{{ po_status_labels.get(order.status, order.status|title) }}</td><td class="text-end">{{ order.currency }} {{ order.total|money }}</td></tr>
         {% else %}
         <tr><td colspan="6" class="py-4 text-center text-secondary">No purchase orders created yet.</td></tr>
         {% endfor %}
