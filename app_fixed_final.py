@@ -1,4 +1,9 @@
 import os
+import re
+import secrets
+import smtplib
+import html as htmllib
+from email.message import EmailMessage
 import psycopg2
 from dotenv import load_dotenv
 from uuid import uuid4, UUID as PythonUUID
@@ -150,7 +155,14 @@ class PurchaseOrder(db.Model):
     subtotal = db.Column(db.Numeric(14, 2), nullable=False)
     vat_amount = db.Column(db.Numeric(14, 2), nullable=False)
     total = db.Column(db.Numeric(14, 2), nullable=False)
-    status = db.Column(db.String(20), nullable=False, default='pending')
+    status = db.Column(db.String(30), nullable=False, default='pending')
+    supplier_emails = db.Column(db.Text, nullable=True)
+    approval_token = db.Column(db.String(64), nullable=True, unique=True, index=True)
+    supplier_comment = db.Column(db.Text, nullable=True)
+    invoice_number = db.Column(db.String(120), nullable=True)
+    waybill_number = db.Column(db.String(120), nullable=True)
+    driver_phone = db.Column(db.String(60), nullable=True)
+    status_updated_at = db.Column(db.DateTime(timezone=True), nullable=True)
     created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
 
 class PurchaseOrderItem(db.Model):
@@ -165,7 +177,44 @@ class PurchaseOrderItem(db.Model):
     unit = db.Column(db.Text, nullable=True)
     unit_cost = db.Column(db.Numeric(14, 2), nullable=False)
     line_total = db.Column(db.Numeric(14, 2), nullable=False)
+    supplier_included = db.Column(db.Boolean, nullable=True)
+    supplier_quantity = db.Column(db.Numeric(14, 3), nullable=True)
+    supplier_unit_cost = db.Column(db.Numeric(14, 2), nullable=True)
     created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
+
+class PurchaseOrderEvent(db.Model):
+    __tablename__ = 'purchase_order_events'
+
+    id = db.Column(db.BigInteger, primary_key=True, autoincrement=True)
+    purchase_order_id = db.Column(db.BigInteger, db.ForeignKey('purchase_orders.id', ondelete='CASCADE'), nullable=False, index=True)
+    status = db.Column(db.String(30), nullable=False)
+    actor = db.Column(db.String(20), nullable=False, default='staff')
+    note = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
+
+PO_STATUS_LABELS = {
+    'pending': 'Draft (not sent)', 'sent': 'Awaiting supplier', 'revision_requested': 'Changes proposed',
+    'declined': 'Declined', 'approved': 'Approved', 'awaiting_payment': 'Awaiting payment',
+    'on_credit': 'On credit', 'payment_received': 'Payment received', 'to_be_paid': 'To be paid',
+    'preparing': 'Preparing order', 'packing': 'Packing', 'out_for_delivery': 'Out for delivery',
+    'delivered': 'Delivered'
+}
+# Supplier-driven fulfilment steps after approval.
+PO_NEXT_STEPS = {
+    'approved': ['awaiting_payment', 'on_credit'],
+    'awaiting_payment': ['payment_received'],
+    'on_credit': ['to_be_paid', 'preparing'],
+    'payment_received': ['preparing'],
+    'to_be_paid': ['preparing'],
+    'preparing': ['packing'],
+    'packing': ['out_for_delivery'],
+    'out_for_delivery': ['delivered']
+}
+PO_TRACK_ORDER = ['sent', 'approved', 'awaiting_payment', 'payment_received', 'preparing', 'packing', 'out_for_delivery', 'delivered']
+
+@app.context_processor
+def inject_po_labels():
+    return {'po_status_labels': PO_STATUS_LABELS}
 
 _tint_recipe_schema_ready = False
 
@@ -178,9 +227,31 @@ def ensure_tint_recipe_tables():
                 TintRecipe.__table__, TintRecipeItem.__table__, ProductCategory.__table__,
                 Client.__table__, ProformaInvoice.__table__, ProformaInvoiceItem.__table__,
                 PurchaseOrder.__table__, PurchaseOrderItem.__table__
+                , PurchaseOrderEvent.__table__
             ],
             checkfirst=True
         )
+        try:
+            for statement in (
+                "ALTER TABLE purchase_orders ADD COLUMN IF NOT EXISTS supplier_emails TEXT",
+                "ALTER TABLE purchase_orders ADD COLUMN IF NOT EXISTS approval_token VARCHAR(64)",
+                "ALTER TABLE purchase_orders ADD COLUMN IF NOT EXISTS supplier_comment TEXT",
+                "ALTER TABLE purchase_orders ADD COLUMN IF NOT EXISTS invoice_number VARCHAR(120)",
+                "ALTER TABLE purchase_orders ADD COLUMN IF NOT EXISTS waybill_number VARCHAR(120)",
+                "ALTER TABLE purchase_orders ADD COLUMN IF NOT EXISTS driver_phone VARCHAR(60)",
+                "ALTER TABLE purchase_orders ADD COLUMN IF NOT EXISTS status_updated_at TIMESTAMPTZ",
+                "ALTER TABLE purchase_order_items ADD COLUMN IF NOT EXISTS supplier_included BOOLEAN",
+                "ALTER TABLE purchase_order_items ADD COLUMN IF NOT EXISTS supplier_quantity NUMERIC(14, 3)",
+                "ALTER TABLE purchase_order_items ADD COLUMN IF NOT EXISTS supplier_unit_cost NUMERIC(14, 2)",
+                "ALTER TABLE purchase_orders ALTER COLUMN status TYPE VARCHAR(30)",
+                "ALTER TABLE purchase_order_events ALTER COLUMN status TYPE VARCHAR(30)",
+                "CREATE UNIQUE INDEX IF NOT EXISTS ix_purchase_orders_approval_token ON purchase_orders (approval_token)"
+            ):
+                db.session.execute(text(statement))
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            app.logger.exception('Purchase order schema upgrade failed')
         _tint_recipe_schema_ready = True
     for category_name in ('Aviation paints & pigments', 'Carpet & textile', 'Other supplies'):
         category = ProductCategory.query.filter(db.func.lower(ProductCategory.name) == category_name.lower()).first()
@@ -257,6 +328,85 @@ def normalize_product_uuid(value):
     if value is None or value == '':
         return None
     return PythonUUID(str(value))
+
+EMAIL_PATTERN = re.compile(r'^[^@\s<>,;]+@[^@\s<>,;]+\.[^@\s<>,;]+$')
+
+def parse_supplier_emails(values):
+    if isinstance(values, str):
+        values = [values]
+    emails = []
+    for value in values or []:
+        for part in re.split(r'[,;\s]+', str(value or '')):
+            part = part.strip().lower()
+            if not part:
+                continue
+            if len(part) > 254 or not EMAIL_PATTERN.match(part):
+                raise ValueError(f'"{part}" is not a valid email address.')
+            if part not in emails:
+                emails.append(part)
+    if len(emails) > 4:
+        raise ValueError('Add no more than 4 supplier email addresses.')
+    return emails
+
+def po_email_list(order):
+    return [e for e in (order.supplier_emails or '').split(',') if e]
+
+def po_public_link(order):
+    base = os.environ.get('PUBLIC_BASE_URL', '').rstrip('/')
+    path = url_for('supplier_po_response', token=order.approval_token)
+    if base:
+        return base + path
+    root = request.url_root.rstrip('/')
+    if root.startswith('http://') and 'localhost' not in root and '127.0.0.1' not in root:
+        root = 'https://' + root[len('http://'):]
+    return root + path
+
+def po_log_event(order, status, actor, note=None):
+    order.status = status
+    order.status_updated_at = datetime.now(timezone.utc)
+    db.session.add(PurchaseOrderEvent(purchase_order_id=order.id, status=status, actor=actor, note=(note or None)))
+
+def po_recalculate(order, items):
+    subtotal = sum((i.line_total for i in items), Decimal('0.00'))
+    order.subtotal = subtotal
+    order.vat_amount = (subtotal * Decimal(order.vat_rate) / Decimal('100')).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+    order.total = order.subtotal + order.vat_amount
+
+def send_po_email(order, items, link, recipients):
+    host = os.environ.get('SMTP_HOST')
+    sender = os.environ.get('SMTP_FROM') or os.environ.get('SMTP_USER')
+    if not host or not sender:
+        return False, 'Email is not configured (set SMTP_HOST, SMTP_USER, SMTP_PASSWORD, SMTP_FROM).'
+    rows = ''.join(
+        f'<tr><td>{htmllib.escape(i.product_name)}</td><td align="right">{i.quantity:.3f} {htmllib.escape(i.unit or "")}</td>'
+        f'<td align="right">{order.currency} {i.unit_cost:.2f}</td></tr>' for i in items)
+    body = (
+        f'<p>A purchase order <strong>{htmllib.escape(order.po_number)}</strong> is awaiting your response.</p>'
+        f'<table cellpadding="6" border="1" style="border-collapse:collapse"><tr><th>Item</th><th>Qty</th><th>Unit cost</th></tr>{rows}</table>'
+        f'<p>Total: <strong>{order.currency} {order.total:.2f}</strong></p>'
+        f'<p><a href="{htmllib.escape(link)}">Review, approve or decline this purchase order</a></p>'
+        f'<p>If the link does not open, copy it: {htmllib.escape(link)}</p>')
+    message = EmailMessage()
+    message['Subject'] = f'Purchase order {order.po_number} - approval requested'
+    message['From'] = sender
+    message['To'] = ', '.join(recipients)
+    message.set_content(f'Purchase order {order.po_number} total {order.currency} {order.total:.2f}. Respond here: {link}')
+    message.add_alternative(body, subtype='html')
+    try:
+        port = int(os.environ.get('SMTP_PORT', '587'))
+        if port == 465:
+            server = smtplib.SMTP_SSL(host, port, timeout=20)
+        else:
+            server = smtplib.SMTP(host, port, timeout=20)
+            server.starttls()
+        with server:
+            if os.environ.get('SMTP_USER'):
+                server.login(os.environ['SMTP_USER'], os.environ.get('SMTP_PASSWORD', ''))
+            server.send_message(message)
+        return True, None
+    except Exception as exc:
+        app.logger.exception('Unable to send purchase order email')
+        return False, f'{type(exc).__name__}: {str(exc)[:150]}'
 
 def get_project_invoice_lines(project_ref):
     rows = db.session.query(
@@ -814,6 +964,11 @@ def staff_purchase_orders():
             return request_error('Choose a supplier before creating a purchase order.')
         if currency not in ('USD', 'KES') or vat_mode not in ('standard', 'exempt'):
             return request_error('Choose USD or KES and a valid VAT option.')
+        try:
+            raw_emails = form_data.get('supplier_emails', []) if json_request else request.form.getlist('supplier_email')
+            supplier_emails = parse_supplier_emails(raw_emails)
+        except ValueError as exc:
+            return request_error(str(exc))
 
         supplier_products = Product.query.filter(
             db.func.lower(Product.supplier) == supplier.casefold()
@@ -869,10 +1024,13 @@ def staff_purchase_orders():
                 vat_rate=vat_rate,
                 subtotal=subtotal,
                 vat_amount=vat_amount,
-                total=subtotal + vat_amount
+                total=subtotal + vat_amount,
+                supplier_emails=','.join(supplier_emails) or None,
+                approval_token=secrets.token_urlsafe(32)
             )
             db.session.add(order)
             db.session.flush()
+            po_log_event(order, 'pending', 'staff', 'Purchase order created')
             for product, quantity, unit_cost, line_total in line_items:
                 db.session.add(PurchaseOrderItem(
                     purchase_order_id=order.id,
@@ -936,6 +1094,12 @@ def staff_purchase_orders():
             other_products.append(product)
 
     orders = PurchaseOrder.query.order_by(PurchaseOrder.created_at.desc()).limit(50).all()
+    last_emails = []
+    if supplier:
+        previous = PurchaseOrder.query.filter(
+            db.func.lower(PurchaseOrder.supplier) == supplier.casefold(), PurchaseOrder.supplier_emails.isnot(None)
+        ).order_by(PurchaseOrder.created_at.desc()).first()
+        last_emails = po_email_list(previous) if previous else []
     return render_template(
         'staff_purchase_orders.html',
         suppliers=suppliers,
@@ -944,7 +1108,8 @@ def staff_purchase_orders():
         vat_mode=vat_mode,
         low_stock_products=low_stock_products,
         other_products=other_products,
-        orders=orders
+        orders=orders,
+        last_emails=last_emails
     )
 
 @app.route('/staff/purchase-orders/<int:order_id>')
@@ -952,7 +1117,156 @@ def staff_purchase_order_detail(order_id):
     ensure_tint_recipe_tables()
     order = PurchaseOrder.query.get_or_404(order_id)
     items = PurchaseOrderItem.query.filter_by(purchase_order_id=order.id).order_by(PurchaseOrderItem.product_name).all()
-    return render_template('staff_purchase_order_detail.html', order=order, items=items)
+    events = PurchaseOrderEvent.query.filter_by(purchase_order_id=order.id).order_by(PurchaseOrderEvent.created_at, PurchaseOrderEvent.id).all()
+    link = po_public_link(order) if order.approval_token else None
+    return render_template(
+        'staff_purchase_order_detail.html', order=order, items=items, events=events,
+        emails=po_email_list(order), supplier_link=link, track_order=PO_TRACK_ORDER
+    )
+
+@app.route('/staff/purchase-orders/<int:order_id>/send', methods=['POST'])
+def staff_purchase_order_send(order_id):
+    ensure_tint_recipe_tables()
+    order = PurchaseOrder.query.get_or_404(order_id)
+    if order.status not in ('pending', 'sent', 'revision_requested'):
+        flash('This purchase order can no longer be sent for approval.', 'error')
+        return redirect(url_for('staff_purchase_order_detail', order_id=order.id))
+    try:
+        emails = parse_supplier_emails(request.form.getlist('supplier_email'))
+    except ValueError as exc:
+        flash(str(exc), 'error')
+        return redirect(url_for('staff_purchase_order_detail', order_id=order.id))
+    if not emails:
+        flash('Add at least one supplier email address.', 'error')
+        return redirect(url_for('staff_purchase_order_detail', order_id=order.id))
+    items = PurchaseOrderItem.query.filter_by(purchase_order_id=order.id).order_by(PurchaseOrderItem.product_name).all()
+    try:
+        order.supplier_emails = ','.join(emails)
+        if not order.approval_token:
+            order.approval_token = secrets.token_urlsafe(32)
+        link = po_public_link(order)
+        sent, error = send_po_email(order, items, link, emails)
+        if order.status != 'sent':
+            po_log_event(order, 'sent', 'staff', 'Sent to ' + ', '.join(emails) if sent else 'Link generated (email not delivered)')
+        else:
+            db.session.add(PurchaseOrderEvent(purchase_order_id=order.id, status='sent', actor='staff', note='Re-sent to ' + ', '.join(emails)))
+        db.session.commit()
+        if sent:
+            flash('Purchase order emailed to ' + ', '.join(emails) + '.', 'success')
+        else:
+            flash(f'Email not sent: {error} Share the supplier link below manually.', 'error')
+    except Exception as exc:
+        db.session.rollback()
+        app.logger.exception('Unable to send purchase order')
+        flash(f'Unable to send the purchase order: {str(getattr(exc, "orig", exc))[:200]}', 'error')
+    return redirect(url_for('staff_purchase_order_detail', order_id=order.id))
+
+@app.route('/staff/purchase-orders/<int:order_id>/review', methods=['POST'])
+def staff_purchase_order_review(order_id):
+    ensure_tint_recipe_tables()
+    order = PurchaseOrder.query.get_or_404(order_id)
+    if order.status != 'revision_requested':
+        flash('No supplier changes are waiting for review.', 'error')
+        return redirect(url_for('staff_purchase_order_detail', order_id=order.id))
+    items = PurchaseOrderItem.query.filter_by(purchase_order_id=order.id).all()
+    try:
+        if request.form.get('decision') == 'accept':
+            kept = []
+            for item in items:
+                if item.supplier_included is False:
+                    db.session.delete(item)
+                    continue
+                if item.supplier_quantity is not None:
+                    item.quantity = item.supplier_quantity
+                if item.supplier_unit_cost is not None:
+                    item.unit_cost = item.supplier_unit_cost
+                item.line_total = (item.quantity * item.unit_cost).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+                kept.append(item)
+            po_recalculate(order, kept)
+            po_log_event(order, 'approved', 'staff', 'Supplier changes accepted')
+            flash('Supplier changes accepted. The order is approved.', 'success')
+        else:
+            po_log_event(order, 'sent', 'staff', 'Supplier changes rejected; original order stands')
+            flash('Changes rejected. The order is back with the supplier for approval.', 'success')
+        db.session.commit()
+    except Exception as exc:
+        db.session.rollback()
+        app.logger.exception('Unable to review purchase order changes')
+        flash(f'Unable to update the purchase order: {str(getattr(exc, "orig", exc))[:200]}', 'error')
+    return redirect(url_for('staff_purchase_order_detail', order_id=order.id))
+
+@app.route('/po/respond/<token>', methods=['GET', 'POST'])
+def supplier_po_response(token):
+    ensure_tint_recipe_tables()
+    if not re.fullmatch(r'[A-Za-z0-9_-]{20,64}', token or ''):
+        return render_template('supplier_po_response.html', order=None), 404
+    order = PurchaseOrder.query.filter_by(approval_token=token).first()
+    if not order:
+        return render_template('supplier_po_response.html', order=None), 404
+    items = PurchaseOrderItem.query.filter_by(purchase_order_id=order.id).order_by(PurchaseOrderItem.product_name).all()
+    error = None
+    if request.method == 'POST':
+        action = request.form.get('action', '')
+        comment = ' '.join(request.form.get('comment', '').split())[:1000]
+        try:
+            if action in ('submit', 'decline') and order.status == 'sent':
+                if action == 'decline':
+                    order.supplier_comment = comment or None
+                    po_log_event(order, 'declined', 'supplier', comment or 'Declined by supplier')
+                else:
+                    changed = False
+                    for item in items:
+                        included = request.form.get(f'include_{item.id}') == 'on'
+                        quantity = Decimal(request.form.get(f'quantity_{item.id}', '').strip()).quantize(Decimal('0.001'), rounding=ROUND_HALF_UP)
+                        unit_cost = Decimal(request.form.get(f'unit_cost_{item.id}', '').strip()).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+                        if not quantity.is_finite() or quantity <= 0 or not unit_cost.is_finite() or unit_cost < 0:
+                            raise ValueError('Quantities must be above zero and prices cannot be negative.')
+                        item.supplier_included = included
+                        item.supplier_quantity = quantity
+                        item.supplier_unit_cost = unit_cost
+                        if not included or quantity != item.quantity or unit_cost != item.unit_cost:
+                            changed = True
+                    if not any(i.supplier_included for i in items):
+                        raise ValueError('Tick at least one item, or decline the order.')
+                    order.supplier_comment = comment or None
+                    if changed:
+                        po_log_event(order, 'revision_requested', 'supplier', comment or 'Supplier proposed changes to quantity/price/items')
+                    else:
+                        po_log_event(order, 'approved', 'supplier', comment or 'Approved as ordered')
+            elif action == 'advance' and order.status in PO_NEXT_STEPS:
+                target = request.form.get('next_status', '')
+                if target not in PO_NEXT_STEPS[order.status]:
+                    raise ValueError('That step is not available.')
+                note = None
+                if target == 'out_for_delivery':
+                    invoice = ' '.join(request.form.get('invoice_number', '').split())[:120]
+                    waybill = ' '.join(request.form.get('waybill_number', '').split())[:120]
+                    phone = ' '.join(request.form.get('driver_phone', '').split())[:60]
+                    if not (invoice or waybill or phone):
+                        raise ValueError('Enter an invoice number, waybill number or delivery person phone.')
+                    order.invoice_number = invoice or order.invoice_number
+                    order.waybill_number = waybill or order.waybill_number
+                    order.driver_phone = phone or order.driver_phone
+                    note = ' | '.join(p for p in (f'Invoice {invoice}' if invoice else '', f'Waybill {waybill}' if waybill else '', f'Driver {phone}' if phone else '') if p)
+                po_log_event(order, target, 'supplier', note)
+            else:
+                raise ValueError('This action is not available for the current order status.')
+            db.session.commit()
+            return redirect(url_for('supplier_po_response', token=token))
+        except (ValueError, ArithmeticError) as exc:
+            db.session.rollback()
+            known = ('Quantities must', 'Tick at least', 'Enter an invoice', 'That step')
+            error = str(exc) if str(exc).startswith(known) else 'Enter a valid quantity and price for every item.'
+        except Exception as exc:
+            db.session.rollback()
+            app.logger.exception('Supplier PO response failed')
+            error = 'Something went wrong. Please try again.'
+        items = PurchaseOrderItem.query.filter_by(purchase_order_id=order.id).order_by(PurchaseOrderItem.product_name).all()
+    events = PurchaseOrderEvent.query.filter_by(purchase_order_id=order.id).order_by(PurchaseOrderEvent.created_at, PurchaseOrderEvent.id).all()
+    return render_template(
+        'supplier_po_response.html', order=order, items=items, events=events, error=error,
+        next_steps=PO_NEXT_STEPS.get(order.status, []), track_order=PO_TRACK_ORDER
+    )
 
 @app.route('/admin/add-product', methods=['POST'])
 def admin_add_product():

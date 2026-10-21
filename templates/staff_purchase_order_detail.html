@@ -26,6 +26,12 @@ body.staff-dashboard .main-content { min-height:calc(100vh - 60px); padding:28px
 .purchase-order-totals { width:min(340px,100%); margin:16px 0 0 auto; }
 .purchase-order-totals div { display:flex; justify-content:space-between; gap:16px; padding:6px 0; }
 .purchase-order-totals .grand { margin-top:6px; padding-top:11px; border-top:1px solid var(--staff-line); font-size:1.05rem; font-weight:750; }
+.po-track { display:flex; flex-wrap:wrap; gap:6px; margin:0 0 20px; padding:0; list-style:none; }
+.po-track li { padding:5px 10px; border:1px solid var(--staff-line); border-radius:999px; color:var(--staff-muted); font-size:.74rem; }
+.po-track li.done { border-color:var(--staff-accent); background:var(--staff-accent); color:#fff; }
+.po-track li.current { border-color:var(--staff-accent); color:var(--staff-accent); font-weight:700; }
+.po-box { margin:0 0 20px; padding:14px 16px; border:1px solid var(--staff-line); border-radius:5px; background:#f4f5f3; }
+.po-box h2 { margin:0 0 10px; font-size:.9rem; font-weight:700; }
 @media(max-width:992px) { body.staff-dashboard .topbar { width:100%; margin-left:0; } body.staff-dashboard .main-content { margin-left:0; padding:20px 16px; } }
 @media print { body.staff-dashboard .sidebar, body.staff-dashboard .topbar, .purchase-order-actions { display:none !important; } body.staff-dashboard .main-content { margin:0; padding:0; } .purchase-order-sheet { padding:0; border:0; box-shadow:none; } }
 </style>
@@ -47,10 +53,53 @@ body.staff-dashboard .main-content { min-height:calc(100vh - 60px); padding:28px
       <div><span>PO number</span><strong>{{ order.po_number }}</strong></div>
       <div><span>Date</span><strong><time data-utc-timestamp="{{ order.created_at.isoformat() }}">{{ order.created_at.strftime('%Y-%m-%d') }}</time></strong></div>
       <div><span>Supplier</span><strong>{{ order.supplier }}</strong></div>
-      <div><span>Status</span><strong>{{ order.status|title }}</strong></div>
+      <div><span>Status</span><strong>{{ po_status_labels.get(order.status, order.status|title) }}</strong></div>
       <div><span>Currency</span><strong>{{ order.currency }}</strong></div>
       <div><span>VAT</span><strong>{{ 'Exempt' if order.vat_mode == 'exempt' else '16%' }}</strong></div>
+      {% if order.invoice_number %}<div><span>Supplier invoice no.</span><strong>{{ order.invoice_number }}</strong></div>{% endif %}
+      {% if order.waybill_number %}<div><span>Waybill no.</span><strong>{{ order.waybill_number }}</strong></div>{% endif %}
+      {% if order.driver_phone %}<div><span>Delivery person phone</span><strong><a href="tel:{{ order.driver_phone }}">{{ order.driver_phone }}</a></strong></div>{% endif %}
     </div>
+
+    {% set st = order.status %}
+    <ul class="po-track" aria-label="Order tracking">
+      {% set reached = track_order.index(st) if st in track_order else (track_order.index('awaiting_payment') if st in ('on_credit','to_be_paid') else -1) %}
+      {% for step in track_order %}
+      <li class="{{ 'done' if loop.index0 < reached else ('current' if loop.index0 == reached else '') }}">{{ po_status_labels[step] }}</li>
+      {% endfor %}
+      {% if st == 'on_credit' or st == 'to_be_paid' %}<li class="current">{{ po_status_labels[st] }}</li>{% endif %}
+      {% if st == 'declined' %}<li class="current" style="color:#a33">Declined</li>{% endif %}
+      {% if st == 'revision_requested' %}<li class="current">Changes proposed</li>{% endif %}
+    </ul>
+
+    {% if st == 'revision_requested' %}
+    <div class="po-box" style="border-color:#c9a25a">
+      <h2><i class="fas fa-rotate me-2" aria-hidden="true"></i>Supplier proposed changes</h2>
+      {% if order.supplier_comment %}<p class="mb-2">"{{ order.supplier_comment }}"</p>{% endif %}
+      <div class="table-responsive"><table class="table table-sm mb-2"><thead><tr><th>Product</th><th class="text-end">Qty ordered &rarr; offered</th><th class="text-end">Price ordered &rarr; offered</th><th>Supplier</th></tr></thead><tbody>
+        {% for item in items %}<tr><td>{{ item.product_name }}</td><td class="text-end">{{ '%.3f'|format(item.quantity) }} &rarr; {{ '%.3f'|format(item.supplier_quantity if item.supplier_quantity is not none else item.quantity) }}</td><td class="text-end">{{ '%.2f'|format(item.unit_cost) }} &rarr; {{ '%.2f'|format(item.supplier_unit_cost if item.supplier_unit_cost is not none else item.unit_cost) }}</td><td>{{ 'Can supply' if item.supplier_included is not false else 'Not available' }}</td></tr>{% endfor %}
+      </tbody></table></div>
+      <form method="post" action="{{ url_for('staff_purchase_order_review', order_id=order.id) }}" class="d-flex flex-wrap gap-2">
+        <button class="btn btn-success btn-sm" name="decision" value="accept" title="Accept supplier changes and approve"><i class="fas fa-check me-1" aria-hidden="true"></i>Accept changes</button>
+        <button class="btn btn-outline-secondary btn-sm" name="decision" value="reject" title="Reject changes and send back for approval"><i class="fas fa-paper-plane me-1" aria-hidden="true"></i>Send back for approval</button>
+      </form>
+    </div>
+    {% endif %}
+
+    {% if st in ('pending', 'sent', 'revision_requested') %}
+    <form method="post" action="{{ url_for('staff_purchase_order_send', order_id=order.id) }}" class="po-box">
+      <h2><i class="fas fa-envelope me-2" aria-hidden="true"></i>{{ 'Send to supplier' if st == 'pending' else 'Re-send to supplier' }}</h2>
+      <div class="row g-2 mb-2">
+        {% for n in range(4) %}<div class="col-md-3"><input type="email" name="supplier_email" maxlength="254" class="form-control form-control-sm" aria-label="Supplier email {{ n + 1 }}" placeholder="Email {{ n + 1 }}" value="{{ emails[n] if n < emails|length else '' }}"></div>{% endfor %}
+      </div>
+      <button class="btn btn-sm btn-dark" type="submit"><i class="fas fa-paper-plane me-1" aria-hidden="true"></i>Email approval link</button>
+    </form>
+    {% endif %}
+
+    {% if supplier_link and st != 'pending' %}
+    <div class="po-box"><h2>Supplier link</h2><input class="form-control form-control-sm" readonly value="{{ supplier_link }}" onfocus="this.select()" aria-label="Supplier link"></div>
+    {% endif %}
+
     <div class="table-responsive"><table class="table purchase-order-table">
       <thead><tr><th>SKU</th><th>Product</th><th class="text-end">Qty</th><th>Unit</th><th class="text-end">Unit cost</th><th class="text-end">Line total</th></tr></thead>
       <tbody>
@@ -63,6 +112,14 @@ body.staff-dashboard .main-content { min-height:calc(100vh - 60px); padding:28px
       <div><span>Subtotal</span><strong>{{ order.currency }} {{ '%.2f'|format(order.subtotal) }}</strong></div>
       <div><span>VAT ({{ 'Exempt' if order.vat_mode == 'exempt' else '16%' }})</span><strong>{{ order.currency }} {{ '%.2f'|format(order.vat_amount) }}</strong></div>
       <div class="grand"><span>Total</span><strong>{{ order.currency }} {{ '%.2f'|format(order.total) }}</strong></div>
+    </div>
+
+    <div class="po-box mt-4">
+      <h2>Tracking history</h2>
+      <ul class="list-unstyled mb-0 small">
+        {% for event in events|reverse %}<li class="mb-1"><time data-utc-timestamp="{{ event.created_at.isoformat() }}">{{ event.created_at.strftime('%Y-%m-%d %H:%M') }}</time> &middot; <strong>{{ po_status_labels.get(event.status, event.status) }}</strong> <span class="text-muted">({{ event.actor }})</span>{% if event.note %} &mdash; {{ event.note }}{% endif %}</li>
+        {% else %}<li class="text-muted">No tracking events yet.</li>{% endfor %}
+      </ul>
     </div>
   </article>
 </div>

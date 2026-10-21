@@ -78,6 +78,14 @@ body.staff-dashboard .main-content { min-height:calc(100vh - 60px); padding:28px
     <input type="hidden" name="supplier" value="{{ supplier }}">
     <input type="hidden" name="currency" value="{{ currency }}">
     <input type="hidden" name="vat_mode" value="{{ vat_mode }}">
+    <section class="purchase-panel" aria-label="Supplier email addresses">
+      <div class="purchase-panel-header"><h2>Supplier emails <small class="text-muted">Up to 4 recipients receive a private approve / decline link</small></h2></div>
+      <div class="purchase-panel-body"><div class="purchase-fields">
+        {% for n in range(4) %}
+        <div><label for="poEmail{{ n }}">Email {{ n + 1 }}{% if n == 0 %} (optional){% endif %}</label><input id="poEmail{{ n }}" name="supplier_email" type="email" maxlength="254" class="form-control" value="{{ last_emails[n] if n < last_emails|length else '' }}" placeholder="name@supplier.com"></div>
+        {% endfor %}
+      </div></div>
+    </section>
     {% if low_stock_products %}
     <section class="purchase-panel" aria-label="Low-stock reorder suggestions">
       <div class="purchase-panel-header"><h2>Low-stock suggestions <small class="text-muted">Preselected to bring combined stock up to minimum</small></h2></div>
@@ -143,7 +151,7 @@ body.staff-dashboard .main-content { min-height:calc(100vh - 60px); padding:28px
       <thead><tr><th>PO number</th><th>Supplier</th><th>Created</th><th>Currency</th><th>Status</th><th class="text-end">Total</th></tr></thead>
       <tbody>
         {% for order in orders %}
-        <tr><td><a href="{{ url_for('staff_purchase_order_detail', order_id=order.id) }}">{{ order.po_number }}</a></td><td>{{ order.supplier }}</td><td><time data-utc-timestamp="{{ order.created_at.isoformat() }}">{{ order.created_at.strftime('%Y-%m-%d') }}</time></td><td>{{ order.currency }}</td><td>{{ order.status|title }}</td><td class="text-end">{{ order.currency }} {{ '%.2f'|format(order.total) }}</td></tr>
+        <tr><td><a href="{{ url_for('staff_purchase_order_detail', order_id=order.id) }}">{{ order.po_number }}</a></td><td>{{ order.supplier }}</td><td><time data-utc-timestamp="{{ order.created_at.isoformat() }}">{{ order.created_at.strftime('%Y-%m-%d') }}</time></td><td>{{ order.currency }}</td><td>{{ po_status_labels.get(order.status, order.status|title) }}</td><td class="text-end">{{ order.currency }} {{ '%.2f'|format(order.total) }}</td></tr>
         {% else %}
         <tr><td colspan="6" class="py-4 text-center text-secondary">No purchase orders created yet.</td></tr>
         {% endfor %}
