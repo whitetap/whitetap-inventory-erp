@@ -65,7 +65,7 @@ body.staff-dashboard .main-content { min-height:calc(100vh - 60px); padding:28px
     <ul class="po-track" aria-label="Order tracking">
       {% set reached = track_order.index(st) if st in track_order else (track_order.index('awaiting_payment') if st in ('on_credit','to_be_paid') else -1) %}
       {% for step in track_order %}
-      <li class="{{ 'done' if loop.index0 < reached else ('current' if loop.index0 == reached else '') }}">{{ po_status_labels[step] }}</li>
+      <li class="{{ 'done' if (loop.index0 < reached or st == 'delivered') else ('current' if loop.index0 == reached else '') }}">{{ po_status_labels[step] }}</li>
       {% endfor %}
       {% if st == 'on_credit' or st == 'to_be_paid' %}<li class="current">{{ po_status_labels[st] }}</li>{% endif %}
       {% if st == 'declined' %}<li class="current" style="color:#a33">Declined</li>{% endif %}
