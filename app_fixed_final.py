@@ -158,7 +158,7 @@ class PurchaseOrderItem(db.Model):
 
     id = db.Column(db.BigInteger, primary_key=True, autoincrement=True)
     purchase_order_id = db.Column(db.BigInteger, db.ForeignKey('purchase_orders.id', ondelete='CASCADE'), nullable=False, index=True)
-    product_id = db.Column(UUID(as_uuid=False), nullable=True)
+    product_id = db.Column(UUID(as_uuid=True), nullable=True)
     product_sku = db.Column(db.Text, nullable=True)
     product_name = db.Column(db.Text, nullable=False)
     quantity = db.Column(db.Numeric(14, 3), nullable=False)
@@ -256,7 +256,7 @@ def normalize_client_name(name):
 def normalize_product_uuid(value):
     if value is None or value == '':
         return None
-    return str(PythonUUID(str(value)))
+    return PythonUUID(str(value))
 
 def get_project_invoice_lines(project_ref):
     rows = db.session.query(
@@ -876,7 +876,7 @@ def staff_purchase_orders():
             for product, quantity, unit_cost, line_total in line_items:
                 db.session.add(PurchaseOrderItem(
                     purchase_order_id=order.id,
-                    product_id=normalize_product_uuid(product.id),
+                    product_id=product.id,
                     product_sku=product.sku,
                     product_name=product.name or 'Unnamed product',
                     quantity=quantity,
