@@ -138,6 +138,35 @@ class ProformaInvoiceItem(db.Model):
     line_total = db.Column(db.Numeric(14, 2), nullable=False)
     created_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
 
+class PurchaseOrder(db.Model):
+    __tablename__ = 'purchase_orders'
+
+    id = db.Column(db.BigInteger, primary_key=True, autoincrement=True)
+    po_number = db.Column(db.String(40), nullable=False, unique=True, index=True)
+    supplier = db.Column(db.Text, nullable=False, index=True)
+    currency = db.Column(db.String(3), nullable=False)
+    vat_mode = db.Column(db.String(10), nullable=False)
+    vat_rate = db.Column(db.Numeric(5, 2), nullable=False)
+    subtotal = db.Column(db.Numeric(14, 2), nullable=False)
+    vat_amount = db.Column(db.Numeric(14, 2), nullable=False)
+    total = db.Column(db.Numeric(14, 2), nullable=False)
+    status = db.Column(db.String(20), nullable=False, default='pending')
+    created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
+
+class PurchaseOrderItem(db.Model):
+    __tablename__ = 'purchase_order_items'
+
+    id = db.Column(db.BigInteger, primary_key=True, autoincrement=True)
+    purchase_order_id = db.Column(db.BigInteger, db.ForeignKey('purchase_orders.id', ondelete='CASCADE'), nullable=False, index=True)
+    product_id = db.Column(UUID(as_uuid=True), nullable=True)
+    product_sku = db.Column(db.Text, nullable=True)
+    product_name = db.Column(db.Text, nullable=False)
+    quantity = db.Column(db.Numeric(14, 3), nullable=False)
+    unit = db.Column(db.Text, nullable=True)
+    unit_cost = db.Column(db.Numeric(14, 2), nullable=False)
+    line_total = db.Column(db.Numeric(14, 2), nullable=False)
+    created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
+
 _tint_recipe_schema_ready = False
 
 def ensure_tint_recipe_tables():
@@ -147,7 +176,8 @@ def ensure_tint_recipe_tables():
             bind=db.engine,
             tables=[
                 TintRecipe.__table__, TintRecipeItem.__table__, ProductCategory.__table__,
-                Client.__table__, ProformaInvoice.__table__, ProformaInvoiceItem.__table__
+                Client.__table__, ProformaInvoice.__table__, ProformaInvoiceItem.__table__,
+                PurchaseOrder.__table__, PurchaseOrderItem.__table__
             ],
             checkfirst=True
         )
@@ -756,6 +786,125 @@ def admin_added_products():
         invoice_number=invoice_number,
         category_name_by_id=get_product_category_name_map()
     )
+
+@app.route('/staff/purchase-orders', methods=['GET', 'POST'])
+def staff_purchase_orders():
+    ensure_tint_recipe_tables()
+
+    if request.method == 'POST':
+        supplier = ' '.join(request.form.get('supplier', '').split())
+        currency = request.form.get('currency', '').upper()
+        vat_mode = request.form.get('vat_mode', '')
+        if not supplier or len(supplier) > 250:
+            flash('Choose a supplier before creating a purchase order.', 'error')
+            return redirect(url_for('staff_purchase_orders'))
+        if currency not in ('USD', 'KES') or vat_mode not in ('standard', 'exempt'):
+            flash('Choose USD or KES and a valid VAT option.', 'error')
+            return redirect(url_for('staff_purchase_orders', supplier=supplier))
+
+        supplier_products = Product.query.filter(
+            db.func.lower(Product.supplier) == supplier.casefold()
+        ).all()
+        products_by_id = {str(product.id): product for product in supplier_products}
+        selected_ids = set(request.form.getlist('product_id'))
+        if not selected_ids or not selected_ids.issubset(products_by_id):
+            flash('Select at least one product supplied by this supplier.', 'error')
+            return redirect(url_for('staff_purchase_orders', supplier=supplier, currency=currency, vat_mode=vat_mode))
+
+        line_items = []
+        for product_id in selected_ids:
+            try:
+                quantity = Decimal(request.form.get(f'quantity_{product_id}', '').strip())
+                unit_cost = Decimal(request.form.get(f'unit_cost_{product_id}', '').strip())
+            except Exception:
+                flash('Enter a valid quantity and unit cost for each selected product.', 'error')
+                return redirect(url_for('staff_purchase_orders', supplier=supplier, currency=currency, vat_mode=vat_mode))
+            if not quantity.is_finite() or quantity <= 0 or not unit_cost.is_finite() or unit_cost < 0:
+                flash('Quantities must be greater than zero and unit costs cannot be negative.', 'error')
+                return redirect(url_for('staff_purchase_orders', supplier=supplier, currency=currency, vat_mode=vat_mode))
+            quantity = quantity.quantize(Decimal('0.001'), rounding=ROUND_HALF_UP)
+            unit_cost = unit_cost.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+            line_total = (quantity * unit_cost).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+            line_items.append((products_by_id[product_id], quantity, unit_cost, line_total))
+
+        try:
+            subtotal = sum((line_total for _, _, _, line_total in line_items), Decimal('0.00'))
+            vat_rate = Decimal('16.00') if vat_mode == 'standard' else Decimal('0.00')
+            vat_amount = (subtotal * vat_rate / Decimal('100')).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+            order = PurchaseOrder(
+                po_number=f"PO-{datetime.now().strftime('%Y%m%d')}-{uuid4().hex[:6].upper()}",
+                supplier=supplier,
+                currency=currency,
+                vat_mode=vat_mode,
+                vat_rate=vat_rate,
+                subtotal=subtotal,
+                vat_amount=vat_amount,
+                total=subtotal + vat_amount
+            )
+            db.session.add(order)
+            db.session.flush()
+            for product, quantity, unit_cost, line_total in line_items:
+                db.session.add(PurchaseOrderItem(
+                    purchase_order_id=order.id,
+                    product_id=product.id,
+                    product_sku=product.sku,
+                    product_name=product.name or 'Unnamed product',
+                    quantity=quantity,
+                    unit=product.unit_of_measure or '',
+                    unit_cost=unit_cost,
+                    line_total=line_total
+                ))
+            db.session.commit()
+            flash(f'Purchase order {order.po_number} created. Inventory balances were not changed.', 'success')
+            return redirect(url_for('staff_purchase_order_detail', order_id=order.id))
+        except Exception:
+            db.session.rollback()
+            app.logger.exception('Unable to create staff purchase order')
+            flash('Unable to save the purchase order. Please try again.', 'error')
+            return redirect(url_for('staff_purchase_orders', supplier=supplier, currency=currency, vat_mode=vat_mode))
+
+    suppliers = [row[0] for row in db.session.query(Product.supplier).filter(
+        Product.supplier.isnot(None), Product.supplier != ''
+    ).distinct().order_by(Product.supplier).all()]
+    supplier = request.args.get('supplier', '').strip()
+    currency = request.args.get('currency', 'KES').upper()
+    if currency not in ('KES', 'USD'):
+        currency = 'KES'
+    vat_mode = request.args.get('vat_mode', 'standard')
+    if vat_mode not in ('standard', 'exempt'):
+        vat_mode = 'standard'
+
+    supplier_products = Product.query.filter(
+        db.func.lower(Product.supplier) == supplier.casefold()
+    ).order_by(Product.name).all() if supplier else []
+    low_stock_products = []
+    other_products = []
+    for product in supplier_products:
+        total_available = Decimal(product.current_stock or 0) + Decimal(product.parent_stock or 0)
+        minimum = Decimal(product.min_stock_level or 0)
+        if total_available < minimum:
+            low_stock_products.append((product, minimum - total_available))
+        else:
+            other_products.append(product)
+
+    orders = PurchaseOrder.query.order_by(PurchaseOrder.created_at.desc()).limit(50).all()
+    return render_template(
+        'staff_purchase_orders.html',
+        suppliers=suppliers,
+        supplier=supplier,
+        currency=currency,
+        vat_mode=vat_mode,
+        low_stock_products=low_stock_products,
+        other_products=other_products,
+        orders=orders
+    )
+
+@app.route('/staff/purchase-orders/<int:order_id>')
+def staff_purchase_order_detail(order_id):
+    ensure_tint_recipe_tables()
+    order = PurchaseOrder.query.get_or_404(order_id)
+    items = PurchaseOrderItem.query.filter_by(purchase_order_id=order.id).order_by(PurchaseOrderItem.product_name).all()
+    return render_template('staff_purchase_order_detail.html', order=order, items=items)
 
 @app.route('/admin/add-product', methods=['POST'])
 def admin_add_product():

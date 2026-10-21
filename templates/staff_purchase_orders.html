@@ -1,0 +1,193 @@
+{% extends "base.html" %}
+{% block title %}Create Purchase Order - Aviation ERP{% endblock %}
+{% block page_title %}Purchase Orders{% endblock %}
+{% block body_class %}staff-dashboard{% endblock %}
+
+{% block extra_styles %}
+<style>
+:root { --staff-ink:#252b27; --staff-muted:#68716b; --staff-paper:#e9ece9; --staff-line:#d5dad6; --staff-accent:#4d6053; --staff-warn:#9a7d50; }
+body.staff-dashboard { background:var(--staff-paper); color:var(--staff-ink); font-size:.94rem; }
+body.staff-dashboard .sidebar { width:260px; overflow-y:auto; background:#292e2b; border-right:1px solid #3b413d; }
+body.staff-dashboard .sidebar .nav-link { margin:3px 0; padding:10px 12px !important; border-radius:5px; color:#c3c8c3 !important; font-size:.88rem; }
+body.staff-dashboard .sidebar .nav-link:hover, body.staff-dashboard .sidebar .nav-link.active { color:#fff !important; background:#414844; transform:none; }
+body.staff-dashboard .sidebar .nav-link.active { box-shadow:inset 3px 0 #b6c1b8; }
+body.staff-dashboard .topbar { position:sticky; top:0; z-index:900; width:calc(100% - 260px); margin-left:260px; padding:13px 28px; background:#f8f9f7; border-bottom:1px solid var(--staff-line); }
+body.staff-dashboard .topbar h4 { color:var(--staff-ink) !important; font-size:.98rem; font-weight:650; }
+body.staff-dashboard .main-content { min-height:calc(100vh - 60px); padding:28px clamp(18px, 3vw, 42px); background:var(--staff-paper); }
+.purchase-page { max-width:1480px; margin:0 auto; }
+.purchase-heading { margin:0 0 20px; padding:20px 22px; border:1px solid #39423c; border-bottom:3px solid #8c9b90; border-radius:5px; background:#303833; color:#f7f8f6; }
+.purchase-heading .eyebrow { color:#c4c9c2; font-size:.7rem; font-weight:700; text-transform:uppercase; }
+.purchase-heading h1 { margin:5px 0; font-size:1.55rem; font-weight:700; }
+.purchase-heading p { margin:0; color:#c5ccc6; font-size:.9rem; }
+.purchase-panel { margin-bottom:18px; overflow:hidden; border:1px solid var(--staff-line); border-radius:5px; background:#fbfcfa; box-shadow:0 3px 10px rgba(29,36,31,.055); }
+.purchase-panel-header { padding:14px 17px; border-bottom:1px solid var(--staff-line); background:#f4f5f3; }
+.purchase-panel-header h2 { margin:0; color:var(--staff-ink); font-size:.98rem; font-weight:680; }
+.purchase-panel-body { padding:17px; }
+.purchase-fields { display:grid; grid-template-columns:repeat(4, minmax(150px, 1fr)); align-items:end; gap:12px; }
+.purchase-fields label, .purchase-line label { display:block; margin-bottom:5px; color:#59625c; font-size:.75rem; font-weight:650; }
+.purchase-fields .form-control, .purchase-fields .form-select, .purchase-line .form-control { border-color:var(--staff-line); }
+.purchase-fields .form-control:focus, .purchase-fields .form-select:focus, .purchase-line .form-control:focus { border-color:#87948b; box-shadow:0 0 0 3px rgba(83,104,91,.12); }
+.purchase-table { margin:0; color:var(--staff-ink); font-size:.86rem; }
+.purchase-table th { padding:10px 12px; border-bottom:1px solid var(--staff-line); background:#ecefeb; color:#59625c; font-size:.69rem; text-transform:uppercase; white-space:nowrap; }
+.purchase-table td { padding:10px 12px; border-color:#eceeeb; vertical-align:middle; }
+.purchase-line { min-width:128px; }
+.purchase-stock { color:#566158; font-size:.78rem; white-space:nowrap; }
+.purchase-check { width:18px; height:18px; accent-color:var(--staff-accent); }
+.purchase-additional summary { padding:13px 17px; color:var(--staff-accent); cursor:pointer; font-size:.86rem; font-weight:650; }
+.purchase-additional .table-responsive { border-top:1px solid var(--staff-line); }
+.purchase-totals { display:grid; gap:6px; width:min(340px, 100%); margin:18px 0 0 auto; }
+.purchase-totals div { display:flex; justify-content:space-between; gap:18px; color:var(--staff-muted); }
+.purchase-totals .grand { margin-top:7px; padding-top:11px; border-top:1px solid var(--staff-line); color:var(--staff-ink); font-size:1rem; font-weight:750; }
+.purchase-submit { border-color:var(--staff-accent); color:#fff; background:var(--staff-accent); }
+.purchase-submit:hover { border-color:#3e5045; color:#fff; background:#3e5045; }
+.purchase-history { width:100%; color:var(--staff-ink); font-size:.85rem; }
+.purchase-history th { padding:10px 13px; background:#ecefeb; color:#59625c; font-size:.69rem; text-transform:uppercase; }
+.purchase-history td { padding:11px 13px; border-color:#eceeeb; vertical-align:middle; }
+@media(max-width:992px) { body.staff-dashboard .topbar { width:100%; margin-left:0; padding:12px 18px; } body.staff-dashboard .main-content { margin-left:0; padding:22px 18px; } }
+@media(max-width:700px) { .purchase-fields { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@media(max-width:480px) { .purchase-fields { grid-template-columns:1fr; } .purchase-heading { padding:17px; } }
+</style>
+{% endblock %}
+
+{% block sidebar_navigation %}
+<li class="nav-item"><a class="nav-link" href="{{ url_for('staff_inventory') }}"><i class="fas fa-gauge-high me-2"></i>Inventory</a></li>
+<li class="nav-item"><a class="nav-link" href="{{ url_for('staff_inventory') }}#paints-section"><i class="fas fa-fill-drip me-2"></i>Paints &amp; pigments</a></li>
+<li class="nav-item"><a class="nav-link" href="{{ url_for('staff_inventory') }}#carpets-section"><i class="fas fa-layer-group me-2"></i>Carpets &amp; textiles</a></li>
+<li class="nav-item"><a class="nav-link active" href="{{ url_for('staff_purchase_orders') }}"><i class="fas fa-cart-flatbed me-2"></i>Purchase orders</a></li>
+<li class="nav-item"><a class="nav-link" href="{{ url_for('staff_inventory') }}#activity-section"><i class="fas fa-clock-rotate-left me-2"></i>Recent activity</a></li>
+{% endblock %}
+
+{% block content %}
+<div class="purchase-page">
+  <header class="purchase-heading"><div class="eyebrow">Staff workspace / Procurement</div><h1>Create purchase order</h1><p>Reorder low-stock products or add other items from the selected supplier.</p></header>
+
+  <section class="purchase-panel" aria-label="Purchase order supplier and terms">
+    <div class="purchase-panel-header"><h2>Supplier and terms</h2></div>
+    <form method="get" action="{{ url_for('staff_purchase_orders') }}" class="purchase-panel-body">
+      <div class="purchase-fields">
+        <div><label for="poSupplier">Supplier</label><input id="poSupplier" name="supplier" class="form-control" list="supplierOptions" value="{{ supplier }}" placeholder="Select or enter supplier" required><datalist id="supplierOptions">{% for option in suppliers %}<option value="{{ option }}">{% endfor %}</datalist></div>
+        <div><label for="poCurrency">Currency</label><select id="poCurrency" name="currency" class="form-select"><option value="KES" {% if currency == 'KES' %}selected{% endif %}>KES</option><option value="USD" {% if currency == 'USD' %}selected{% endif %}>USD</option></select></div>
+        <div><label for="poVat">VAT</label><select id="poVat" name="vat_mode" class="form-select"><option value="standard" {% if vat_mode == 'standard' %}selected{% endif %}>16% VAT</option><option value="exempt" {% if vat_mode == 'exempt' %}selected{% endif %}>Exempt</option></select></div>
+        <button type="submit" class="btn purchase-submit"><i class="fas fa-boxes-stacked me-2" aria-hidden="true"></i>Load supplier items</button>
+      </div>
+    </form>
+  </section>
+
+  {% if supplier %}
+  <form method="post" action="{{ url_for('staff_purchase_orders') }}" id="purchaseOrderForm" data-currency="{{ currency }}" data-vat-rate="{{ '16' if vat_mode == 'standard' else '0' }}">
+    <input type="hidden" name="supplier" value="{{ supplier }}">
+    <input type="hidden" name="currency" value="{{ currency }}">
+    <input type="hidden" name="vat_mode" value="{{ vat_mode }}">
+    {% if low_stock_products %}
+    <section class="purchase-panel" aria-label="Low-stock reorder suggestions">
+      <div class="purchase-panel-header"><h2>Low-stock suggestions <small class="text-muted">Preselected to bring combined stock up to minimum</small></h2></div>
+      <div class="table-responsive"><table class="table purchase-table">
+        <thead><tr><th>Select</th><th>SKU</th><th>Product</th><th>Available</th><th>Order qty</th><th>Unit</th><th>Unit cost ({{ currency }})</th><th>Line total</th></tr></thead>
+        <tbody>
+          {% for product, suggested_quantity in low_stock_products %}
+          {% set product_key = product.id|string %}
+          <tr class="purchase-product-row">
+            <td><input class="purchase-check purchase-select" type="checkbox" name="product_id" value="{{ product.id }}" checked aria-label="Include {{ product.name }}"></td>
+            <td>{{ product.sku or '-' }}</td><td>{{ product.name }}</td>
+            <td class="purchase-stock">{{ '%.3f'|format((product.parent_stock or 0) + (product.current_stock or 0)) }} / {{ '%.3f'|format(product.min_stock_level or 0) }}</td>
+            <td class="purchase-line"><label class="visually-hidden" for="poQty{{ loop.index }}">Order quantity for {{ product.name }}</label><input id="poQty{{ loop.index }}" class="form-control form-control-sm purchase-quantity" name="quantity_{{ product_key }}" type="number" min="0.001" step="0.001" value="{{ '%.3f'|format(suggested_quantity) }}" required></td>
+            <td>{{ product.unit_of_measure or '-' }}</td>
+            <td class="purchase-line"><label class="visually-hidden" for="poCost{{ loop.index }}">Unit cost for {{ product.name }}</label><input id="poCost{{ loop.index }}" class="form-control form-control-sm purchase-unit-cost" name="unit_cost_{{ product_key }}" type="number" min="0" step="0.01" placeholder="0.00" required></td>
+            <td class="text-end purchase-line-total">0.00</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table></div>
+    </section>
+    {% else %}
+    <section class="purchase-panel"><div class="purchase-panel-body text-secondary">No low-stock products are assigned to this supplier.</div></section>
+    {% endif %}
+
+    {% if other_products %}
+    <details class="purchase-panel purchase-additional">
+      <summary>Add other products from {{ supplier }}</summary>
+      <div class="table-responsive"><table class="table purchase-table">
+        <thead><tr><th>Select</th><th>SKU</th><th>Product</th><th>Available</th><th>Order qty</th><th>Unit</th><th>Unit cost ({{ currency }})</th><th>Line total</th></tr></thead>
+        <tbody>
+          {% for product in other_products %}
+          {% set product_key = product.id|string %}
+          <tr class="purchase-product-row">
+            <td><input class="purchase-check purchase-select" type="checkbox" name="product_id" value="{{ product.id }}" aria-label="Include {{ product.name }}"></td>
+            <td>{{ product.sku or '-' }}</td><td>{{ product.name }}</td>
+            <td class="purchase-stock">{{ '%.3f'|format((product.parent_stock or 0) + (product.current_stock or 0)) }}</td>
+            <td class="purchase-line"><label class="visually-hidden" for="poOtherQty{{ loop.index }}">Order quantity for {{ product.name }}</label><input id="poOtherQty{{ loop.index }}" class="form-control form-control-sm purchase-quantity" name="quantity_{{ product_key }}" type="number" min="0.001" step="0.001" value="1.000" disabled></td>
+            <td>{{ product.unit_of_measure or '-' }}</td>
+            <td class="purchase-line"><label class="visually-hidden" for="poOtherCost{{ loop.index }}">Unit cost for {{ product.name }}</label><input id="poOtherCost{{ loop.index }}" class="form-control form-control-sm purchase-unit-cost" name="unit_cost_{{ product_key }}" type="number" min="0" step="0.01" placeholder="0.00" disabled></td>
+            <td class="text-end purchase-line-total">0.00</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table></div>
+    </details>
+    {% endif %}
+
+    <section class="purchase-panel">
+      <div class="purchase-totals px-3 py-2">
+        <div><span>Subtotal</span><strong id="poSubtotal">{{ currency }} 0.00</strong></div>
+        <div><span>VAT ({{ '16%' if vat_mode == 'standard' else 'Exempt' }})</span><strong id="poVatAmount">{{ currency }} 0.00</strong></div>
+        <div class="grand"><span>Total</span><strong id="poTotal">{{ currency }} 0.00</strong></div>
+      </div>
+      <div class="text-end px-3 pb-3"><button type="submit" class="btn purchase-submit"><i class="fas fa-file-circle-check me-2" aria-hidden="true"></i>Create purchase order</button></div>
+    </section>
+  </form>
+  {% endif %}
+
+  <section class="purchase-panel" aria-label="Recent purchase orders">
+    <div class="purchase-panel-header"><h2>Recent purchase orders</h2></div>
+    <div class="table-responsive"><table class="table purchase-history mb-0">
+      <thead><tr><th>PO number</th><th>Supplier</th><th>Created</th><th>Currency</th><th>Status</th><th class="text-end">Total</th></tr></thead>
+      <tbody>
+        {% for order in orders %}
+        <tr><td><a href="{{ url_for('staff_purchase_order_detail', order_id=order.id) }}">{{ order.po_number }}</a></td><td>{{ order.supplier }}</td><td><time data-utc-timestamp="{{ order.created_at.isoformat() }}">{{ order.created_at.strftime('%Y-%m-%d') }}</time></td><td>{{ order.currency }}</td><td>{{ order.status|title }}</td><td class="text-end">{{ order.currency }} {{ '%.2f'|format(order.total) }}</td></tr>
+        {% else %}
+        <tr><td colspan="6" class="py-4 text-center text-secondary">No purchase orders created yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table></div>
+  </section>
+</div>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const form = document.getElementById('purchaseOrderForm');
+  if (!form) return;
+  const currency = form.dataset.currency;
+  const vatRate = Number(form.dataset.vatRate) / 100;
+  const money = new Intl.NumberFormat(undefined, { style:'currency', currency, currencyDisplay:'code' });
+  function updateTotals() {
+    let subtotal = 0;
+    form.querySelectorAll('.purchase-product-row').forEach(row => {
+      const selected = row.querySelector('.purchase-select');
+      const quantity = row.querySelector('.purchase-quantity');
+      const unitCost = row.querySelector('.purchase-unit-cost');
+      const lineTotal = selected.checked ? (Number(quantity.value) || 0) * (Number(unitCost.value) || 0) : 0;
+      row.querySelector('.purchase-line-total').textContent = lineTotal.toFixed(2);
+      subtotal += lineTotal;
+    });
+    const vat = subtotal * vatRate;
+    document.getElementById('poSubtotal').textContent = money.format(subtotal);
+    document.getElementById('poVatAmount').textContent = money.format(vat);
+    document.getElementById('poTotal').textContent = money.format(subtotal + vat);
+  }
+  form.querySelectorAll('.purchase-select').forEach(selected => {
+    const row = selected.closest('.purchase-product-row');
+    const fields = row.querySelectorAll('.purchase-quantity, .purchase-unit-cost');
+    function syncFields() {
+      fields.forEach(field => {
+        field.disabled = !selected.checked;
+        field.required = selected.checked;
+      });
+      updateTotals();
+    }
+    selected.addEventListener('change', syncFields);
+    syncFields();
+  });
+  form.addEventListener('input', updateTotals);
+  updateTotals();
+});
+</script>
+{% endblock %}
