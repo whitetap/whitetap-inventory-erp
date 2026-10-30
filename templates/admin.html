@@ -81,6 +81,10 @@ body.admin-dashboard .modal-content { border: 1px solid var(--admin-line); borde
 .qr-label-sku, .qr-label-token { font-size: 8pt; }
 .admin-list-toggle .fa-chevron-down { transition: transform .18s ease; }
 .admin-list-toggle[aria-expanded="true"] .fa-chevron-down { transform: rotate(180deg); }
+.category-section + .category-section { border-top: 1px solid var(--admin-line); }
+.category-toolbar { padding: 12px 18px; background: #f7f8f6; }
+.category-toolbar h3 { margin: 0; color: var(--admin-ink); font-size: .9rem; font-weight: 700; }
+.category-toolbar .admin-list-toggle { width: 32px; height: 32px; padding: 0; }
 .admin-add-toggle { color: #fff; border-color: var(--admin-copper); background: var(--admin-copper); }
 .admin-add-toggle:hover { color: #fff; border-color: #9f572f; background: #9f572f; }
 .admin-form { margin-bottom: 18px; }
@@ -228,7 +232,14 @@ body.admin-dashboard .modal-content { border: 1px solid var(--admin-line); borde
                       <button class="btn btn-outline-secondary admin-list-toggle" type="button" data-bs-toggle="collapse" data-bs-target="#inventoryListContent" aria-expanded="true" aria-controls="inventoryListContent" aria-label="Collapse inventory list" title="Collapse inventory list"><i class="fas fa-chevron-down" aria-hidden="true"></i></button>
                     </header>
                     <div id="inventoryListContent" class="collapse show">
-                    <div class="card-body p-0">
+                    <div class="card-body p-0" id="productsTable">
+                        {% for group in category_groups %}
+                        <section class="category-section" data-category-section>
+                          <header class="admin-toolbar category-toolbar">
+                            <div><h3>{{ group.name }}</h3><small class="text-secondary">{{ group.products|length }} item{% if group.products|length != 1 %}s{% endif %}</small></div>
+                            <button class="btn btn-outline-secondary admin-list-toggle" type="button" data-bs-toggle="collapse" data-bs-target="#categoryCollapse{{ loop.index }}" aria-expanded="{{ 'true' if group.products else 'false' }}" aria-controls="categoryCollapse{{ loop.index }}" aria-label="Toggle {{ group.name }}" title="Toggle {{ group.name }}"><i class="fas fa-chevron-down" aria-hidden="true"></i></button>
+                          </header>
+                          <div id="categoryCollapse{{ loop.index }}" class="collapse{% if group.products %} show{% endif %}">
                         <div class="table-responsive inventory-table-scroll">
                             <table class="table admin-table table-hover mb-0">
                                 <thead>
@@ -247,12 +258,12 @@ body.admin-dashboard .modal-content { border: 1px solid var(--admin-line); borde
                                         <th>Actions</th>
                                     </tr>
                                 </thead>
-                                <tbody id="productsTable">
-                                    {% for product in all_products %}
+                                <tbody>
+                                    {% for product in group.products %}
                                     <tr class="product-row align-middle">
                                         <td class="fw-bold">{{ product.sku or '-' }}</td>
                                         <td>{{ product.name or '-' }}</td>
-                                        <td>{{ (category_name_by_id.get(product.category_id|string) if product.category_id else none) or ('Aviation paints &amp; pigments' if 'PNT' in (product.sku or '').upper() else 'Carpet &amp; textile' if 'CRP' in (product.sku or '').upper() else 'Other supplies') }}</td>
+                                        <td>{{ group.name }}</td>
                                         <td>
                                           <details class="product-source">
                                             <summary><i class="fas fa-circle-info" aria-hidden="true"></i>Supplier / invoice</summary>
@@ -296,13 +307,16 @@ body.admin-dashboard .modal-content { border: 1px solid var(--admin-line); borde
                                         </td>
                                     </tr>
                                     {% endfor %}
-                                    {% if not all_products %}
-                                    <tr><td colspan="12" class="py-5 text-center text-secondary">No inventory products yet. Add a product to get started.</td></tr>
+                                    {% if not group.products %}
+                                    <tr><td colspan="12" class="py-4 text-center text-secondary">No products in this category yet.</td></tr>
                                     {% endif %}
-                                    <tr id="emptySearchState" hidden><td colspan="12" class="py-4 text-center text-secondary">No products match this search.</td></tr>
                                 </tbody>
                             </table>
                         </div>
+                          </div>
+                        </section>
+                        {% endfor %}
+                        <div id="emptySearchState" hidden class="py-4 text-center text-secondary">No products match this search.</div>
                     </div>
                     </div>
                 </div>
@@ -433,6 +447,18 @@ document.addEventListener('DOMContentLoaded', function() {
                 row.hidden = !row.textContent.toLowerCase().includes(term);
           if (!row.hidden) visibleRows += 1;
             });
+        document.querySelectorAll('[data-category-section]').forEach(section => {
+          if (term.length === 0) {
+            section.hidden = false;
+            return;
+          }
+          const visibleInSection = section.querySelectorAll('.product-row:not([hidden])').length;
+          section.hidden = visibleInSection === 0;
+          if (visibleInSection > 0) {
+            const collapseEl = section.querySelector('.collapse');
+            if (collapseEl) bootstrap.Collapse.getOrCreateInstance(collapseEl, { toggle: false }).show();
+          }
+        });
         const emptySearchState = document.getElementById('emptySearchState');
         if (emptySearchState) emptySearchState.hidden = term.length === 0 || visibleRows > 0;
         if (term.length > 0 && visibleRows > 0) {

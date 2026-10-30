@@ -257,7 +257,11 @@ def ensure_tint_recipe_tables():
             db.session.rollback()
             app.logger.exception('Purchase order schema upgrade failed')
         _tint_recipe_schema_ready = True
-    for category_name in ('Aviation paints & pigments', 'Carpet & textile', 'Other supplies'):
+    for category_name in (
+        'Aviation paints & pigments', 'Carpet & textile', 'Other supplies',
+        'Exterior paint', 'Interior paint', 'Matt black', 'Walkway grit',
+        'Anti static', 'Clear coat', 'Metallic paint', 'Carpets'
+    ):
         category = ProductCategory.query.filter(db.func.lower(ProductCategory.name) == category_name.lower()).first()
         if not category:
             db.session.add(ProductCategory(name=category_name))
@@ -265,6 +269,26 @@ def ensure_tint_recipe_tables():
 
 def get_product_category_name_map():
     return {str(category.id): category.name for category in ProductCategory.query.order_by(ProductCategory.name).all()}
+
+def effective_product_category_name(product, category_names):
+    saved_category = category_names.get(str(product.category_id)) if product.category_id else None
+    if saved_category:
+        return saved_category
+    sku = (product.sku or '').upper()
+    if 'PNT' in sku:
+        return 'Aviation paints & pigments'
+    if 'CRP' in sku:
+        return 'Carpet & textile'
+    return 'Other supplies'
+
+def build_category_groups(products, categories, category_names):
+    grouped = {}
+    for product in products:
+        grouped.setdefault(effective_product_category_name(product, category_names), []).append(product)
+    groups = [{'name': category.name, 'products': grouped.pop(category.name, [])} for category in categories]
+    for leftover_name in sorted(grouped):
+        groups.append({'name': leftover_name, 'products': grouped[leftover_name]})
+    return groups
 
 def resolve_product_category():
     selected_id = request.form.get('category_id', '').strip()
@@ -925,8 +949,12 @@ def admin_dashboard():
     
     # Today's usage logs count
     today_logs = UsageLog.query.filter(db.func.date(UsageLog.created_at) == datetime.now().date()).count()
-    
-    return render_template('admin.html', view=view, display_products=display_products, all_products=all_products, total_items=total_items, low_stock_count=low_stock_count, total_inventory_value=total_inventory_value, today_logs=today_logs, unit_options=get_product_units(), product_categories=ProductCategory.query.order_by(ProductCategory.name).all(), category_name_by_id=get_product_category_name_map())
+
+    product_categories = ProductCategory.query.order_by(ProductCategory.name).all()
+    category_names = get_product_category_name_map()
+    category_groups = build_category_groups(all_products, product_categories, category_names)
+
+    return render_template('admin.html', view=view, display_products=display_products, all_products=all_products, total_items=total_items, low_stock_count=low_stock_count, total_inventory_value=total_inventory_value, today_logs=today_logs, unit_options=get_product_units(), product_categories=product_categories, category_name_by_id=category_names, category_groups=category_groups)
 
 @app.route('/admin/added-products')
 def admin_added_products():
