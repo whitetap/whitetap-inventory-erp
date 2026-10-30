@@ -94,9 +94,10 @@ body.staff-dashboard .card { border:1px solid var(--staff-line) !important; bord
           <table class="table quotation-lines mb-0">
             <thead>
               <tr>
-                <th style="min-width:220px">Item description</th>
-                <th style="width:110px" class="text-end">Qty</th>
-                <th style="width:110px">Unit</th>
+                <th style="min-width:150px">Part number</th>
+                <th style="min-width:220px">Description</th>
+                <th style="width:100px" class="text-end">Qty</th>
+                <th style="width:100px">Unit</th>
                 <th style="width:140px" class="text-end">Unit price</th>
                 <th style="width:130px" class="text-end">Line total</th>
                 <th style="width:44px"><span class="visually-hidden">Remove</span></th>
@@ -105,21 +106,24 @@ body.staff-dashboard .card { border:1px solid var(--staff-line) !important; bord
             <tbody id="quotationLines">
               <tr class="quotation-line">
                 <td>
-                  <input class="form-control form-control-sm item-description" name="item_description" list="productOptions" maxlength="200" placeholder="Type or pick a product" required>
+                  <input class="form-control form-control-sm item-part" name="item_part" list="partOptions" maxlength="50" placeholder="Type part number" autocomplete="off">
+                </td>
+                <td>
+                  <input class="form-control form-control-sm item-description" name="item_description" maxlength="200" placeholder="Description" required>
                   <input type="hidden" name="item_product_id" class="item-product-id">
                   <input type="hidden" name="item_sku" class="item-sku">
                 </td>
                 <td><input class="form-control form-control-sm text-end item-quantity" name="item_quantity" type="number" min="0.001" step="0.001" value="1" required></td>
                 <td><input class="form-control form-control-sm item-unit" name="item_unit" maxlength="20" placeholder="Unit"></td>
-                <td><input class="form-control form-control-sm text-end item-price" name="item_price" type="number" min="0" step="0.01" placeholder="0.00" required></td>
+                <td><input class="form-control form-control-sm text-end item-price" name="item_price" inputmode="decimal" placeholder="0.00" required></td>
                 <td class="text-end fw-bold line-total">0.00</td>
                 <td><button type="button" class="btn btn-outline-danger btn-sm remove-line" title="Remove line" aria-label="Remove line"><i class="fas fa-trash" aria-hidden="true"></i></button></td>
               </tr>
             </tbody>
           </table>
         </div>
-        <datalist id="productOptions">
-          {% for product in products %}<option value="{{ product.name }}" data-id="{{ product.id }}" data-sku="{{ product.sku }}" data-unit="{{ product.unit }}">{% endfor %}
+        <datalist id="partOptions">
+          {% for product in products %}<option value="{{ product.sku }}" data-id="{{ product.id }}" data-name="{{ product.name }}" data-unit="{{ product.unit }}">{% endfor %}
         </datalist>
         <div class="mt-2">
           <button type="button" id="addLine" class="btn btn-outline-secondary btn-sm"><i class="fas fa-plus me-2" aria-hidden="true"></i>Add line</button>
@@ -148,7 +152,7 @@ body.staff-dashboard .card { border:1px solid var(--staff-line) !important; bord
           <td>{{ quotation_client_name }}</td>
           <td><time data-utc-timestamp="{{ quotation.created_at.isoformat() }}">{{ quotation.created_at.strftime('%Y-%m-%d') }}</time></td>
           <td>{{ 'Exempt' if quotation.tax_mode == 'exempt' else '16%' }}</td>
-          <td class="text-end fw-bold">{{ quotation.currency }} {{ '%.2f'|format(quotation.total) }}</td>
+          <td class="text-end fw-bold">{{ quotation.currency }} {{ '{:,.2f}'.format(quotation.total) }}</td>
         </tr>
         {% else %}
         <tr><td colspan="5" class="py-4 text-center text-secondary">No quotations have been created yet.</td></tr>
@@ -165,17 +169,31 @@ document.addEventListener('DOMContentLoaded', function() {
   const linesBody = document.getElementById('quotationLines');
   const currencySelect = document.getElementById('quotationCurrency');
   const taxSelect = document.getElementById('quotationTax');
-  const productOptions = document.getElementById('productOptions');
+  const partOptions = document.getElementById('partOptions');
 
   function formatMoney(value) {
     return Number(value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
 
+  function parseNumber(value) {
+    return Number(String(value || '').replace(/,/g, '')) || 0;
+  }
+
+  function formatPriceInput(input) {
+    const raw = String(input.value || '').replace(/,/g, '');
+    if (raw === '') { input.value = ''; return; }
+    const num = Number(raw);
+    if (isNaN(num)) return;
+    const parts = raw.split('.');
+    const intPart = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    input.value = parts.length > 1 ? intPart + '.' + parts[1].replace(/[^0-9]/g, '').slice(0, 2) : intPart;
+  }
+
   function updateTotals() {
     let subtotal = 0;
     linesBody.querySelectorAll('.quotation-line').forEach(row => {
-      const quantity = Number(row.querySelector('.item-quantity').value) || 0;
-      const price = Number(row.querySelector('.item-price').value) || 0;
+      const quantity = parseNumber(row.querySelector('.item-quantity').value);
+      const price = parseNumber(row.querySelector('.item-price').value);
       const lineTotal = quantity * price;
       row.querySelector('.line-total').textContent = formatMoney(lineTotal);
       subtotal += lineTotal;
@@ -189,20 +207,28 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   function bindRow(row) {
-    row.querySelector('.item-description').addEventListener('input', function() {
-      const match = Array.from(productOptions.options).find(option => option.value === this.value);
-      row.querySelector('.item-product-id').value = match ? match.dataset.id : '';
-      row.querySelector('.item-sku').value = match ? match.dataset.sku : '';
-      if (match && match.dataset.unit && !row.querySelector('.item-unit').value) {
-        row.querySelector('.item-unit').value = match.dataset.unit;
+    const partInput = row.querySelector('.item-part');
+    partInput.addEventListener('input', function() {
+      const match = Array.from(partOptions.options).find(option => option.value === this.value);
+      if (match) {
+        row.querySelector('.item-product-id').value = match.dataset.id || '';
+        row.querySelector('.item-sku').value = match.value || '';
+        row.querySelector('.item-description').value = match.dataset.name || '';
+        if (match.dataset.unit) row.querySelector('.item-unit').value = match.dataset.unit;
+      } else {
+        row.querySelector('.item-product-id').value = '';
+        row.querySelector('.item-sku').value = this.value;
       }
     });
+    const priceInput = row.querySelector('.item-price');
+    priceInput.addEventListener('blur', function() { formatPriceInput(this); updateTotals(); });
     row.querySelector('.remove-line').addEventListener('click', function() {
       if (linesBody.querySelectorAll('.quotation-line').length > 1) {
         row.remove();
         updateTotals();
       } else {
         row.querySelectorAll('input').forEach(input => { input.value = input.classList.contains('item-quantity') ? '1' : ''; });
+        row.querySelector('.line-total').textContent = '0.00';
         updateTotals();
       }
     });
@@ -215,7 +241,12 @@ document.addEventListener('DOMContentLoaded', function() {
     clone.querySelector('.line-total').textContent = '0.00';
     linesBody.appendChild(clone);
     bindRow(clone);
-    clone.querySelector('.item-description').focus();
+    clone.querySelector('.item-part').focus();
+  });
+
+  // Strip commas before submit so the server receives plain numbers
+  form.addEventListener('submit', function() {
+    linesBody.querySelectorAll('.item-price').forEach(input => { input.value = String(input.value || '').replace(/,/g, ''); });
   });
 
   linesBody.querySelectorAll('.quotation-line').forEach(bindRow);

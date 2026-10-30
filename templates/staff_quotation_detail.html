@@ -78,26 +78,27 @@ body.staff-dashboard .main-content { min-height:calc(100vh - 60px); margin-left:
     <div class="table-responsive">
       <table class="table quotation-items">
         <thead>
-          <tr><th>#</th><th>Description</th><th class="text-end">Qty</th><th>Unit</th><th class="text-end">Unit price</th><th class="text-end">Line total</th></tr>
+          <tr><th>#</th><th>Part number</th><th>Description</th><th class="text-end">Qty</th><th>Unit</th><th class="text-end">Unit price</th><th class="text-end">Line total</th></tr>
         </thead>
         <tbody>
           {% for item in items %}
           <tr>
             <td>{{ loop.index }}</td>
-            <td>{{ item.product_name }}{% if item.product_sku %} <small class="text-muted">({{ item.product_sku }})</small>{% endif %}</td>
+            <td>{{ item.product_sku or '-' }}</td>
+            <td>{{ item.product_name }}</td>
             <td class="text-end">{{ '%.3f'|format(item.quantity) }}</td>
             <td>{{ item.unit or '-' }}</td>
-            <td class="text-end">{{ quotation.currency }} {{ '%.2f'|format(item.unit_price) }}</td>
-            <td class="text-end">{{ quotation.currency }} {{ '%.2f'|format(item.line_total) }}</td>
+            <td class="text-end">{{ quotation.currency }} {{ '{:,.2f}'.format(item.unit_price) }}</td>
+            <td class="text-end">{{ quotation.currency }} {{ '{:,.2f}'.format(item.line_total) }}</td>
           </tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
     <div class="quotation-summary">
-      <div><span>Subtotal</span><strong>{{ quotation.currency }} {{ '%.2f'|format(quotation.subtotal) }}</strong></div>
-      <div><span>VAT ({{ 'Exempt' if quotation.tax_mode == 'exempt' else '16%' }})</span><strong>{{ quotation.currency }} {{ '%.2f'|format(quotation.tax_amount) }}</strong></div>
-      <div class="total"><span>Total</span><strong>{{ quotation.currency }} {{ '%.2f'|format(quotation.total) }}</strong></div>
+      <div><span>Subtotal</span><strong>{{ quotation.currency }} {{ '{:,.2f}'.format(quotation.subtotal) }}</strong></div>
+      <div><span>VAT ({{ 'Exempt' if quotation.tax_mode == 'exempt' else '16%' }})</span><strong>{{ quotation.currency }} {{ '{:,.2f}'.format(quotation.tax_amount) }}</strong></div>
+      <div class="total"><span>Total</span><strong>{{ quotation.currency }} {{ '{:,.2f}'.format(quotation.total) }}</strong></div>
     </div>
     <p class="quotation-footer-note">This quotation is valid for 30 days from the date above unless otherwise stated. Prices are quoted in {{ quotation.currency }}.</p>
   </article>

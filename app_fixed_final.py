@@ -861,6 +861,10 @@ def staff_quotations():
         prices = request.form.getlist('item_price')
         product_ids = request.form.getlist('item_product_id')
         product_skus = request.form.getlist('item_sku')
+        part_numbers = request.form.getlist('item_part')
+
+        def clean_number(value):
+            return (value or '').replace(',', '').strip()
 
         line_items = []
         for index, description in enumerate(descriptions):
@@ -871,8 +875,8 @@ def staff_quotations():
                 flash('Keep every item description under 200 characters.', 'error')
                 return redirect(url_for('staff_quotations'))
             try:
-                quantity = Decimal((quantities[index] if index < len(quantities) else '').strip())
-                unit_price = Decimal((prices[index] if index < len(prices) else '').strip())
+                quantity = Decimal(clean_number(quantities[index] if index < len(quantities) else ''))
+                unit_price = Decimal(clean_number(prices[index] if index < len(prices) else ''))
             except Exception:
                 flash('Enter a valid quantity and price for every quotation line.', 'error')
                 return redirect(url_for('staff_quotations'))
@@ -887,7 +891,8 @@ def staff_quotations():
             line_total = (quantity * unit_price).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
             unit = (units[index] if index < len(units) else '').strip()[:20]
             product_id = normalize_product_uuid(product_ids[index]) if index < len(product_ids) else None
-            product_sku = (product_skus[index] if index < len(product_skus) else '').strip()[:50]
+            part_number = (part_numbers[index] if index < len(part_numbers) else '').strip()[:50]
+            product_sku = (product_skus[index] if index < len(product_skus) else '').strip()[:50] or part_number
             line_items.append({
                 'description': description, 'quantity': quantity, 'unit': unit,
                 'unit_price': unit_price, 'line_total': line_total,
