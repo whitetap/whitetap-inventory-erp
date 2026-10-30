@@ -143,6 +143,35 @@ class ProformaInvoiceItem(db.Model):
     line_total = db.Column(db.Numeric(14, 2), nullable=False)
     created_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
 
+class Quotation(db.Model):
+    __tablename__ = 'quotations'
+
+    id = db.Column(db.BigInteger, primary_key=True, autoincrement=True)
+    quotation_number = db.Column(db.String(60), nullable=False, unique=True, index=True)
+    client_id = db.Column(db.BigInteger, db.ForeignKey('clients.id'), nullable=False, index=True)
+    currency = db.Column(db.String(3), nullable=False)
+    tax_mode = db.Column(db.String(10), nullable=False)
+    tax_rate = db.Column(db.Numeric(5, 2), nullable=False)
+    subtotal = db.Column(db.Numeric(14, 2), nullable=False)
+    tax_amount = db.Column(db.Numeric(14, 2), nullable=False)
+    total = db.Column(db.Numeric(14, 2), nullable=False)
+    created_by = db.Column(db.String(100), nullable=True)
+    created_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+
+class QuotationItem(db.Model):
+    __tablename__ = 'quotation_items'
+
+    id = db.Column(db.BigInteger, primary_key=True, autoincrement=True)
+    quotation_id = db.Column(db.BigInteger, db.ForeignKey('quotations.id', ondelete='CASCADE'), nullable=False, index=True)
+    product_id = db.Column(UUID(as_uuid=True), nullable=True)
+    product_sku = db.Column(db.Text, nullable=True)
+    product_name = db.Column(db.Text, nullable=False)
+    quantity = db.Column(db.Numeric(14, 3), nullable=False)
+    unit = db.Column(db.Text, nullable=True)
+    unit_price = db.Column(db.Numeric(14, 2), nullable=False)
+    line_total = db.Column(db.Numeric(14, 2), nullable=False)
+    created_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+
 class PurchaseOrder(db.Model):
     __tablename__ = 'purchase_orders'
 
@@ -230,6 +259,7 @@ def ensure_tint_recipe_tables():
             tables=[
                 TintRecipe.__table__, TintRecipeItem.__table__, ProductCategory.__table__,
                 Client.__table__, ProformaInvoice.__table__, ProformaInvoiceItem.__table__,
+                Quotation.__table__, QuotationItem.__table__,
                 PurchaseOrder.__table__, PurchaseOrderItem.__table__
                 , PurchaseOrderEvent.__table__
             ],
@@ -483,25 +513,19 @@ def staff_inventory():
     activity_filter = request.args.get('activity_filter', '')
     
     all_products = Product.query.all()
-    
-    # Split products
-    def belongs_to_category(product, category_name, sku_marker):
-        saved_category = category_names.get(str(product.category_id), '')
-        if saved_category:
-            return saved_category.casefold() == category_name.casefold()
-        return sku_marker in (product.sku or '').upper()
 
-    paints = [p for p in all_products if belongs_to_category(p, 'Aviation paints & pigments', 'PNT')]
-    carpets = [p for p in all_products if belongs_to_category(p, 'Carpet & textile', 'CRP')]
-    others = [p for p in all_products if p not in paints and p not in carpets]
-    
+    # Group products by the categories managed in the admin workspace
+    product_categories = ProductCategory.query.order_by(ProductCategory.name).all()
+    category_groups = build_category_groups(all_products, product_categories, category_names)
+
     # Apply search filter
     if search_query:
         def matches_search(p):
             return search_query.lower() in (p.name or '').lower() or search_query.lower() in (p.sku or '').lower()
-        paints = [p for p in paints if matches_search(p)]
-        carpets = [p for p in carpets if matches_search(p)]
-        others = [p for p in others if matches_search(p)]
+        for group in category_groups:
+            group['products'] = [p for p in group['products'] if matches_search(p)]
+
+    all_items = [p for group in category_groups for p in group['products']]
     
     # Recent activity
     logs_query = UsageLog.query.order_by(desc(UsageLog.created_at))
@@ -509,12 +533,11 @@ def staff_inventory():
         logs_query = logs_query.filter(UsageLog.project_ref.ilike(f'%{activity_filter}%'))
     recent_logs = logs_query.limit(10).all()
     
-    all_items = paints + carpets + others
     low_stock_products = [p for p in all_products if (p.current_stock or 0) < (p.min_stock_level or 0)]
     low_stock_count = len(low_stock_products)
     tint_projects = [row[0] for row in db.session.query(TintRecipe.project_ref).filter(TintRecipe.project_ref.isnot(None)).order_by(TintRecipe.project_ref).all()]
-    
-    return render_template('staff_dashboard.html', paints=paints, carpets=carpets, others=others, recent_logs=recent_logs, search_query=search_query, activity_filter=activity_filter, low_stock_products=low_stock_products, low_stock_count=low_stock_count, tint_projects=tint_projects, category_name_by_id=category_names)
+
+    return render_template('staff_dashboard.html', category_groups=category_groups, total_items=len(all_products), recent_logs=recent_logs, search_query=search_query, activity_filter=activity_filter, low_stock_products=low_stock_products, low_stock_count=low_stock_count, tint_projects=tint_projects, category_name_by_id=category_names)
 
 @app.route('/api/products/lookup')
 def api_product_lookup():
@@ -805,6 +828,141 @@ def proforma_invoice_detail(invoice_id):
     client = Client.query.get_or_404(invoice.client_id)
     items = ProformaInvoiceItem.query.filter_by(invoice_id=invoice.id).order_by(ProformaInvoiceItem.product_name).all()
     return render_template('proforma_invoice_detail.html', invoice=invoice, client=client, items=items)
+
+@app.route('/staff/quotations', methods=['GET', 'POST'])
+def staff_quotations():
+    ensure_tint_recipe_tables()
+    if request.method == 'POST':
+        quotation_number = ' '.join(request.form.get('quotation_number', '').split())
+        client_name = ' '.join(request.form.get('client_name', '').split())
+        currency = request.form.get('currency', '').upper()
+        tax_mode = request.form.get('tax_mode', '')
+        created_by = request.form.get('created_by', '').strip()
+
+        if not quotation_number or len(quotation_number) > 60:
+            flash('Enter a quotation number of no more than 60 characters.', 'error')
+            return redirect(url_for('staff_quotations'))
+        if not client_name or len(client_name) > 200:
+            flash('Enter a client name of no more than 200 characters.', 'error')
+            return redirect(url_for('staff_quotations'))
+        if currency not in ('USD', 'KES'):
+            flash('Choose USD or KES.', 'error')
+            return redirect(url_for('staff_quotations'))
+        if tax_mode not in ('standard', 'exempt'):
+            flash('Choose 16% VAT or VAT exempt.', 'error')
+            return redirect(url_for('staff_quotations'))
+        if Quotation.query.filter(db.func.lower(Quotation.quotation_number) == quotation_number.lower()).first():
+            flash(f'Quotation {quotation_number} already exists. Open it from the list below.', 'error')
+            return redirect(url_for('staff_quotations'))
+
+        descriptions = request.form.getlist('item_description')
+        quantities = request.form.getlist('item_quantity')
+        units = request.form.getlist('item_unit')
+        prices = request.form.getlist('item_price')
+        product_ids = request.form.getlist('item_product_id')
+        product_skus = request.form.getlist('item_sku')
+
+        line_items = []
+        for index, description in enumerate(descriptions):
+            description = ' '.join((description or '').split())
+            if not description:
+                continue
+            if len(description) > 200:
+                flash('Keep every item description under 200 characters.', 'error')
+                return redirect(url_for('staff_quotations'))
+            try:
+                quantity = Decimal((quantities[index] if index < len(quantities) else '').strip())
+                unit_price = Decimal((prices[index] if index < len(prices) else '').strip())
+            except Exception:
+                flash('Enter a valid quantity and price for every quotation line.', 'error')
+                return redirect(url_for('staff_quotations'))
+            if not quantity.is_finite() or quantity <= 0:
+                flash('Quantities must be greater than zero.', 'error')
+                return redirect(url_for('staff_quotations'))
+            if not unit_price.is_finite() or unit_price < 0:
+                flash('Prices must be zero or greater.', 'error')
+                return redirect(url_for('staff_quotations'))
+            quantity = quantity.quantize(Decimal('0.001'), rounding=ROUND_HALF_UP)
+            unit_price = unit_price.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+            line_total = (quantity * unit_price).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+            unit = (units[index] if index < len(units) else '').strip()[:20]
+            product_id = normalize_product_uuid(product_ids[index]) if index < len(product_ids) else None
+            product_sku = (product_skus[index] if index < len(product_skus) else '').strip()[:50]
+            line_items.append({
+                'description': description, 'quantity': quantity, 'unit': unit,
+                'unit_price': unit_price, 'line_total': line_total,
+                'product_id': product_id, 'product_sku': product_sku
+            })
+
+        if not line_items:
+            flash('Add at least one quotation line item.', 'error')
+            return redirect(url_for('staff_quotations'))
+
+        try:
+            client_key = normalize_client_name(client_name)
+            client = Client.query.filter_by(normalized_name=client_key).first()
+            if not client:
+                client = Client(name=client_name, normalized_name=client_key)
+                db.session.add(client)
+                db.session.flush()
+
+            subtotal = sum((item['line_total'] for item in line_items), Decimal('0.00'))
+            tax_rate = Decimal('16.00') if tax_mode == 'standard' else Decimal('0.00')
+            tax_amount = (subtotal * tax_rate / Decimal('100')).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+            quotation = Quotation(
+                quotation_number=quotation_number,
+                client_id=client.id,
+                currency=currency,
+                tax_mode=tax_mode,
+                tax_rate=tax_rate,
+                subtotal=subtotal,
+                tax_amount=tax_amount,
+                total=subtotal + tax_amount,
+                created_by=created_by[:100] if created_by else None
+            )
+            db.session.add(quotation)
+            db.session.flush()
+            for item in line_items:
+                db.session.add(QuotationItem(
+                    quotation_id=quotation.id,
+                    product_id=item['product_id'],
+                    product_sku=item['product_sku'] or None,
+                    product_name=item['description'],
+                    quantity=item['quantity'],
+                    unit=item['unit'] or None,
+                    unit_price=item['unit_price'],
+                    line_total=item['line_total']
+                ))
+            db.session.commit()
+            flash(f'Quotation {quotation.quotation_number} saved for {client.name}.', 'success')
+            return redirect(url_for('staff_quotation_detail', quotation_id=quotation.id))
+        except Exception:
+            db.session.rollback()
+            app.logger.exception('Unable to create quotation')
+            flash('Unable to save the quotation. Please try again.', 'error')
+            return redirect(url_for('staff_quotations'))
+
+    quotations = db.session.query(Quotation, Client.name).join(
+        Client, Client.id == Quotation.client_id
+    ).order_by(Quotation.created_at.desc()).limit(100).all()
+    products = Product.query.order_by(Product.name).all()
+    return render_template(
+        'staff_quotations.html',
+        quotations=quotations,
+        clients=Client.query.order_by(Client.name).all(),
+        products=[{
+            'id': str(p.id), 'sku': p.sku or '', 'name': p.name or 'Unnamed product',
+            'unit': p.unit_of_measure or ''
+        } for p in products]
+    )
+
+@app.route('/staff/quotations/<int:quotation_id>')
+def staff_quotation_detail(quotation_id):
+    ensure_tint_recipe_tables()
+    quotation = Quotation.query.get_or_404(quotation_id)
+    client = Client.query.get_or_404(quotation.client_id)
+    items = QuotationItem.query.filter_by(quotation_id=quotation.id).order_by(QuotationItem.id).all()
+    return render_template('staff_quotation_detail.html', quotation=quotation, client=client, items=items)
 
 @app.route('/export-products')
 def export_products():

@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block title %}{{ quotation.quotation_number }} - Quotation{% endblock %}
+{% block page_title %}Quotation{% endblock %}
+{% block body_class %}staff-dashboard{% endblock %}
+
+{% block extra_styles %}
+<style>
+:root { --staff-ink:#252b27; --staff-muted:#68716b; --staff-paper:#e9ece9; --staff-line:#d5dad6; --staff-accent:#4d6053; }
+body.staff-dashboard { background:var(--staff-paper); color:var(--staff-ink); }
+body.staff-dashboard .sidebar { width:260px; background:#292e2b; border-right:1px solid #3b413d; }
+body.staff-dashboard .sidebar .nav-link { margin:3px 0; padding:10px 12px !important; border-radius:5px; color:#c3c8c3 !important; font-size:.88rem; }
+body.staff-dashboard .sidebar .nav-link:hover, body.staff-dashboard .sidebar .nav-link.active { color:#fff !important; background:#414844; transform:none; }
+body.staff-dashboard .sidebar .nav-link.active { box-shadow:inset 3px 0 #b6c1b8; }
+body.staff-dashboard .topbar { position:sticky; top:0; z-index:900; width:calc(100% - 260px); margin-left:260px; padding:13px 28px; background:#f8f9f7; border-bottom:1px solid var(--staff-line); }
+body.staff-dashboard .topbar h4 { color:var(--staff-ink) !important; font-size:.98rem; font-weight:650; }
+body.staff-dashboard .main-content { min-height:calc(100vh - 60px); margin-left:260px; padding:30px clamp(18px, 3vw, 42px); background:var(--staff-paper); }
+.quotation-doc-page { max-width:960px; margin:0 auto; }
+.quotation-actions { display:flex; justify-content:space-between; gap:12px; margin-bottom:16px; }
+.quotation-sheet { padding:clamp(24px, 4vw, 52px); border:1px solid var(--staff-line); border-radius:6px; background:#fff; box-shadow:0 3px 12px rgba(29,36,31,.07); }
+.quotation-sheet-head { display:flex; justify-content:space-between; align-items:flex-start; gap:20px; padding-bottom:22px; border-bottom:3px solid var(--staff-accent); margin-bottom:24px; }
+.quotation-brand { color:var(--staff-accent); font-size:.74rem; font-weight:700; letter-spacing:.08em; text-transform:uppercase; }
+.quotation-doc-title { margin:6px 0 0; color:var(--staff-ink); font-size:1.9rem; font-weight:750; }
+.quotation-number-block { text-align:right; }
+.quotation-number-block span { display:block; color:var(--staff-muted); font-size:.72rem; font-weight:700; text-transform:uppercase; }
+.quotation-number-block strong { display:block; margin-top:4px; color:var(--staff-ink); font-size:1.15rem; }
+.quotation-meta { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:16px 28px; margin-bottom:28px; }
+.quotation-meta span { display:block; color:var(--staff-muted); font-size:.72rem; font-weight:700; text-transform:uppercase; }
+.quotation-meta strong { display:block; margin-top:4px; color:var(--staff-ink); }
+.quotation-items { color:var(--staff-ink); }
+.quotation-items th { padding:11px 13px; background:#f1f4f1; color:#59625c; font-size:.72rem; font-weight:700; text-transform:uppercase; border-bottom:2px solid var(--staff-line); }
+.quotation-items td { padding:11px 13px; border-color:#eceeeb; }
+.quotation-items tbody tr:nth-child(even) { background:#fafbfa; }
+.quotation-summary { width:min(340px, 100%); margin:22px 0 0 auto; }
+.quotation-summary div { display:flex; justify-content:space-between; gap:18px; padding:7px 0; }
+.quotation-summary .total { margin-top:8px; padding:14px 16px; border-radius:5px; background:var(--staff-accent); color:#fff; font-size:1.12rem; font-weight:750; }
+.quotation-footer-note { margin-top:34px; padding-top:16px; border-top:1px solid var(--staff-line); color:var(--staff-muted); font-size:.82rem; }
+@media(max-width:992px) { body.staff-dashboard .topbar { width:100%; margin-left:0; } body.staff-dashboard .main-content { margin-left:0; padding:20px 16px; } }
+@media(max-width:575px) { .quotation-sheet-head { flex-direction:column; } .quotation-number-block { text-align:left; } .quotation-meta { grid-template-columns:1fr; } }
+@media print {
+  body.staff-dashboard .sidebar, body.staff-dashboard .topbar, .quotation-actions { display:none !important; }
+  body.staff-dashboard .main-content { margin:0; padding:0; }
+  body.staff-dashboard { background:#fff; }
+  .quotation-sheet { padding:0; border:0; box-shadow:none; }
+}
+</style>
+{% endblock %}
+
+{% block sidebar_navigation %}
+<li class="nav-item"><a class="nav-link" href="{{ url_for('staff_inventory') }}"><i class="fas fa-gauge-high me-2"></i>Inventory</a></li>
+<li class="nav-item"><a class="nav-link active" href="{{ url_for('staff_quotations') }}"><i class="fas fa-file-invoice-dollar me-2"></i>Quotations</a></li>
+<li class="nav-item"><a class="nav-link" href="{{ url_for('staff_purchase_orders') }}"><i class="fas fa-cart-flatbed me-2"></i>Create purchase order</a></li>
+{% endblock %}
+
+{% block content %}
+<div class="quotation-doc-page">
+  <div class="quotation-actions">
+    <a class="btn btn-outline-secondary" href="{{ url_for('staff_quotations') }}"><i class="fas fa-arrow-left me-2" aria-hidden="true"></i>Quotations</a>
+    <button class="btn btn-outline-secondary" type="button" onclick="window.print()"><i class="fas fa-print me-2" aria-hidden="true"></i>Print</button>
+  </div>
+  <article class="quotation-sheet">
+    <div class="quotation-sheet-head">
+      <div>
+        <div class="quotation-brand">Aviation ERP</div>
+        <h1 class="quotation-doc-title">Quotation</h1>
+      </div>
+      <div class="quotation-number-block">
+        <span>Quotation No.</span>
+        <strong>{{ quotation.quotation_number }}</strong>
+      </div>
+    </div>
+    <div class="quotation-meta">
+      <div><span>Client</span><strong>{{ client.name }}</strong></div>
+      <div><span>Date</span><strong><time data-utc-timestamp="{{ quotation.created_at.isoformat() }}">{{ quotation.created_at.strftime('%Y-%m-%d') }}</time></strong></div>
+      <div><span>Currency</span><strong>{{ quotation.currency }}</strong></div>
+      <div><span>VAT</span><strong>{{ 'Exempt' if quotation.tax_mode == 'exempt' else '16%' }}</strong></div>
+      {% if quotation.created_by %}<div><span>Prepared by</span><strong>{{ quotation.created_by }}</strong></div>{% endif %}
+    </div>
+    <div class="table-responsive">
+      <table class="table quotation-items">
+        <thead>
+          <tr><th>#</th><th>Description</th><th class="text-end">Qty</th><th>Unit</th><th class="text-end">Unit price</th><th class="text-end">Line total</th></tr>
+        </thead>
+        <tbody>
+          {% for item in items %}
+          <tr>
+            <td>{{ loop.index }}</td>
+            <td>{{ item.product_name }}{% if item.product_sku %} <small class="text-muted">({{ item.product_sku }})</small>{% endif %}</td>
+            <td class="text-end">{{ '%.3f'|format(item.quantity) }}</td>
+            <td>{{ item.unit or '-' }}</td>
+            <td class="text-end">{{ quotation.currency }} {{ '%.2f'|format(item.unit_price) }}</td>
+            <td class="text-end">{{ quotation.currency }} {{ '%.2f'|format(item.line_total) }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="quotation-summary">
+      <div><span>Subtotal</span><strong>{{ quotation.currency }} {{ '%.2f'|format(quotation.subtotal) }}</strong></div>
+      <div><span>VAT ({{ 'Exempt' if quotation.tax_mode == 'exempt' else '16%' }})</span><strong>{{ quotation.currency }} {{ '%.2f'|format(quotation.tax_amount) }}</strong></div>
+      <div class="total"><span>Total</span><strong>{{ quotation.currency }} {{ '%.2f'|format(quotation.total) }}</strong></div>
+    </div>
+    <p class="quotation-footer-note">This quotation is valid for 30 days from the date above unless otherwise stated. Prices are quoted in {{ quotation.currency }}.</p>
+  </article>
+</div>
+{% endblock %}

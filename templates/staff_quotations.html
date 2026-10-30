@@ -1,0 +1,228 @@
+{% extends "base.html" %}
+{% block title %}Quotations - Aviation ERP{% endblock %}
+{% block page_title %}Quotations{% endblock %}
+{% block body_class %}staff-dashboard{% endblock %}
+
+{% block extra_styles %}
+<style>
+:root { --staff-ink:#252b27; --staff-muted:#68716b; --staff-paper:#e9ece9; --staff-line:#d5dad6; --staff-accent:#4d6053; }
+body.staff-dashboard { background:var(--staff-paper); color:var(--staff-ink); }
+body.staff-dashboard .sidebar { width:260px; background:#292e2b; border-right:1px solid #3b413d; }
+body.staff-dashboard .sidebar .nav-link { margin:3px 0; padding:10px 12px !important; border-radius:5px; color:#c3c8c3 !important; font-size:.88rem; }
+body.staff-dashboard .sidebar .nav-link:hover, body.staff-dashboard .sidebar .nav-link.active { color:#fff !important; background:#414844; transform:none; }
+body.staff-dashboard .sidebar .nav-link.active { box-shadow:inset 3px 0 #b6c1b8; }
+body.staff-dashboard .topbar { position:sticky; top:0; z-index:900; width:calc(100% - 260px); margin-left:260px; padding:13px 28px; background:#f8f9f7; border-bottom:1px solid var(--staff-line); }
+body.staff-dashboard .topbar h4 { color:var(--staff-ink) !important; font-size:.98rem; font-weight:650; }
+body.staff-dashboard .main-content { min-height:calc(100vh - 60px); margin-left:260px; padding:30px clamp(18px, 3vw, 42px); background:var(--staff-paper); }
+body.staff-dashboard .card { border:1px solid var(--staff-line) !important; border-radius:5px; background:#fbfcfa !important; box-shadow:0 3px 10px rgba(29,36,31,.055) !important; }
+.quotation-page { max-width:1280px; margin:0 auto; }
+.quotation-heading { display:flex; align-items:flex-end; justify-content:space-between; gap:18px; margin-bottom:22px; padding:22px 24px; border:1px solid #39423c; border-bottom:3px solid #8c9b90; border-radius:5px; background:#303833; }
+.quotation-kicker { margin-bottom:6px; color:#c4c9c2; font-size:.7rem; font-weight:700; text-transform:uppercase; }
+.quotation-heading h1 { margin:0; color:#f7f8f6; font-size:1.6rem; font-weight:700; }
+.quotation-heading p { margin:6px 0 0; color:#c5ccc6; font-size:.9rem; }
+.quotation-form .card-header { padding:14px 18px; border-bottom:1px solid var(--staff-line); background:#f7f8f6; }
+.quotation-form .card-header h2 { margin:0; color:var(--staff-ink); font-size:.98rem; font-weight:680; }
+.quotation-form .form-label { color:#535e59; font-size:.8rem; font-weight:650; }
+.quotation-form .form-control, .quotation-form .form-select { border-color:var(--staff-line); }
+.quotation-form .form-control:focus, .quotation-form .form-select:focus { border-color:#87948b; box-shadow:0 0 0 3px rgba(83,104,91,.12); }
+.quotation-lines th { padding:10px 12px; border-bottom:1px solid var(--staff-line); background:#ecefeb; color:#59625c; font-size:.7rem; font-weight:700; text-transform:uppercase; }
+.quotation-lines td { padding:8px 12px; border-color:#eceeeb; vertical-align:middle; }
+.quotation-totals { width:min(340px, 100%); margin:16px 16px 16px auto; }
+.quotation-totals div { display:flex; justify-content:space-between; gap:18px; padding:5px 0; }
+.quotation-totals .grand-total { margin-top:7px; padding-top:12px; border-top:1px solid var(--staff-line); font-size:1.08rem; font-weight:750; }
+.quotation-primary { color:#fff; border-color:var(--staff-accent); background:var(--staff-accent); }
+.quotation-primary:hover { color:#fff; border-color:#3d4f43; background:#3d4f43; }
+.quotation-list { overflow:hidden; border:1px solid var(--staff-line); border-radius:5px; background:#fff; }
+.quotation-list th { padding:11px 14px; background:#f6f7f5; color:#5f6965; font-size:.72rem; text-transform:uppercase; }
+.quotation-list td { padding:12px 14px; border-color:#edf0ed; vertical-align:middle; }
+@media(max-width:992px) { body.staff-dashboard .topbar { width:100%; margin-left:0; } body.staff-dashboard .main-content { margin-left:0; padding:20px 16px; } }
+@media(max-width:575px) { .quotation-heading { align-items:flex-start; flex-direction:column; } .quotation-heading h1 { font-size:1.35rem; } }
+</style>
+{% endblock %}
+
+{% block sidebar_navigation %}
+<li class="nav-item"><a class="nav-link" href="{{ url_for('staff_inventory') }}"><i class="fas fa-gauge-high me-2"></i>Inventory</a></li>
+<li class="nav-item"><a class="nav-link active" href="{{ url_for('staff_quotations') }}"><i class="fas fa-file-invoice-dollar me-2"></i>Quotations</a></li>
+<li class="nav-item"><a class="nav-link" href="{{ url_for('staff_purchase_orders') }}"><i class="fas fa-cart-flatbed me-2"></i>Create purchase order</a></li>
+{% endblock %}
+
+{% block content %}
+<div class="quotation-page">
+  <header class="quotation-heading">
+    <div>
+      <div class="quotation-kicker">Staff workspace / Sales</div>
+      <h1>Quotations</h1>
+      <p>Build a quotation with manual pricing, 16% VAT or VAT exempt.</p>
+    </div>
+  </header>
+
+  <section class="card quotation-form mb-4" aria-label="Create a quotation">
+    <div class="card-header"><h2><i class="fas fa-file-circle-plus me-2" aria-hidden="true"></i>New quotation</h2></div>
+    <form method="post" action="{{ url_for('staff_quotations') }}" id="quotationForm" data-tax-standard="0.16">
+      <div class="card-body">
+        <div class="row g-3 mb-3">
+          <div class="col-sm-6 col-lg-3">
+            <label class="form-label" for="quotationNumber">Quotation number <span class="text-danger">*</span></label>
+            <input id="quotationNumber" class="form-control" name="quotation_number" maxlength="60" placeholder="e.g. QT-2026-001" required>
+          </div>
+          <div class="col-sm-6 col-lg-3">
+            <label class="form-label" for="quotationClient">Client <span class="text-danger">*</span></label>
+            <input id="quotationClient" class="form-control" name="client_name" list="knownClients" maxlength="200" placeholder="Enter or select client" required>
+            <datalist id="knownClients">{% for client in clients %}<option value="{{ client.name }}">{% endfor %}</datalist>
+          </div>
+          <div class="col-sm-6 col-lg-2">
+            <label class="form-label" for="quotationCurrency">Currency <span class="text-danger">*</span></label>
+            <select id="quotationCurrency" class="form-select" name="currency" required>
+              <option value="KES" selected>KES</option>
+              <option value="USD">USD</option>
+            </select>
+          </div>
+          <div class="col-sm-6 col-lg-2">
+            <label class="form-label" for="quotationTax">VAT <span class="text-danger">*</span></label>
+            <select id="quotationTax" class="form-select" name="tax_mode" required>
+              <option value="standard" selected>16% VAT</option>
+              <option value="exempt">Exempt</option>
+            </select>
+          </div>
+          <div class="col-sm-6 col-lg-2">
+            <label class="form-label" for="quotationPreparedBy">Prepared by</label>
+            <input id="quotationPreparedBy" class="form-control" name="created_by" maxlength="100" placeholder="Your name">
+          </div>
+        </div>
+
+        <div class="table-responsive">
+          <table class="table quotation-lines mb-0">
+            <thead>
+              <tr>
+                <th style="min-width:220px">Item description</th>
+                <th style="width:110px" class="text-end">Qty</th>
+                <th style="width:110px">Unit</th>
+                <th style="width:140px" class="text-end">Unit price</th>
+                <th style="width:130px" class="text-end">Line total</th>
+                <th style="width:44px"><span class="visually-hidden">Remove</span></th>
+              </tr>
+            </thead>
+            <tbody id="quotationLines">
+              <tr class="quotation-line">
+                <td>
+                  <input class="form-control form-control-sm item-description" name="item_description" list="productOptions" maxlength="200" placeholder="Type or pick a product" required>
+                  <input type="hidden" name="item_product_id" class="item-product-id">
+                  <input type="hidden" name="item_sku" class="item-sku">
+                </td>
+                <td><input class="form-control form-control-sm text-end item-quantity" name="item_quantity" type="number" min="0.001" step="0.001" value="1" required></td>
+                <td><input class="form-control form-control-sm item-unit" name="item_unit" maxlength="20" placeholder="Unit"></td>
+                <td><input class="form-control form-control-sm text-end item-price" name="item_price" type="number" min="0" step="0.01" placeholder="0.00" required></td>
+                <td class="text-end fw-bold line-total">0.00</td>
+                <td><button type="button" class="btn btn-outline-danger btn-sm remove-line" title="Remove line" aria-label="Remove line"><i class="fas fa-trash" aria-hidden="true"></i></button></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <datalist id="productOptions">
+          {% for product in products %}<option value="{{ product.name }}" data-id="{{ product.id }}" data-sku="{{ product.sku }}" data-unit="{{ product.unit }}">{% endfor %}
+        </datalist>
+        <div class="mt-2">
+          <button type="button" id="addLine" class="btn btn-outline-secondary btn-sm"><i class="fas fa-plus me-2" aria-hidden="true"></i>Add line</button>
+        </div>
+
+        <div class="quotation-totals">
+          <div><span>Subtotal</span><strong id="subtotalValue">0.00</strong></div>
+          <div><span id="taxLabel">VAT (16%)</span><strong id="taxValue">0.00</strong></div>
+          <div class="grand-total"><span>Total</span><strong id="totalValue">0.00</strong></div>
+        </div>
+      </div>
+      <div class="card-footer text-end bg-transparent border-top">
+        <button type="submit" class="btn quotation-primary"><i class="fas fa-file-circle-check me-2" aria-hidden="true"></i>Save quotation</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="quotation-list" aria-label="Recent quotations">
+    <div class="p-3 border-bottom"><h2 class="h6 fw-bold mb-0">Recent quotations</h2></div>
+    <div class="table-responsive"><table class="table mb-0">
+      <thead><tr><th>Quotation</th><th>Client</th><th>Date</th><th>VAT</th><th class="text-end">Total</th></tr></thead>
+      <tbody>
+        {% for quotation, quotation_client_name in quotations %}
+        <tr>
+          <td><a href="{{ url_for('staff_quotation_detail', quotation_id=quotation.id) }}">{{ quotation.quotation_number }}</a></td>
+          <td>{{ quotation_client_name }}</td>
+          <td><time data-utc-timestamp="{{ quotation.created_at.isoformat() }}">{{ quotation.created_at.strftime('%Y-%m-%d') }}</time></td>
+          <td>{{ 'Exempt' if quotation.tax_mode == 'exempt' else '16%' }}</td>
+          <td class="text-end fw-bold">{{ quotation.currency }} {{ '%.2f'|format(quotation.total) }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5" class="py-4 text-center text-secondary">No quotations have been created yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table></div>
+  </section>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const form = document.getElementById('quotationForm');
+  if (!form) return;
+  const linesBody = document.getElementById('quotationLines');
+  const currencySelect = document.getElementById('quotationCurrency');
+  const taxSelect = document.getElementById('quotationTax');
+  const productOptions = document.getElementById('productOptions');
+
+  function formatMoney(value) {
+    return Number(value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  function updateTotals() {
+    let subtotal = 0;
+    linesBody.querySelectorAll('.quotation-line').forEach(row => {
+      const quantity = Number(row.querySelector('.item-quantity').value) || 0;
+      const price = Number(row.querySelector('.item-price').value) || 0;
+      const lineTotal = quantity * price;
+      row.querySelector('.line-total').textContent = formatMoney(lineTotal);
+      subtotal += lineTotal;
+    });
+    const taxRate = taxSelect.value === 'standard' ? 0.16 : 0;
+    const tax = subtotal * taxRate;
+    document.getElementById('taxLabel').textContent = taxSelect.value === 'standard' ? 'VAT (16%)' : 'VAT (Exempt)';
+    document.getElementById('subtotalValue').textContent = currencySelect.value + ' ' + formatMoney(subtotal);
+    document.getElementById('taxValue').textContent = currencySelect.value + ' ' + formatMoney(tax);
+    document.getElementById('totalValue').textContent = currencySelect.value + ' ' + formatMoney(subtotal + tax);
+  }
+
+  function bindRow(row) {
+    row.querySelector('.item-description').addEventListener('input', function() {
+      const match = Array.from(productOptions.options).find(option => option.value === this.value);
+      row.querySelector('.item-product-id').value = match ? match.dataset.id : '';
+      row.querySelector('.item-sku').value = match ? match.dataset.sku : '';
+      if (match && match.dataset.unit && !row.querySelector('.item-unit').value) {
+        row.querySelector('.item-unit').value = match.dataset.unit;
+      }
+    });
+    row.querySelector('.remove-line').addEventListener('click', function() {
+      if (linesBody.querySelectorAll('.quotation-line').length > 1) {
+        row.remove();
+        updateTotals();
+      } else {
+        row.querySelectorAll('input').forEach(input => { input.value = input.classList.contains('item-quantity') ? '1' : ''; });
+        updateTotals();
+      }
+    });
+  }
+
+  document.getElementById('addLine').addEventListener('click', function() {
+    const template = linesBody.querySelector('.quotation-line');
+    const clone = template.cloneNode(true);
+    clone.querySelectorAll('input').forEach(input => { input.value = input.classList.contains('item-quantity') ? '1' : ''; });
+    clone.querySelector('.line-total').textContent = '0.00';
+    linesBody.appendChild(clone);
+    bindRow(clone);
+    clone.querySelector('.item-description').focus();
+  });
+
+  linesBody.querySelectorAll('.quotation-line').forEach(bindRow);
+  form.addEventListener('input', updateTotals);
+  taxSelect.addEventListener('change', updateTotals);
+  currencySelect.addEventListener('change', updateTotals);
+  updateTotals();
+});
+</script>
+{% endblock %}
