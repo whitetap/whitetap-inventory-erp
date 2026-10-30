@@ -42,14 +42,6 @@
                             <input id="editInvoiceNumber" type="text" name="invoice_number" class="form-control" value="{{ product.invoice_number or '' }}" maxlength="100">
                         </div>
                         <div class="mb-4">
-                            <label class="form-label fw-bold" for="editSupplier">Supplier</label>
-                            <input id="editSupplier" type="text" name="supplier" class="form-control" value="{{ product.supplier or '' }}" maxlength="250">
-                        </div>
-                        <div class="mb-4">
-                            <label class="form-label fw-bold" for="editInvoiceNumber">Invoice number</label>
-                            <input id="editInvoiceNumber" type="text" name="invoice_number" class="form-control" value="{{ product.invoice_number or '' }}" maxlength="100">
-                        </div>
-                        <div class="mb-4">
                             <label class="form-label fw-bold">Unit of Measure</label>
                             <select id="editUnit" name="unit_of_measure" class="form-select" required>
                                 {% for unit in unit_options %}
