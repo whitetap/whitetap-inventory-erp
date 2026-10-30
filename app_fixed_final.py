@@ -969,6 +969,54 @@ def staff_quotation_detail(quotation_id):
     items = QuotationItem.query.filter_by(quotation_id=quotation.id).order_by(QuotationItem.id).all()
     return render_template('staff_quotation_detail.html', quotation=quotation, client=client, items=items)
 
+@app.route('/staff/quotations/<int:quotation_id>/delete', methods=['POST'])
+def delete_quotation(quotation_id):
+    ensure_tint_recipe_tables()
+    quotation = Quotation.query.get_or_404(quotation_id)
+    try:
+        QuotationItem.query.filter_by(quotation_id=quotation.id).delete()
+        db.session.delete(quotation)
+        db.session.commit()
+        flash(f'Quotation {quotation.quotation_number} deleted.', 'success')
+    except Exception:
+        db.session.rollback()
+        app.logger.exception('Unable to delete quotation')
+        flash('Unable to delete the quotation. Please try again.', 'error')
+    return redirect(url_for('staff_quotations'))
+
+@app.route('/staff/purchase-orders/<int:order_id>/delete', methods=['POST'])
+def delete_purchase_order(order_id):
+    ensure_tint_recipe_tables()
+    order = PurchaseOrder.query.get_or_404(order_id)
+    try:
+        PurchaseOrderItem.query.filter_by(purchase_order_id=order.id).delete()
+        PurchaseOrderEvent.query.filter_by(purchase_order_id=order.id).delete()
+        db.session.delete(order)
+        db.session.commit()
+        flash(f'Purchase order {order.po_number} deleted.', 'success')
+    except Exception:
+        db.session.rollback()
+        app.logger.exception('Unable to delete purchase order')
+        flash('Unable to delete the purchase order. Please try again.', 'error')
+    return redirect(url_for('staff_purchase_orders'))
+
+@app.route('/admin/proforma-invoices/<int:invoice_id>/delete', methods=['POST'])
+def delete_proforma_invoice(invoice_id):
+    if not session.get('logged_in'):
+        return redirect(url_for('login'))
+    ensure_tint_recipe_tables()
+    invoice = ProformaInvoice.query.get_or_404(invoice_id)
+    try:
+        ProformaInvoiceItem.query.filter_by(invoice_id=invoice.id).delete()
+        db.session.delete(invoice)
+        db.session.commit()
+        flash(f'Proforma {invoice.invoice_number} deleted.', 'success')
+    except Exception:
+        db.session.rollback()
+        app.logger.exception('Unable to delete proforma invoice')
+        flash('Unable to delete the proforma invoice. Please try again.', 'error')
+    return redirect(url_for('admin_proforma_invoices'))
+
 @app.route('/export-products')
 def export_products():
     products = Product.query.order_by(Product.name).all()

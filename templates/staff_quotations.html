@@ -144,7 +144,7 @@ body.staff-dashboard .card { border:1px solid var(--staff-line) !important; bord
   <section class="quotation-list" aria-label="Recent quotations">
     <div class="p-3 border-bottom"><h2 class="h6 fw-bold mb-0">Recent quotations</h2></div>
     <div class="table-responsive"><table class="table mb-0">
-      <thead><tr><th>Quotation</th><th>Client</th><th>Date</th><th>VAT</th><th class="text-end">Total</th></tr></thead>
+      <thead><tr><th>Quotation</th><th>Client</th><th>Date</th><th>VAT</th><th class="text-end">Total</th><th class="text-end"><span class="visually-hidden">Actions</span></th></tr></thead>
       <tbody>
         {% for quotation, quotation_client_name in quotations %}
         <tr>
@@ -153,9 +153,14 @@ body.staff-dashboard .card { border:1px solid var(--staff-line) !important; bord
           <td><time data-utc-timestamp="{{ quotation.created_at.isoformat() }}">{{ quotation.created_at.strftime('%Y-%m-%d') }}</time></td>
           <td>{{ 'Exempt' if quotation.tax_mode == 'exempt' else '16%' }}</td>
           <td class="text-end fw-bold">{{ quotation.currency }} {{ '{:,.2f}'.format(quotation.total) }}</td>
+          <td class="text-end">
+            <form method="POST" action="{{ url_for('delete_quotation', quotation_id=quotation.id) }}" style="display:inline" onsubmit="return confirm('Delete quotation {{ quotation.quotation_number }}? This cannot be undone.');">
+              <button type="submit" class="btn btn-outline-danger btn-sm" title="Delete quotation" aria-label="Delete {{ quotation.quotation_number }}"><i class="fas fa-trash" aria-hidden="true"></i></button>
+            </form>
+          </td>
         </tr>
         {% else %}
-        <tr><td colspan="5" class="py-4 text-center text-secondary">No quotations have been created yet.</td></tr>
+        <tr><td colspan="6" class="py-4 text-center text-secondary">No quotations have been created yet.</td></tr>
         {% endfor %}
       </tbody>
     </table></div>
