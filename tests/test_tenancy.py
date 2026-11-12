@@ -336,6 +336,12 @@ class TenantIsolationTests(unittest.TestCase):
                     created_ids.append((tenant_id, log.id))
                     db.session.commit()
 
+            with app.app_context(), db.engine.begin() as connection:
+                connection.execute(
+                    text('UPDATE usage_logs SET created_at = :created_at WHERE id = :id'),
+                    {'created_at': f'{today.date().isoformat()} invalid timestamp', 'id': created_ids[0][1]}
+                )
+
             statements = []
             postgres_statements = []
             contexts = []
@@ -373,9 +379,10 @@ class TenantIsolationTests(unittest.TestCase):
             self.assertEqual(len(re.findall(r'usage_logs\.tenant_id\s*=', statements[0].lower())), 1)
             self.assertEqual(len(postgres_statements), 1)
             pg_sql, pg_parameters = postgres_statements[0]
-            self.assertIn('date(usage_logs.created_at)', pg_sql)
+            self.assertIn('CAST(usage_logs.created_at AS VARCHAR) LIKE', pg_sql)
+            self.assertNotIn(' AS DATE)', pg_sql)
             self.assertEqual(len(re.findall(r'usage_logs\.tenant_id\s*=', pg_sql.lower())), 1)
-            self.assertIn(today.date(), pg_parameters.values())
+            self.assertIn(f'{today.date().isoformat()}%', pg_parameters.values())
             with app.app_context(), patch.object(db.engine.dialect, 'name', 'postgresql'):
                 pg_date = usage_log_date().compile(dialect=postgresql.dialect())
                 self.assertEqual(str(pg_date), 'CAST(usage_logs.created_at AS DATE)')

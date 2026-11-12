@@ -34,7 +34,7 @@ try:
     os.environ['SESSION_COOKIE_SECURE'] = 'false'
     sys.path.insert(0, os.getcwd())
     from app_fixed_final import app, db, Product, ProductCategory, Tenant, TenantUser, UsageLog
-    from flask import g
+    from flask import g, template_rendered
     from werkzeug.security import generate_password_hash
 
     app.config['TESTING'] = True
@@ -95,6 +95,21 @@ try:
                      '/whitetap/admin/usage-logs?period=daily', '/whitetap/export-logs?period=daily'):
             response = client.get(path)
             assert response.status_code == 200, (column_type, path, response.status_code)
+    with admin_connection.cursor() as cursor:
+        cursor.execute(sql.SQL('UPDATE {}.usage_logs SET created_at = %s').format(sql.Identifier(schema)),
+                       (f'{datetime.now().date().isoformat()} invalid timestamp',))
+    dashboard_counts = []
+
+    def record_dashboard(sender, template, context, **extra):
+        if template.name == 'admin.html':
+            dashboard_counts.append(context['today_logs'])
+
+    template_rendered.connect(record_dashboard, app, weak=False)
+    try:
+        assert client.get('/whitetap/admin-dashboard').status_code == 200
+        assert dashboard_counts == [1], dashboard_counts
+    finally:
+        template_rendered.disconnect(record_dashboard, app)
     with app.app_context():
         db.session.remove()
         db.engine.dispose()

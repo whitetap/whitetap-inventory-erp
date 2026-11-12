@@ -108,7 +108,12 @@ set `ERP_TEST_DATABASE_URL` to its local PostgreSQL connection URL, and run
 `python tests/postgres_smoke.py`. The test creates and removes its own schema;
 it requires permission to create schemas and does not inspect the live database.
 
-Usage-log date filters cast `created_at` to `DATE` on PostgreSQL. Text values
+The dashboard's today's usage count matches the ISO date prefix of `created_at`
+after converting it to text, so text values must begin with `YYYY-MM-DD`.
+For timestamp-with-time-zone columns, PostgreSQL renders timestamps in the
+database session time zone. This text conversion may prevent use of a plain
+`created_at` index. Usage-log report and export date filters still cast
+`created_at` to `DATE` on PostgreSQL. For those filters, text values
 must be valid PostgreSQL date/timestamp input, and timestamp-with-time-zone
 values are interpreted in the database session time zone. Casting may prevent
 use of a plain `created_at` index. Usage-log values returned as dates or ISO
