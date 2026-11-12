@@ -316,6 +316,7 @@ body.admin-dashboard .modal-content { border: 1px solid var(--admin-line); borde
                           </div>
                         </section>
                         {% endfor %}
+                        {% if not category_groups %}<div class="py-4 text-center text-secondary">No products or categories yet. Add a product to create a category.</div>{% endif %}
                         <div id="emptySearchState" hidden class="py-4 text-center text-secondary">No products match this search.</div>
                     </div>
                     </div>
@@ -474,4 +475,3 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 
 {% endblock %}
-

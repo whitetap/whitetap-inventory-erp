@@ -79,7 +79,7 @@ try:
     with app.app_context(), app.test_request_context('/'):
         tenant = Tenant.query.filter_by(slug='second-company').one()
         g.current_tenant = tenant
-        assert ProductCategory.query.count() > 0
+        assert ProductCategory.query.count() == 0
         assert Product.query.count() == 0
         assert UsageLog.query.count() == 0
     for path in ('/whitetap/staff-inventory',

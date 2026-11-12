@@ -26,7 +26,7 @@ SKU uniqueness or repair existing duplicates. SQLAlchemy model declarations do
 not modify constraints in an existing database.
 
 Run `migrations/product_categories_tenant_name.sql` against a verified backup
-or staging copy before deploying the category seeding change, then apply it to
+or staging copy before deploying per-tenant categories, then apply it to
 production during a controlled migration. It replaces the known global category
 name constraint with `(tenant_id, name)` without deleting category rows. It also
 removes the known legacy standalone unique index `ix_product_categories_name`
@@ -34,6 +34,11 @@ when that index uniquely covers only `name`. If another single-column global
 unique index exists, it aborts and rolls back so
 that the index can be inspected. Existing duplicate `(tenant_id, name)` pairs
 also make the migration fail without changing the table.
+
+New organizations start with no product categories; administrators create them
+when adding or editing products. Existing category records are preserved,
+including any previously created defaults. Products without a saved category
+are shown as uncategorized rather than classified by SKU.
 
 Set `DATABASE_URL` and a new, long, random `SECRET_KEY` in the hosting
 environment. Changing the secret signs out existing sessions. HTTPS is required

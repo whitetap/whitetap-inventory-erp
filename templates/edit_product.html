@@ -53,13 +53,10 @@
                         </div>
                         <div class="mb-4">
                             <label class="form-label fw-bold" for="editCategory">Category</label>
-                            {% set current_category_name = category_name_by_id.get(product.category_id|string) if product.category_id else none %}
-                            {% if not current_category_name %}
-                                {% set current_category_name = 'Aviation paints & pigments' if 'PNT' in (product.sku or '').upper() else 'Carpet & textile' if 'CRP' in (product.sku or '').upper() else 'Other supplies' %}
-                            {% endif %}
                             <select id="editCategory" name="category_id" class="form-select" required>
+                                <option value="" disabled {% if not product.category_id or not category_name_by_id.get(product.category_id|string) %}selected{% endif %}>Select a category</option>
                                 {% for category in product_categories %}
-                                <option value="{{ category.id }}" {% if current_category_name == category.name %}selected{% endif %}>{{ category.name }}</option>
+                                <option value="{{ category.id }}" {% if product.category_id == category.id %}selected{% endif %}>{{ category.name }}</option>
                                 {% endfor %}
                                 <option value="__custom__">Add a category...</option>
                             </select>
@@ -112,4 +109,3 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 {% endblock %}
-

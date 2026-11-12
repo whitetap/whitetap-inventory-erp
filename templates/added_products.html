@@ -64,7 +64,7 @@ body.admin-dashboard .added-table .card { box-shadow:none !important; }
           <td>{% if product.created_at %}<time data-utc-timestamp="{{ product.created_at.isoformat() }}">{{ product.created_at.strftime('%Y-%m-%d %H:%M') }}</time>{% else %}-{% endif %}</td>
           <td>{{ product.sku or '-' }}</td>
           <td>{{ product.name or '-' }}</td>
-          <td>{{ category_name_by_id.get(product.category_id|string) if product.category_id else 'Other supplies' }}</td>
+          <td>{{ category_name_by_id.get(product.category_id|string, 'Uncategorized') if product.category_id else 'Uncategorized' }}</td>
           <td>{{ product.supplier or '-' }}</td>
           <td>{{ product.invoice_number or '-' }}</td>
           <td>{{ product.unit_of_measure or '-' }}</td>

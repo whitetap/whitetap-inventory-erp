@@ -481,55 +481,21 @@ def money_filter(value):
 def inject_po_labels():
     return {'po_status_labels': PO_STATUS_LABELS}
 
-DEFAULT_PRODUCT_CATEGORIES = (
-    'Aviation paints & pigments', 'Carpet & textile', 'Other supplies',
-    'Exterior paint', 'Interior paint', 'Matt black', 'Walkway grit',
-    'Anti static', 'Clear coat', 'Metallic paint', 'Carpets'
-)
-
-
-def seed_product_categories():
-    tenant_id = current_tenant_id()
-    if tenant_id is None:
-        raise RuntimeError('A tenant context is required to seed product categories')
-    if db.engine.dialect.name == 'postgresql':
-        db.session.connection().exec_driver_sql(
-            'SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))',
-            (f'product-categories:{tenant_id}',)
-        )
-    for category_name in DEFAULT_PRODUCT_CATEGORIES:
-        category = ProductCategory.query.filter(
-            db.func.lower(ProductCategory.name) == category_name.lower()
-        ).first()
-        if not category:
-            db.session.add(ProductCategory(tenant_id=tenant_id, name=category_name))
-
-
-def ensure_tint_recipe_tables():
-    seed_product_categories()
-    db.session.commit()
-
 def get_product_category_name_map():
     return {str(category.id): category.name for category in ProductCategory.query.order_by(ProductCategory.name).all()}
 
-def effective_product_category_name(product, category_names):
-    saved_category = category_names.get(str(product.category_id)) if product.category_id else None
-    if saved_category:
-        return saved_category
-    sku = (product.sku or '').upper()
-    if 'PNT' in sku:
-        return 'Aviation paints & pigments'
-    if 'CRP' in sku:
-        return 'Carpet & textile'
-    return 'Other supplies'
-
-def build_category_groups(products, categories, category_names):
-    grouped = {}
+def build_category_groups(products, categories):
+    grouped = {str(category.id): [] for category in categories}
+    uncategorized = []
     for product in products:
-        grouped.setdefault(effective_product_category_name(product, category_names), []).append(product)
-    groups = [{'name': category.name, 'products': grouped.pop(category.name, [])} for category in categories]
-    for leftover_name in sorted(grouped):
-        groups.append({'name': leftover_name, 'products': grouped[leftover_name]})
+        category_id = str(product.category_id) if product.category_id else None
+        if category_id in grouped:
+            grouped[category_id].append(product)
+        else:
+            uncategorized.append(product)
+    groups = [{'name': category.name, 'products': grouped[str(category.id)]} for category in categories]
+    if uncategorized:
+        groups.append({'name': 'Uncategorized products', 'products': uncategorized})
     return groups
 
 def resolve_product_category():
@@ -754,8 +720,6 @@ def signup():
             tenant = Tenant(name=name, slug=slug)
             db.session.add(tenant)
             db.session.flush()
-            g.current_tenant = tenant
-            seed_product_categories()
             db.session.add(TenantUser(
                 tenant_id=tenant.id, email=email,
                 password_hash=generate_password_hash(password), role='admin'
@@ -792,7 +756,6 @@ def index():
 
 @tenant_route('/staff-inventory')
 def staff_inventory():
-    ensure_tint_recipe_tables()
     category_names = get_product_category_name_map()
     search_query = request.args.get('search', '')
     activity_filter = request.args.get('activity_filter', '')
@@ -801,7 +764,7 @@ def staff_inventory():
 
     # Group products by the categories managed in the admin workspace
     product_categories = ProductCategory.query.order_by(ProductCategory.name).all()
-    category_groups = build_category_groups(all_products, product_categories, category_names)
+    category_groups = build_category_groups(all_products, product_categories)
 
     # Apply search filter
     if search_query:
@@ -822,7 +785,7 @@ def staff_inventory():
     low_stock_count = len(low_stock_products)
     tint_projects = [row[0] for row in db.session.query(TintRecipe.project_ref).filter(TintRecipe.project_ref.isnot(None)).order_by(TintRecipe.project_ref).all()]
 
-    return render_template('staff_dashboard.html', category_groups=category_groups, total_items=len(all_products), recent_logs=recent_logs, search_query=search_query, activity_filter=activity_filter, low_stock_products=low_stock_products, low_stock_count=low_stock_count, tint_projects=tint_projects, category_name_by_id=category_names)
+    return render_template('staff_dashboard.html', category_groups=category_groups, category_count=len(product_categories), total_items=len(all_products), recent_logs=recent_logs, search_query=search_query, activity_filter=activity_filter, low_stock_products=low_stock_products, low_stock_count=low_stock_count, tint_projects=tint_projects, category_name_by_id=category_names)
 
 @tenant_route('/api/products/lookup')
 def api_product_lookup():
@@ -859,7 +822,6 @@ def api_tint_recipes():
         return jsonify({'success': False, 'error': 'Provide a recipe_name, name, or project_ref.'}), 400
 
     try:
-        ensure_tint_recipe_tables()
         filters = []
         if recipe_name:
             filters.append(db.func.lower(TintRecipe.recipe_name) == recipe_name.lower())
@@ -899,7 +861,6 @@ def api_tint_recipes():
 @tenant_route('/api/tint-recipes/<int:recipe_id>', methods=['DELETE'])
 def delete_tint_recipe(recipe_id):
     try:
-        ensure_tint_recipe_tables()
         recipe = TintRecipe.query.get(recipe_id)
         if not recipe:
             return jsonify({'success': False, 'error': 'Recipe not found.'}), 404
@@ -988,7 +949,6 @@ def admin_proforma_invoices():
     if not session.get('logged_in'):
         return redirect(url_for('login'))
 
-    ensure_tint_recipe_tables()
     if request.method == 'POST':
         client_name = ' '.join(request.form.get('client_name', '').split())
         project_ref = request.form.get('project_ref', '').strip()
@@ -1108,7 +1068,6 @@ def proforma_invoice_detail(invoice_id):
     if not session.get('logged_in'):
         return redirect(url_for('login'))
 
-    ensure_tint_recipe_tables()
     invoice = ProformaInvoice.query.get_or_404(invoice_id)
     client = Client.query.get_or_404(invoice.client_id)
     items = ProformaInvoiceItem.query.filter_by(invoice_id=invoice.id).order_by(ProformaInvoiceItem.product_name).all()
@@ -1116,7 +1075,6 @@ def proforma_invoice_detail(invoice_id):
 
 @tenant_route('/staff/quotations', methods=['GET', 'POST'])
 def staff_quotations():
-    ensure_tint_recipe_tables()
     if request.method == 'POST':
         quotation_number = ' '.join(request.form.get('quotation_number', '').split())
         client_name = ' '.join(request.form.get('client_name', '').split())
@@ -1252,7 +1210,6 @@ def staff_quotations():
 
 @tenant_route('/staff/quotations/<int:quotation_id>')
 def staff_quotation_detail(quotation_id):
-    ensure_tint_recipe_tables()
     quotation = Quotation.query.get_or_404(quotation_id)
     client = Client.query.get_or_404(quotation.client_id)
     items = QuotationItem.query.filter_by(quotation_id=quotation.id).order_by(QuotationItem.id).all()
@@ -1260,7 +1217,6 @@ def staff_quotation_detail(quotation_id):
 
 @tenant_route('/staff/quotations/<int:quotation_id>/delete', methods=['POST'])
 def delete_quotation(quotation_id):
-    ensure_tint_recipe_tables()
     quotation = Quotation.query.get_or_404(quotation_id)
     try:
         QuotationItem.query.filter_by(quotation_id=quotation.id).delete()
@@ -1275,7 +1231,6 @@ def delete_quotation(quotation_id):
 
 @tenant_route('/staff/purchase-orders/<int:order_id>/delete', methods=['POST'])
 def delete_purchase_order(order_id):
-    ensure_tint_recipe_tables()
     order = PurchaseOrder.query.get_or_404(order_id)
     try:
         PurchaseOrderItem.query.filter_by(purchase_order_id=order.id).delete()
@@ -1293,7 +1248,6 @@ def delete_purchase_order(order_id):
 def delete_proforma_invoice(invoice_id):
     if not session.get('logged_in'):
         return redirect(url_for('login'))
-    ensure_tint_recipe_tables()
     invoice = ProformaInvoice.query.get_or_404(invoice_id)
     try:
         ProformaInvoiceItem.query.filter_by(invoice_id=invoice.id).delete()
@@ -1438,7 +1392,6 @@ def admin_dashboard():
     if not session.get('logged_in'):
         return redirect(url_for('login'))
         
-    ensure_tint_recipe_tables()
     view = request.args.get('view', 'summary')
     
     all_products = Product.query.order_by(Product.name).all()
@@ -1464,7 +1417,7 @@ def admin_dashboard():
 
     product_categories = ProductCategory.query.order_by(ProductCategory.name).all()
     category_names = get_product_category_name_map()
-    category_groups = build_category_groups(all_products, product_categories, category_names)
+    category_groups = build_category_groups(all_products, product_categories)
 
     return render_template('admin.html', view=view, display_products=display_products, all_products=all_products, total_items=total_items, low_stock_count=low_stock_count, total_inventory_value=total_inventory_value, today_logs=today_logs, unit_options=get_product_units(), product_categories=product_categories, category_name_by_id=category_names, category_groups=category_groups)
 
@@ -1473,7 +1426,6 @@ def admin_added_products():
     if not session.get('logged_in'):
         return redirect(url_for('login'))
 
-    ensure_tint_recipe_tables()
     period = request.args.get('period', 'all')
     if period not in ('7', '30', '90', '365', 'all'):
         period = 'all'
@@ -1502,7 +1454,6 @@ def admin_added_products():
 
 @tenant_route('/staff/purchase-orders', methods=['GET', 'POST'])
 def staff_purchase_orders():
-    ensure_tint_recipe_tables()
 
     if request.method == 'POST':
         json_request = request.is_json
@@ -1672,7 +1623,6 @@ def staff_purchase_orders():
 
 @tenant_route('/staff/purchase-orders/<int:order_id>')
 def staff_purchase_order_detail(order_id):
-    ensure_tint_recipe_tables()
     order = PurchaseOrder.query.get_or_404(order_id)
     po_sync_status(order)
     items = PurchaseOrderItem.query.filter_by(purchase_order_id=order.id).order_by(PurchaseOrderItem.product_name).all()
@@ -1685,7 +1635,6 @@ def staff_purchase_order_detail(order_id):
 
 @tenant_route('/staff/purchase-orders/<int:order_id>/send', methods=['POST'])
 def staff_purchase_order_send(order_id):
-    ensure_tint_recipe_tables()
     order = PurchaseOrder.query.get_or_404(order_id)
     if order.status not in ('pending', 'sent', 'revision_requested'):
         flash('This purchase order can no longer be sent for approval.', 'error')
@@ -1722,7 +1671,6 @@ def staff_purchase_order_send(order_id):
 
 @tenant_route('/staff/purchase-orders/<int:order_id>/review', methods=['POST'])
 def staff_purchase_order_review(order_id):
-    ensure_tint_recipe_tables()
     order = PurchaseOrder.query.get_or_404(order_id)
     if order.status != 'revision_requested':
         flash('No supplier changes are waiting for review.', 'error')
@@ -1829,7 +1777,6 @@ def supplier_po_response(token):
 
 @tenant_route('/admin/add-product', methods=['POST'])
 def admin_add_product():
-    ensure_tint_recipe_tables()
     name = request.form['name'].strip()
     sku = request.form['sku'].strip()
     supplier = request.form.get('supplier', '').strip() or None
@@ -1912,7 +1859,6 @@ def issue_item():
         db.session.add(usage_log)
 
         if is_tinting:
-            ensure_tint_recipe_tables()
             recipe = TintRecipe.query.filter(
                 db.func.lower(TintRecipe.project_ref) == project_ref.lower()
             ).first()
@@ -2001,7 +1947,6 @@ def admin_transfer_stock():
 
 @tenant_route('/edit-product/<string:product_id>', methods=['GET', 'POST'])
 def edit_product(product_id):
-    ensure_tint_recipe_tables()
     try:
         product_id = normalize_product_uuid(product_id)
     except (ValueError, TypeError):

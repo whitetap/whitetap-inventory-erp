@@ -20,8 +20,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 from app_fixed_final import (
     app, db, Tenant, TenantUser, Product, ProductCategory, PurchaseOrder, UsageLog,
-    DEFAULT_PRODUCT_CATEGORIES, ensure_tint_recipe_tables, usage_period_bounds,
-    get_project_invoice_lines
+    usage_period_bounds, get_project_invoice_lines
 )
 
 
@@ -108,10 +107,7 @@ class TenantIsolationTests(unittest.TestCase):
             tenant_id, user_id = tenant.id, user.id
         with app.test_request_context('/'):
             g.current_tenant = db.session.get(Tenant, tenant_id)
-            self.assertEqual(
-                {category.name for category in ProductCategory.query.all()},
-                set(DEFAULT_PRODUCT_CATEGORIES)
-            )
+            self.assertEqual(ProductCategory.query.count(), 0)
 
         def cleanup_signup():
             with app.test_request_context('/'):
@@ -130,6 +126,11 @@ class TenantIsolationTests(unittest.TestCase):
         })
         self.assertTrue(login_response.location.endswith('/other-2/admin-dashboard'))
         self.assertEqual(self.client.get(login_response.location).status_code, 200)
+        inventory_page = self.client.get('/other-2/admin-dashboard?view=inventory')
+        self.assertIn(b'No products or categories yet', inventory_page.data)
+        staff_page = self.client.get('/other-2/staff-inventory')
+        self.assertIn(b'No products or categories yet', staff_page.data)
+        self.assertIn(b'Good day, Other staff', staff_page.data)
         self.assertEqual(self.client.get('/other-2/api/products/lookup?identifier=SKU-1').status_code, 404)
         self.assertEqual(self.client.get('/whitetap/api/products/lookup?identifier=SKU-1').status_code, 401)
 
@@ -156,30 +157,68 @@ class TenantIsolationTests(unittest.TestCase):
         with app.app_context():
             self.assertIsNone(Tenant.query.filter_by(slug='test-company').first())
 
-    def test_category_seed_is_per_tenant_and_idempotent(self):
-        for tenant_id in (1, 2):
+    def test_company_greeting_and_saved_categories_are_tenant_specific(self):
+        created_categories = []
+        product_id = None
+        try:
             with app.test_request_context('/'):
-                g.current_tenant = db.session.get(Tenant, tenant_id)
-                ensure_tint_recipe_tables()
-                ensure_tint_recipe_tables()
-                categories = ProductCategory.query.all()
-                self.assertEqual({category.name for category in categories}, set(DEFAULT_PRODUCT_CATEGORIES))
-                self.assertEqual(len(categories), len(DEFAULT_PRODUCT_CATEGORIES))
-                self.assertTrue(all(category.tenant_id == tenant_id for category in categories))
+                g.current_tenant = db.session.get(Tenant, 2)
+                category = ProductCategory(name='Other company category')
+                db.session.add(category)
+                db.session.flush()
+                created_categories.append((2, category.id))
+                db.session.commit()
 
-    def test_signup_rolls_back_if_category_seeding_fails(self):
-        app.config['PUBLIC_SIGNUP_ENABLED'] = True
-        page = self.client.get('/signup')
-        token = re.search(rb'name="csrf_token" value="([^"]+)"', page.data).group(1).decode()
-        with patch('app_fixed_final.seed_product_categories', side_effect=RuntimeError('test failure')):
-            with self.assertRaises(RuntimeError):
-                self.client.post('/signup', data={
-                    'csrf_token': token, 'organization_name': 'Failed Seed',
-                    'email': 'seed@example.test', 'password': 'long-enough-password'
-                })
-        with app.app_context():
-            self.assertIsNone(Tenant.query.filter_by(slug='failed-seed').first())
-            self.assertIsNone(TenantUser.query.filter_by(email='seed@example.test').first())
+            self.login('whitetap', 'whitetap-password')
+            with self.client.session_transaction() as sess:
+                sess['csrf_token'] = 'c' * 32
+            response = self.client.post('/whitetap/admin/add-product', data={
+                'csrf_token': 'c' * 32, 'name': 'Custom category product', 'sku': 'CUSTOM-1',
+                'unit_of_measure': 'each', 'category_id': '__custom__',
+                'custom_category_name': 'My saved category', 'current_stock': '1',
+            })
+            self.assertEqual(response.status_code, 302)
+            with app.test_request_context('/'):
+                g.current_tenant = db.session.get(Tenant, 1)
+                product = Product.query.filter_by(sku='CUSTOM-1').one()
+                product_id = product.id
+                category = ProductCategory.query.filter_by(name='My saved category').one()
+                created_categories.append((1, category.id))
+                self.assertEqual(product.category_id, category.id)
+                self.assertEqual(ProductCategory.query.count(), 1)
+
+            for path in ('/whitetap/staff-inventory', '/whitetap/admin-dashboard?view=inventory'):
+                page = self.client.get(path)
+                self.assertEqual(page.status_code, 200)
+                self.assertIn(b'My saved category', page.data)
+                self.assertNotIn(b'Other company category', page.data)
+                self.assertNotIn(b'Aviation paints &amp; pigments', page.data)
+            page = self.client.get('/whitetap/staff-inventory')
+            self.assertIn(b'Good day, Whitetap staff', page.data)
+            self.assertIn(b'data-company-name="Whitetap"', page.data)
+            self.assertIn(b'Uncategorized', page.data)
+            page = self.client.get(f'/whitetap/edit-product/{self.product_ids[0]}')
+            self.assertIn(b'Select a category', page.data)
+            self.assertNotIn(b'Other supplies', page.data)
+
+            self.login('other', 'other-password')
+            page = self.client.get('/other/staff-inventory')
+            self.assertEqual(page.status_code, 200)
+            self.assertIn(b'Good day, Other staff', page.data)
+            self.assertIn(b'data-company-name="Other"', page.data)
+            self.assertIn(b'Other company category', page.data)
+            self.assertNotIn(b'My saved category', page.data)
+        finally:
+            if product_id:
+                with app.test_request_context('/'):
+                    g.current_tenant = db.session.get(Tenant, 1)
+                    Product.query.filter_by(id=product_id).delete()
+                    db.session.commit()
+            for tenant_id, category_id in created_categories:
+                with app.test_request_context('/'):
+                    g.current_tenant = db.session.get(Tenant, tenant_id)
+                    ProductCategory.query.filter_by(id=category_id).delete()
+                    db.session.commit()
 
     def test_public_landing_uses_private_organization_login(self):
         app.config['PUBLIC_SIGNUP_ENABLED'] = False
