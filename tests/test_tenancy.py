@@ -1,6 +1,7 @@
 import os
 import re
 import unittest
+from datetime import datetime, timedelta
 from decimal import Decimal
 from uuid import uuid4
 
@@ -9,8 +10,8 @@ os.environ['SECRET_KEY'] = 'test-secret-not-for-production'
 os.environ['SESSION_COOKIE_SECURE'] = 'false'
 os.environ['INITIAL_ADMIN_PASSWORD'] = ''
 
-from flask import g, url_for
-from sqlalchemy import select, text
+from flask import g, url_for, template_rendered
+from sqlalchemy import event, select, text
 from werkzeug.security import generate_password_hash
 
 from app_fixed_final import (
@@ -165,6 +166,57 @@ class TenantIsolationTests(unittest.TestCase):
         page = self.client.get('/whitetap/staff-inventory')
         self.assertIn(b'/whitetap/api/products/lookup', page.data)
         self.assertIn(b'/whitetap/api/tint-recipes', page.data)
+
+    def test_dashboard_usage_count_is_direct_and_tenant_scoped(self):
+        created_ids = []
+        today = datetime.now().replace(hour=12, minute=0, second=0, microsecond=0)
+        try:
+            for tenant_id, created_at in (
+                (1, today), (1, today - timedelta(days=1)), (2, today)
+            ):
+                with app.test_request_context('/'):
+                    g.current_tenant = db.session.get(Tenant, tenant_id)
+                    log = UsageLog(
+                        product_id=self.product_ids[tenant_id - 1],
+                        quantity_used=1, technician_name='Count test', created_at=created_at
+                    )
+                    db.session.add(log)
+                    db.session.flush()
+                    created_ids.append((tenant_id, log.id))
+                    db.session.commit()
+
+            statements = []
+            contexts = []
+
+            def record_sql(conn, cursor, statement, parameters, context, executemany):
+                if 'count(' in statement.lower() and 'usage_logs' in statement.lower():
+                    statements.append(statement)
+
+            def record_template(sender, template, context, **extra):
+                if template.name == 'admin.html':
+                    contexts.append(context)
+
+            self.login('whitetap', 'whitetap-password')
+            with app.app_context():
+                engine = db.engine
+            event.listen(engine, 'before_cursor_execute', record_sql)
+            template_rendered.connect(record_template, app, weak=False)
+            try:
+                response = self.client.get('/whitetap/admin-dashboard')
+            finally:
+                event.remove(engine, 'before_cursor_execute', record_sql)
+                template_rendered.disconnect(record_template, app)
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(contexts[0]['today_logs'], 1)
+            self.assertEqual(len(statements), 1)
+            self.assertNotIn('anon_1', statements[0].lower())
+            self.assertIn('usage_logs.tenant_id', statements[0].lower())
+        finally:
+            for tenant_id, log_id in created_ids:
+                with app.test_request_context('/'):
+                    g.current_tenant = db.session.get(Tenant, tenant_id)
+                    UsageLog.query.filter_by(id=log_id).delete()
+                    db.session.commit()
 
     def test_csrf_required_for_state_changes(self):
         self.login('whitetap', 'whitetap-password')

@@ -12,7 +12,7 @@ from io import StringIO
 from flask import Flask, render_template, request, redirect, url_for, flash, session, Response, make_response, jsonify, g, abort, has_request_context
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy import desc, text, event, inspect, UniqueConstraint
+from sqlalchemy import desc, text, event, inspect, UniqueConstraint, func
 from sqlalchemy.engine import make_url
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Session, with_loader_criteria
@@ -1325,7 +1325,10 @@ def admin_dashboard():
     total_inventory_value = sum((p.current_stock or 0) for p in all_products)
     
     # Today's usage logs count
-    today_logs = UsageLog.query.filter(db.func.date(UsageLog.created_at) == datetime.now().date()).count()
+    today_logs = db.session.query(func.count(UsageLog.id)).filter(
+        func.date(UsageLog.created_at) == datetime.now().date(),
+        UsageLog.tenant_id == g.current_tenant.id
+    ).scalar()
 
     product_categories = ProductCategory.query.order_by(ProductCategory.name).all()
     category_names = get_product_category_name_map()
