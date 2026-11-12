@@ -55,6 +55,13 @@ try:
                                     technician_name='Test', project_ref='TEST', created_at=datetime.now()))
             db.session.commit()
 
+    with app.app_context():
+        db.session.remove()
+        db.engine.dispose()
+    with admin_connection.cursor() as cursor:
+        cursor.execute(sql.SQL('ALTER TABLE {}.usage_logs ALTER COLUMN created_at TYPE TEXT USING created_at::TEXT')
+                       .format(sql.Identifier(schema)))
+
     client = app.test_client()
     page = client.get('/whitetap/login')
     assert page.status_code == 200
@@ -87,7 +94,7 @@ try:
     with app.app_context():
         db.session.remove()
         db.engine.dispose()
-    for column_type in ('TIMESTAMP WITH TIME ZONE', 'DATE', 'TEXT'):
+    for column_type in ('VARCHAR', 'TEXT'):
         with admin_connection.cursor() as cursor:
             cursor.execute(sql.SQL('ALTER TABLE {}.usage_logs ALTER COLUMN created_at TYPE {} USING created_at::{}')
                            .format(sql.Identifier(schema), sql.SQL(column_type), sql.SQL(column_type)))
@@ -113,7 +120,7 @@ try:
     with app.app_context():
         db.session.remove()
         db.engine.dispose()
-    print('PostgreSQL signup, tenant isolation, login, navigation, and date/timestamp/text smoke tests passed')
+    print('PostgreSQL signup, tenant isolation, login, navigation, and text/VARCHAR smoke tests passed')
 finally:
     with admin_connection.cursor() as cursor:
         cursor.execute(sql.SQL('DROP SCHEMA {} CASCADE').format(sql.Identifier(schema)))

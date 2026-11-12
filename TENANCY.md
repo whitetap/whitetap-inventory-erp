@@ -109,10 +109,8 @@ set `ERP_TEST_DATABASE_URL` to its local PostgreSQL connection URL, and run
 it requires permission to create schemas and does not inspect the live database.
 
 The dashboard's today's usage count matches the ISO date prefix of `created_at`
-after converting it to text, so text values must begin with `YYYY-MM-DD`.
-For timestamp-with-time-zone columns, PostgreSQL renders timestamps in the
-database session time zone. This text conversion may prevent use of a plain
-`created_at` index. Usage-log report and export date filters still cast
+directly using `LIKE`, so the PostgreSQL column must be text or VARCHAR and
+its values must begin with `YYYY-MM-DD`. Usage-log report and export date filters still cast
 `created_at` to `DATE` on PostgreSQL. For those filters, text values
 must be valid PostgreSQL date/timestamp input, and timestamp-with-time-zone
 values are interpreted in the database session time zone. Casting may prevent

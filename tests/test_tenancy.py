@@ -379,8 +379,8 @@ class TenantIsolationTests(unittest.TestCase):
             self.assertEqual(len(re.findall(r'usage_logs\.tenant_id\s*=', statements[0].lower())), 1)
             self.assertEqual(len(postgres_statements), 1)
             pg_sql, pg_parameters = postgres_statements[0]
-            self.assertIn('CAST(usage_logs.created_at AS VARCHAR) LIKE', pg_sql)
-            self.assertNotIn(' AS DATE)', pg_sql)
+            self.assertRegex(pg_sql, r'usage_logs\.created_at\s+LIKE\s+')
+            self.assertNotIn('CAST(', pg_sql.upper())
             self.assertEqual(len(re.findall(r'usage_logs\.tenant_id\s*=', pg_sql.lower())), 1)
             self.assertIn(f'{today.date().isoformat()}%', pg_parameters.values())
             with app.app_context(), patch.object(db.engine.dialect, 'name', 'postgresql'):

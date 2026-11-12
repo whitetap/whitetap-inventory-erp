@@ -13,7 +13,7 @@ from io import StringIO
 from flask import Flask, render_template, request, redirect, url_for, flash, session, Response, make_response, jsonify, g, abort, has_request_context
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy import Date, String, cast, desc, text, event, inspect, UniqueConstraint, func
+from sqlalchemy import Date, String, bindparam, cast, desc, text, event, inspect, UniqueConstraint, func
 from sqlalchemy.engine import make_url
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Session, with_loader_criteria
@@ -1449,7 +1449,7 @@ def admin_dashboard():
     # Today's usage logs count
     today_prefix = f'{datetime.now().date().isoformat()}%'
     today_logs = db.session.query(func.count(UsageLog.id)).filter(
-        cast(UsageLog.created_at, String).like(today_prefix)
+        UsageLog.created_at.like(bindparam('usage_date_prefix', today_prefix, type_=String()))
     ).scalar()
 
     product_categories = ProductCategory.query.order_by(ProductCategory.name).all()
