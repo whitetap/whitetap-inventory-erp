@@ -24,7 +24,7 @@
                     <h2 class="mb-0">✏️ Edit {{ product.name }}</h2>
                 </div>
                 <div class="card-body">
-                    <form method="POST">
+                    <form method="POST"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <div class="mb-4">
                             <label class="form-label fw-bold">SKU</label>
                             <input type="text" name="sku" class="form-control" value="{{ product.sku }}" required>

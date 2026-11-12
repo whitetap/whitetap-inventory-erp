@@ -406,7 +406,7 @@ body.staff-dashboard .btn-warning:hover { border-color:#96702f; background:#9670
         <h5 class="modal-title fw-bold">📤 Issue Product</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
-      <form id="issueForm" method="POST" action="{{ url_for('issue_item') }}">
+      <form id="issueForm" method="POST" action="{{ url_for('issue_item') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="modal-body">
           <input type="hidden" id="modal-product-id" name="product_id">
           <div class="row g-3">
@@ -547,7 +547,7 @@ document.addEventListener('DOMContentLoaded', function() {
       qrLookupPending = true;
       qrScannerStatus.textContent = 'Looking up product...';
       try {
-        const response = await fetch(`/api/products/lookup?identifier=${encodeURIComponent(decodedText.trim())}`);
+        const response = await fetch(`{{ url_for('api_product_lookup') }}?identifier=${encodeURIComponent(decodedText.trim())}`);
         const payload = await response.json();
         if (!response.ok || !payload.success) throw new Error(payload.error || 'Product not found.');
 
@@ -645,7 +645,7 @@ document.addEventListener('DOMContentLoaded', function() {
       let activeRecipeButton = null;
 
       function fetchTintRecipe(projectRef) {
-        return fetch(`/api/tint-recipes?project_ref=${encodeURIComponent(projectRef)}`)
+        return fetch(`{{ url_for('api_tint_recipes') }}?project_ref=${encodeURIComponent(projectRef)}`)
           .then(response => {
             return response.json().then(payload => {
               if (!response.ok || !payload.success) {
@@ -672,7 +672,7 @@ document.addEventListener('DOMContentLoaded', function() {
         deleteButton.addEventListener('click', function() {
           if (!window.confirm(`Delete the saved recipe for ${recipe.recipe.recipe_name}?`)) return;
           deleteButton.disabled = true;
-          fetch(`/api/tint-recipes/${recipe.recipe.id}`, { method: 'DELETE' })
+          fetch(`{{ url_for('api_tint_recipes') }}/${recipe.recipe.id}`, { method: 'DELETE', headers: { 'X-CSRF-Token': {{ csrf_token()|tojson }} } })
             .then(response => response.json().then(payload => {
               if (!response.ok || !payload.success) throw new Error(payload.error || 'Unable to delete recipe');
               return payload;

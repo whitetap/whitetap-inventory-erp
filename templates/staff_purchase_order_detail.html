@@ -79,7 +79,7 @@ body.staff-dashboard .main-content { min-height:calc(100vh - 60px); padding:28px
       <div class="table-responsive"><table class="table table-sm mb-2"><thead><tr><th>Product</th><th class="text-end">Qty ordered &rarr; offered</th><th class="text-end">Price ordered &rarr; offered</th><th>Supplier</th></tr></thead><tbody>
         {% for item in items %}<tr><td>{{ item.product_name }}</td><td class="text-end">{{ '%.3f'|format(item.quantity) }} &rarr; {{ '%.3f'|format(item.supplier_quantity if item.supplier_quantity is not none else item.quantity) }}</td><td class="text-end">{{ '%.2f'|format(item.unit_cost) }} &rarr; {{ '%.2f'|format(item.supplier_unit_cost if item.supplier_unit_cost is not none else item.unit_cost) }}</td><td>{{ 'Can supply' if item.supplier_included is not false else 'Not available' }}</td></tr>{% endfor %}
       </tbody></table></div>
-      <form method="post" action="{{ url_for('staff_purchase_order_review', order_id=order.id) }}" class="d-flex flex-wrap gap-2">
+      <form method="post" action="{{ url_for('staff_purchase_order_review', order_id=order.id) }}" class="d-flex flex-wrap gap-2"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <button class="btn btn-success btn-sm" name="decision" value="accept" title="Accept supplier changes and approve"><i class="fas fa-check me-1" aria-hidden="true"></i>Accept changes</button>
         <button class="btn btn-outline-secondary btn-sm" name="decision" value="reject" title="Reject changes and send back for approval"><i class="fas fa-paper-plane me-1" aria-hidden="true"></i>Send back for approval</button>
       </form>
@@ -87,7 +87,7 @@ body.staff-dashboard .main-content { min-height:calc(100vh - 60px); padding:28px
     {% endif %}
 
     {% if st in ('pending', 'sent', 'revision_requested') %}
-    <form method="post" action="{{ url_for('staff_purchase_order_send', order_id=order.id) }}" class="po-box">
+    <form method="post" action="{{ url_for('staff_purchase_order_send', order_id=order.id) }}" class="po-box"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <h2><i class="fas fa-envelope me-2" aria-hidden="true"></i>{{ 'Send to supplier' if st == 'pending' else 'Re-send to supplier' }}</h2>
       <div class="row g-2 mb-2">
         {% for n in range(4) %}<div class="col-md-3"><input type="email" name="supplier_email" maxlength="254" class="form-control form-control-sm" aria-label="Supplier email {{ n + 1 }}" placeholder="Email {{ n + 1 }}" value="{{ emails[n] if n < emails|length else '' }}"></div>{% endfor %}

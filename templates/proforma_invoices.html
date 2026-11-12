@@ -72,7 +72,7 @@ body.admin-dashboard .card { border:1px solid var(--admin-line) !important; bord
   <section class="card mb-4" aria-label="Price invoice items">
     <div class="p-3 border-bottom"><h2 class="h6 fw-bold mb-1">Project {{ selected_project_ref }}</h2><small class="text-secondary">Add a unit price to each issued product. Client details are saved when the invoice is created.</small></div>
     {% if project_lines %}
-    <form method="post" action="{{ url_for('admin_proforma_invoices') }}" id="proformaForm" data-currency="{{ currency }}" data-tax-rate="{{ '16' if tax_mode == 'standard' else '0' }}">
+    <form method="post" action="{{ url_for('admin_proforma_invoices') }}" id="proformaForm" data-currency="{{ currency }}" data-tax-rate="{{ '16' if tax_mode == 'standard' else '0' }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <input type="hidden" name="client_name" value="{{ client_name }}">
       <input type="hidden" name="project_ref" value="{{ selected_project_ref }}">
       <input type="hidden" name="currency" value="{{ currency }}">
@@ -110,7 +110,7 @@ body.admin-dashboard .card { border:1px solid var(--admin-line) !important; bord
       <thead><tr><th>Invoice</th><th>Client</th><th>Project</th><th>Date</th><th class="text-end">Total</th><th class="text-end"><span class="visually-hidden">Actions</span></th></tr></thead>
       <tbody>
         {% for invoice, invoice_client_name in invoices %}
-        <tr><td><a href="{{ url_for('proforma_invoice_detail', invoice_id=invoice.id) }}">{{ invoice.invoice_number }}</a></td><td>{{ invoice_client_name }}</td><td>{{ invoice.project_ref }}</td><td><time data-utc-timestamp="{{ invoice.created_at.isoformat() }}">{{ invoice.created_at.strftime('%Y-%m-%d') }}</time></td><td class="text-end fw-bold">{{ invoice.currency }} {{ '{:,.2f}'.format(invoice.total) }}</td><td class="text-end"><form method="POST" action="{{ url_for('delete_proforma_invoice', invoice_id=invoice.id) }}" style="display:inline" onsubmit="return confirm('Delete proforma {{ invoice.invoice_number }}? This cannot be undone.');"><button type="submit" class="btn btn-outline-danger btn-sm" title="Delete proforma" aria-label="Delete {{ invoice.invoice_number }}"><i class="fas fa-trash" aria-hidden="true"></i></button></form></td></tr>
+        <tr><td><a href="{{ url_for('proforma_invoice_detail', invoice_id=invoice.id) }}">{{ invoice.invoice_number }}</a></td><td>{{ invoice_client_name }}</td><td>{{ invoice.project_ref }}</td><td><time data-utc-timestamp="{{ invoice.created_at.isoformat() }}">{{ invoice.created_at.strftime('%Y-%m-%d') }}</time></td><td class="text-end fw-bold">{{ invoice.currency }} {{ '{:,.2f}'.format(invoice.total) }}</td><td class="text-end"><form method="POST" action="{{ url_for('delete_proforma_invoice', invoice_id=invoice.id) }}" style="display:inline" onsubmit="return confirm('Delete proforma {{ invoice.invoice_number }}? This cannot be undone.');"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button type="submit" class="btn btn-outline-danger btn-sm" title="Delete proforma" aria-label="Delete {{ invoice.invoice_number }}"><i class="fas fa-trash" aria-hidden="true"></i></button></form></td></tr>
         {% else %}
         <tr><td colspan="6" class="py-4 text-center text-secondary">No proforma invoices have been created.</td></tr>
         {% endfor %}

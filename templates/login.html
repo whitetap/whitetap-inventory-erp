@@ -17,7 +17,7 @@
                             <i class="fas fa-shield-alt fa-4x text-white mb-3" style="text-shadow: 0 2px 4px rgba(0,0,0,0.5);"></i>
                         </div>
                         <h2 class="text-white fw-bold mb-4" style="font-size: 2rem; text-shadow: 0 1px 3px rgba(0,0,0,0.5);">Admin Access</h2>
-                        <p class="text-white-50 mb-4">Enter your secure password to access the dashboard</p>
+                        <p class="text-white-50 mb-4">Sign in to {{ g.current_tenant.name }}</p>
                         
                         {% with messages = get_flashed_messages(with_categories=true) %}
                             {% if messages %}
@@ -30,9 +30,12 @@
                             {% endif %}
                         {% endwith %}
                         
-                        <form method="POST">
+                        <form method="POST"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <div class="mb-4">
-                                <input type="password" class="form-control form-control-lg rounded-4" name="password" placeholder="Password" required 
+                                <input type="email" class="form-control form-control-lg rounded-4" name="email" placeholder="Email" autocomplete="username" required>
+                            </div>
+                            <div class="mb-4">
+                                <input type="password" class="form-control form-control-lg rounded-4" name="password" placeholder="Password" autocomplete="current-password" required 
                                        style="background: rgba(30, 41, 59, 0.8); color: #f8fafc; border: 2px solid rgba(59, 130, 246, 0.3); padding: 1rem 1.5rem; transition: all 0.3s ease; font-size: 1.1rem;"
                                        onfocus="this.style.borderColor='#3b82f6'; this.style.boxShadow='0 0 0 0.2rem rgba(59, 130, 246, 0.25)'"
                                        onblur="this.style.borderColor='rgba(59, 130, 246, 0.3)'; this.style.boxShadow='none'">

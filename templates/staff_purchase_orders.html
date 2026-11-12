@@ -74,7 +74,7 @@ body.staff-dashboard .main-content { min-height:calc(100vh - 60px); padding:28px
   </section>
 
   {% if supplier %}
-  <form method="post" action="{{ url_for('staff_purchase_orders') }}" id="purchaseOrderForm" data-currency="{{ currency }}" data-vat-rate="{{ '16' if vat_mode == 'standard' else '0' }}">
+  <form method="post" action="{{ url_for('staff_purchase_orders') }}" id="purchaseOrderForm" data-currency="{{ currency }}" data-vat-rate="{{ '16' if vat_mode == 'standard' else '0' }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <input type="hidden" name="supplier" value="{{ supplier }}">
     <input type="hidden" name="currency" value="{{ currency }}">
     <input type="hidden" name="vat_mode" value="{{ vat_mode }}">
@@ -151,7 +151,7 @@ body.staff-dashboard .main-content { min-height:calc(100vh - 60px); padding:28px
       <thead><tr><th>PO number</th><th>Supplier</th><th>Created</th><th>Currency</th><th>Status</th><th class="text-end">Total</th><th class="text-end"><span class="visually-hidden">Actions</span></th></tr></thead>
       <tbody>
         {% for order in orders %}
-        <tr><td><a href="{{ url_for('staff_purchase_order_detail', order_id=order.id) }}">{{ order.po_number }}</a></td><td>{{ order.supplier }}</td><td><time data-utc-timestamp="{{ order.created_at.isoformat() }}">{{ order.created_at.strftime('%Y-%m-%d') }}</time></td><td>{{ order.currency }}</td><td>{{ po_status_labels.get(order.status, order.status|title) }}</td><td class="text-end">{{ order.currency }} {{ order.total|money }}</td><td class="text-end"><form method="POST" action="{{ url_for('delete_purchase_order', order_id=order.id) }}" style="display:inline" onsubmit="return confirm('Delete purchase order {{ order.po_number }}? This cannot be undone.');"><button type="submit" class="btn btn-outline-danger btn-sm" title="Delete purchase order" aria-label="Delete {{ order.po_number }}"><i class="fas fa-trash" aria-hidden="true"></i></button></form></td></tr>
+        <tr><td><a href="{{ url_for('staff_purchase_order_detail', order_id=order.id) }}">{{ order.po_number }}</a></td><td>{{ order.supplier }}</td><td><time data-utc-timestamp="{{ order.created_at.isoformat() }}">{{ order.created_at.strftime('%Y-%m-%d') }}</time></td><td>{{ order.currency }}</td><td>{{ po_status_labels.get(order.status, order.status|title) }}</td><td class="text-end">{{ order.currency }} {{ order.total|money }}</td><td class="text-end"><form method="POST" action="{{ url_for('delete_purchase_order', order_id=order.id) }}" style="display:inline" onsubmit="return confirm('Delete purchase order {{ order.po_number }}? This cannot be undone.');"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button type="submit" class="btn btn-outline-danger btn-sm" title="Delete purchase order" aria-label="Delete {{ order.po_number }}"><i class="fas fa-trash" aria-hidden="true"></i></button></form></td></tr>
         {% else %}
         <tr><td colspan="7" class="py-4 text-center text-secondary">No purchase orders created yet.</td></tr>
         {% endfor %}

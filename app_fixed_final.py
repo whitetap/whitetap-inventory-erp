@@ -9,13 +9,15 @@ from dotenv import load_dotenv
 from uuid import uuid4, UUID as PythonUUID
 import csv
 from io import StringIO
-from flask import Flask, render_template, request, redirect, url_for, flash, session, Response, make_response, jsonify
+from flask import Flask, render_template, request, redirect, url_for, flash, session, Response, make_response, jsonify, g, abort, has_request_context
 from flask_sqlalchemy import SQLAlchemy
-from flask_cors import CORS
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy import desc, text
+from sqlalchemy import desc, text, event, inspect, UniqueConstraint
 from sqlalchemy.engine import make_url
 from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import Session, with_loader_criteria
+from werkzeug.security import check_password_hash, generate_password_hash
+import click
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal, ROUND_HALF_UP
 
@@ -32,23 +34,49 @@ def get_conn():
     url = get_database_url('postgresql')
     return psycopg2.connect(url.render_as_string(hide_password=False))
 
-# Force Environment Overwrite (Render priority)
-load_dotenv(override=True)
+load_dotenv()
 
 app = Flask(__name__)
-app.secret_key = 'RAV4Adventure2020-secure-session-key'
 
 app.config['SQLALCHEMY_DATABASE_URI'] = get_database_url('postgresql+psycopg2')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'Aviation-ERP-Secret-2026-Secure')
-app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {'creator': get_conn}
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY')
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['SESSION_COOKIE_SECURE'] = os.environ.get('SESSION_COOKIE_SECURE', 'true').lower() == 'true'
+if app.config['SQLALCHEMY_DATABASE_URI'] and app.config['SQLALCHEMY_DATABASE_URI'].get_backend_name() == 'postgresql':
+    app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {'creator': get_conn}
 
 db = SQLAlchemy(app)
+
+class Tenant(db.Model):
+    __tablename__ = 'tenants'
+
+    id = db.Column(db.BigInteger, primary_key=True)
+    name = db.Column(db.Text, nullable=False)
+    slug = db.Column(db.String(50), nullable=False, unique=True)
+    created_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+
+class TenantUser(db.Model):
+    __tablename__ = 'tenant_users'
+
+    id = db.Column(db.BigInteger, primary_key=True)
+    tenant_id = db.Column(db.BigInteger, db.ForeignKey('tenants.id'), nullable=False, index=True)
+    email = db.Column(db.String(255), nullable=False)
+    password_hash = db.Column(db.Text, nullable=False)
+    role = db.Column(db.String(50), nullable=False)
+    created_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+
+class TenantOwned:
+    tenant_id = db.Column(db.BigInteger, db.ForeignKey('tenants.id'), nullable=False, index=True)
+
 
 def generate_product_qr_code():
     return f'WTI-{uuid4().hex.upper()}'
 
-class Product(db.Model):
+class Product(TenantOwned, db.Model):
     __tablename__ = 'products'
 
     id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid4)
@@ -67,14 +95,15 @@ class Product(db.Model):
     def __repr__(self):
         return f'<Product {self.name} ({self.sku})>'
 
-class ProductCategory(db.Model):
+class ProductCategory(TenantOwned, db.Model):
     __tablename__ = 'product_categories'
+    __table_args__ = (UniqueConstraint('tenant_id', 'name'),)
 
     id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid4)
-    name = db.Column(db.String(100), nullable=False, unique=True, index=True)
+    name = db.Column(db.String(100), nullable=False, index=True)
     created_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
 
-class UsageLog(db.Model):
+class UsageLog(TenantOwned, db.Model):
     __tablename__ = 'usage_logs'
 
     id = db.Column(db.Integer, primary_key=True)
@@ -86,7 +115,7 @@ class UsageLog(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     product = db.relationship('Product', lazy='joined')
 
-class TintRecipe(db.Model):
+class TintRecipe(TenantOwned, db.Model):
     __tablename__ = 'tint_recipes'
 
     id = db.Column(db.BigInteger, primary_key=True, autoincrement=True)
@@ -95,7 +124,7 @@ class TintRecipe(db.Model):
     created_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
     updated_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
 
-class TintRecipeItem(db.Model):
+class TintRecipeItem(TenantOwned, db.Model):
     __tablename__ = 'tint_recipe_items'
 
     id = db.Column(db.BigInteger, primary_key=True, autoincrement=True)
@@ -106,19 +135,21 @@ class TintRecipeItem(db.Model):
     product_id = db.Column(db.BigInteger, nullable=True)
     created_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
 
-class Client(db.Model):
+class Client(TenantOwned, db.Model):
     __tablename__ = 'clients'
+    __table_args__ = (UniqueConstraint('tenant_id', 'normalized_name'),)
 
     id = db.Column(db.BigInteger, primary_key=True, autoincrement=True)
     name = db.Column(db.Text, nullable=False)
-    normalized_name = db.Column(db.Text, nullable=False, unique=True, index=True)
+    normalized_name = db.Column(db.Text, nullable=False, index=True)
     created_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
 
-class ProformaInvoice(db.Model):
+class ProformaInvoice(TenantOwned, db.Model):
     __tablename__ = 'proforma_invoices'
+    __table_args__ = (UniqueConstraint('tenant_id', 'invoice_number'),)
 
     id = db.Column(db.BigInteger, primary_key=True, autoincrement=True)
-    invoice_number = db.Column(db.String(40), nullable=False, unique=True, index=True)
+    invoice_number = db.Column(db.String(40), nullable=False, index=True)
     client_id = db.Column(db.BigInteger, db.ForeignKey('clients.id'), nullable=False, index=True)
     project_ref = db.Column(db.Text, nullable=False)
     currency = db.Column(db.String(3), nullable=False)
@@ -129,7 +160,7 @@ class ProformaInvoice(db.Model):
     total = db.Column(db.Numeric(14, 2), nullable=False)
     created_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
 
-class ProformaInvoiceItem(db.Model):
+class ProformaInvoiceItem(TenantOwned, db.Model):
     __tablename__ = 'proforma_invoice_items'
 
     id = db.Column(db.BigInteger, primary_key=True, autoincrement=True)
@@ -143,11 +174,12 @@ class ProformaInvoiceItem(db.Model):
     line_total = db.Column(db.Numeric(14, 2), nullable=False)
     created_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
 
-class Quotation(db.Model):
+class Quotation(TenantOwned, db.Model):
     __tablename__ = 'quotations'
+    __table_args__ = (UniqueConstraint('tenant_id', 'quotation_number'),)
 
     id = db.Column(db.BigInteger, primary_key=True, autoincrement=True)
-    quotation_number = db.Column(db.String(60), nullable=False, unique=True, index=True)
+    quotation_number = db.Column(db.String(60), nullable=False, index=True)
     client_id = db.Column(db.BigInteger, db.ForeignKey('clients.id'), nullable=False, index=True)
     currency = db.Column(db.String(3), nullable=False)
     tax_mode = db.Column(db.String(10), nullable=False)
@@ -158,7 +190,7 @@ class Quotation(db.Model):
     created_by = db.Column(db.String(100), nullable=True)
     created_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
 
-class QuotationItem(db.Model):
+class QuotationItem(TenantOwned, db.Model):
     __tablename__ = 'quotation_items'
 
     id = db.Column(db.BigInteger, primary_key=True, autoincrement=True)
@@ -172,11 +204,12 @@ class QuotationItem(db.Model):
     line_total = db.Column(db.Numeric(14, 2), nullable=False)
     created_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
 
-class PurchaseOrder(db.Model):
+class PurchaseOrder(TenantOwned, db.Model):
     __tablename__ = 'purchase_orders'
+    __table_args__ = (UniqueConstraint('tenant_id', 'po_number'),)
 
     id = db.Column(db.BigInteger, primary_key=True, autoincrement=True)
-    po_number = db.Column(db.String(40), nullable=False, unique=True, index=True)
+    po_number = db.Column(db.String(40), nullable=False, index=True)
     supplier = db.Column(db.Text, nullable=False, index=True)
     currency = db.Column(db.String(3), nullable=False)
     vat_mode = db.Column(db.String(10), nullable=False)
@@ -194,7 +227,7 @@ class PurchaseOrder(db.Model):
     status_updated_at = db.Column(db.DateTime(timezone=True), nullable=True)
     created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
 
-class PurchaseOrderItem(db.Model):
+class PurchaseOrderItem(TenantOwned, db.Model):
     __tablename__ = 'purchase_order_items'
 
     id = db.Column(db.BigInteger, primary_key=True, autoincrement=True)
@@ -211,7 +244,7 @@ class PurchaseOrderItem(db.Model):
     supplier_unit_cost = db.Column(db.Numeric(14, 2), nullable=True)
     created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
 
-class PurchaseOrderEvent(db.Model):
+class PurchaseOrderEvent(TenantOwned, db.Model):
     __tablename__ = 'purchase_order_events'
 
     id = db.Column(db.BigInteger, primary_key=True, autoincrement=True)
@@ -220,6 +253,172 @@ class PurchaseOrderEvent(db.Model):
     actor = db.Column(db.String(20), nullable=False, default='staff')
     note = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
+
+
+def current_tenant_id():
+    tenant = getattr(g, 'current_tenant', None) if has_request_context() else None
+    identity = inspect(tenant).identity if tenant is not None else None
+    return identity[0] if identity else None
+
+
+@event.listens_for(Session, 'do_orm_execute')
+def enforce_tenant_scope(execute_state):
+    if execute_state.is_from_statement and has_request_context():
+        raise RuntimeError('ORM from_statement queries are not allowed in tenant requests')
+    if not execute_state.is_orm_statement:
+        if has_request_context():
+            raise RuntimeError('Raw SQL is not allowed in tenant requests')
+        return
+    if execute_state.is_insert or execute_state.is_update:
+        raise RuntimeError('Bulk ORM inserts and updates are not allowed; use the unit of work')
+    if execute_state.is_select or execute_state.is_update or execute_state.is_delete:
+        tenant_id = current_tenant_id()
+        execute_state.statement = execute_state.statement.options(
+            with_loader_criteria(
+                TenantOwned, lambda model: model.tenant_id == tenant_id,
+                include_aliases=True
+            )
+        )
+
+
+TENANT_REFERENCES = {
+    Product: [('category_id', ProductCategory)],
+    UsageLog: [('product_id', Product)],
+    TintRecipeItem: [('recipe_id', TintRecipe)],
+    ProformaInvoice: [('client_id', Client)],
+    ProformaInvoiceItem: [('invoice_id', ProformaInvoice), ('product_id', Product)],
+    Quotation: [('client_id', Client)],
+    QuotationItem: [('quotation_id', Quotation), ('product_id', Product)],
+    PurchaseOrderItem: [('purchase_order_id', PurchaseOrder), ('product_id', Product)],
+    PurchaseOrderEvent: [('purchase_order_id', PurchaseOrder)],
+}
+
+
+@event.listens_for(Session, 'before_flush')
+def enforce_tenant_writes(db_session, flush_context, instances):
+    objects = set(db_session.new).union(db_session.dirty, db_session.deleted)
+    tenant_id = current_tenant_id()
+    for obj in objects:
+        if not isinstance(obj, TenantOwned):
+            continue
+        if tenant_id is None:
+            raise RuntimeError('A tenant context is required for business writes')
+        if obj in db_session.new and obj.tenant_id is None:
+            obj.tenant_id = tenant_id
+        if obj.tenant_id != tenant_id or (
+            obj not in db_session.new and inspect(obj).attrs.tenant_id.history.has_changes()
+        ):
+            raise RuntimeError('Cross-tenant business write rejected')
+        if obj in db_session.deleted:
+            continue
+        for field, target in TENANT_REFERENCES.get(type(obj), ()):
+            value = getattr(obj, field)
+            if value is None or (obj not in db_session.new and not inspect(obj).attrs[field].history.has_changes()):
+                continue
+            with db_session.no_autoflush:
+                exists = db_session.query(target.id).filter(
+                    target.id == value, target.tenant_id == tenant_id
+                ).first()
+            if not exists:
+                raise ValueError(f'Invalid tenant reference: {type(obj).__name__}.{field}')
+
+
+TENANT_ENDPOINTS = set()
+ADMIN_ENDPOINTS = {
+    'admin_dashboard', 'admin_usage_logs', 'admin_proforma_invoices',
+    'proforma_invoice_detail', 'delete_proforma_invoice', 'admin_added_products',
+    'admin_add_product', 'admin_transfer_stock', 'edit_product', 'delete_product',
+}
+
+
+def tenant_route(rule, **options):
+    def register(view):
+        endpoint = options.get('endpoint', view.__name__)
+        TENANT_ENDPOINTS.add(endpoint)
+        if endpoint == 'supplier_po_response':
+            app.add_url_rule('/po/respond/<tenant_slug>/<token>', view_func=view, **options)
+        else:
+            app.add_url_rule('/<tenant_slug>' + rule, view_func=view, **options)
+        app.add_url_rule(rule, view_func=view, **options)
+        return view
+    return register
+
+
+@app.url_value_preprocessor
+def capture_tenant_slug(endpoint, values):
+    if endpoint in TENANT_ENDPOINTS and values is not None:
+        g.tenant_slug = values.pop('tenant_slug', 'whitetap')
+
+
+@app.url_defaults
+def add_tenant_slug(endpoint, values):
+    if endpoint in TENANT_ENDPOINTS and 'tenant_slug' not in values and has_request_context():
+        tenant = getattr(g, 'current_tenant', None)
+        if tenant is not None:
+            values['tenant_slug'] = tenant.slug
+
+
+@app.before_request
+def resolve_tenant_and_authenticate():
+    if request.endpoint not in TENANT_ENDPOINTS:
+        return
+    if not app.config['SECRET_KEY']:
+        raise RuntimeError('SECRET_KEY must be configured before serving requests')
+    tenant = Tenant.query.filter_by(slug=g.tenant_slug).first()
+    if tenant is None:
+        abort(404)
+    g.current_tenant = tenant
+    if request.method not in ('GET', 'HEAD', 'OPTIONS'):
+        supplied = request.headers.get('X-CSRF-Token') or request.form.get('csrf_token', '')
+        expected = session.get('csrf_token', '')
+        if not expected or not secrets.compare_digest(expected.encode('utf-8'), supplied.encode('utf-8')):
+            abort(400, description='Invalid CSRF token')
+    if request.endpoint in ('login', 'supplier_po_response'):
+        return
+    user_id = session.get('tenant_user_id')
+    user = TenantUser.query.filter_by(id=user_id, tenant_id=tenant.id).first() if user_id else None
+    if not user or user.role not in ('admin', 'staff'):
+        session.clear()
+        if request.endpoint.startswith('api_') or request.endpoint == 'delete_tint_recipe' or request.is_json:
+            return jsonify({'error': 'Authentication required'}), 401
+        return redirect(url_for('login'))
+    g.current_user = user
+    session['logged_in'] = user.role == 'admin'
+    if request.endpoint in ADMIN_ENDPOINTS and user.role != 'admin':
+        abort(403)
+
+
+@app.template_global()
+def csrf_token():
+    if 'csrf_token' not in session:
+        session['csrf_token'] = secrets.token_urlsafe(32)
+    return session['csrf_token']
+
+
+@app.cli.command('create-tenant-user')
+@click.option('--tenant-slug', required=True)
+@click.option('--email', prompt=True)
+@click.option('--role', type=click.Choice(['admin', 'staff']), default='admin', show_default=True)
+@click.password_option()
+def create_tenant_user(tenant_slug, email, role, password):
+    """Provision a user for an existing tenant."""
+    tenant = Tenant.query.filter_by(slug=tenant_slug).first()
+    if tenant is None:
+        raise click.ClickException('Tenant not found')
+    email = email.strip().lower()
+    if not EMAIL_PATTERN.fullmatch(email) or len(email) > 255:
+        raise click.ClickException('Invalid email address')
+    if len(password) < 12:
+        raise click.ClickException('Password must contain at least 12 characters')
+    if TenantUser.query.filter(
+        TenantUser.tenant_id == tenant.id, db.func.lower(TenantUser.email) == email
+    ).first():
+        raise click.ClickException('An account with this email already exists for the tenant')
+    db.session.add(TenantUser(tenant_id=tenant.id, email=email,
+                              password_hash=generate_password_hash(password), role=role))
+    db.session.commit()
+    click.echo('Tenant user created')
+
 
 PO_STATUS_LABELS = {
     'pending': 'Draft (not sent)', 'sent': 'Awaiting supplier', 'revision_requested': 'Changes proposed',
@@ -249,44 +448,7 @@ def money_filter(value):
 def inject_po_labels():
     return {'po_status_labels': PO_STATUS_LABELS}
 
-_tint_recipe_schema_ready = False
-
 def ensure_tint_recipe_tables():
-    global _tint_recipe_schema_ready
-    if not _tint_recipe_schema_ready:
-        db.metadata.create_all(
-            bind=db.engine,
-            tables=[
-                TintRecipe.__table__, TintRecipeItem.__table__, ProductCategory.__table__,
-                Client.__table__, ProformaInvoice.__table__, ProformaInvoiceItem.__table__,
-                Quotation.__table__, QuotationItem.__table__,
-                PurchaseOrder.__table__, PurchaseOrderItem.__table__
-                , PurchaseOrderEvent.__table__
-            ],
-            checkfirst=True
-        )
-        try:
-            for statement in (
-                "ALTER TABLE purchase_orders ADD COLUMN IF NOT EXISTS supplier_emails TEXT",
-                "ALTER TABLE purchase_orders ADD COLUMN IF NOT EXISTS approval_token VARCHAR(64)",
-                "ALTER TABLE purchase_orders ADD COLUMN IF NOT EXISTS supplier_comment TEXT",
-                "ALTER TABLE purchase_orders ADD COLUMN IF NOT EXISTS invoice_number VARCHAR(120)",
-                "ALTER TABLE purchase_orders ADD COLUMN IF NOT EXISTS waybill_number VARCHAR(120)",
-                "ALTER TABLE purchase_orders ADD COLUMN IF NOT EXISTS driver_phone VARCHAR(60)",
-                "ALTER TABLE purchase_orders ADD COLUMN IF NOT EXISTS status_updated_at TIMESTAMPTZ",
-                "ALTER TABLE purchase_order_items ADD COLUMN IF NOT EXISTS supplier_included BOOLEAN",
-                "ALTER TABLE purchase_order_items ADD COLUMN IF NOT EXISTS supplier_quantity NUMERIC(14, 3)",
-                "ALTER TABLE purchase_order_items ADD COLUMN IF NOT EXISTS supplier_unit_cost NUMERIC(14, 2)",
-                "ALTER TABLE purchase_orders ALTER COLUMN status TYPE VARCHAR(30)",
-                "ALTER TABLE purchase_order_events ALTER COLUMN status TYPE VARCHAR(30)",
-                "CREATE UNIQUE INDEX IF NOT EXISTS ix_purchase_orders_approval_token ON purchase_orders (approval_token)"
-            ):
-                db.session.execute(text(statement))
-            db.session.commit()
-        except Exception:
-            db.session.rollback()
-            app.logger.exception('Purchase order schema upgrade failed')
-        _tint_recipe_schema_ready = True
     for category_name in (
         'Aviation paints & pigments', 'Carpet & textile', 'Other supplies',
         'Exterior paint', 'Interior paint', 'Matt black', 'Walkway grit',
@@ -351,8 +513,6 @@ def get_submitted_unit():
     if selected_unit == '__custom__':
         return request.form.get('custom_unit_of_measure', '').strip()
     return selected_unit
-
-CORS(app)
 
 USAGE_PERIOD_LABELS = {
     'daily': 'Today',
@@ -501,11 +661,11 @@ def get_project_invoice_lines(project_ref):
         'quantity': Decimal(str(row.quantity or 0)).quantize(Decimal('0.001'), rounding=ROUND_HALF_UP)
     } for row in rows]
 
-@app.route('/')
+@tenant_route('/')
 def index():
     return render_template('index.html')
 
-@app.route('/staff-inventory')
+@tenant_route('/staff-inventory')
 def staff_inventory():
     ensure_tint_recipe_tables()
     category_names = get_product_category_name_map()
@@ -539,7 +699,7 @@ def staff_inventory():
 
     return render_template('staff_dashboard.html', category_groups=category_groups, total_items=len(all_products), recent_logs=recent_logs, search_query=search_query, activity_filter=activity_filter, low_stock_products=low_stock_products, low_stock_count=low_stock_count, tint_projects=tint_projects, category_name_by_id=category_names)
 
-@app.route('/api/products/lookup')
+@tenant_route('/api/products/lookup')
 def api_product_lookup():
     identifier = request.args.get('identifier', '').strip()
     if not identifier:
@@ -566,7 +726,7 @@ def api_product_lookup():
         }
     })
 
-@app.route('/api/tint-recipes')
+@tenant_route('/api/tint-recipes')
 def api_tint_recipes():
     recipe_name = (request.args.get('recipe_name') or request.args.get('name') or '').strip()
     project_ref = request.args.get('project_ref', '').strip()
@@ -611,7 +771,7 @@ def api_tint_recipes():
         app.logger.exception('Unable to load tint recipe')
         return jsonify({'success': False, 'error': 'Unable to load recipe right now.'}), 500
 
-@app.route('/api/tint-recipes/<int:recipe_id>', methods=['DELETE'])
+@tenant_route('/api/tint-recipes/<int:recipe_id>', methods=['DELETE'])
 def delete_tint_recipe(recipe_id):
     try:
         ensure_tint_recipe_tables()
@@ -628,7 +788,7 @@ def delete_tint_recipe(recipe_id):
         app.logger.exception('Unable to delete tint recipe')
         return jsonify({'success': False, 'error': 'Unable to delete recipe right now.'}), 500
 
-@app.route('/export-logs')
+@tenant_route('/export-logs')
 def export_logs():
     period = request.args.get('period', 'all')
     project_ref = request.args.get('project_ref', '').strip()
@@ -664,7 +824,7 @@ def export_logs():
         headers={'Content-Disposition': f'attachment; filename=usage_report_{period}.csv'}
     )
 
-@app.route('/admin/usage-logs')
+@tenant_route('/admin/usage-logs')
 def admin_usage_logs():
     if not session.get('logged_in'):
         return redirect(url_for('login'))
@@ -698,7 +858,7 @@ def admin_usage_logs():
         period_options=USAGE_PERIOD_LABELS
     )
 
-@app.route('/admin/proforma-invoices', methods=['GET', 'POST'])
+@tenant_route('/admin/proforma-invoices', methods=['GET', 'POST'])
 def admin_proforma_invoices():
     if not session.get('logged_in'):
         return redirect(url_for('login'))
@@ -818,7 +978,7 @@ def admin_proforma_invoices():
         invoices=invoices
     )
 
-@app.route('/admin/proforma-invoices/<int:invoice_id>')
+@tenant_route('/admin/proforma-invoices/<int:invoice_id>')
 def proforma_invoice_detail(invoice_id):
     if not session.get('logged_in'):
         return redirect(url_for('login'))
@@ -829,7 +989,7 @@ def proforma_invoice_detail(invoice_id):
     items = ProformaInvoiceItem.query.filter_by(invoice_id=invoice.id).order_by(ProformaInvoiceItem.product_name).all()
     return render_template('proforma_invoice_detail.html', invoice=invoice, client=client, items=items)
 
-@app.route('/staff/quotations', methods=['GET', 'POST'])
+@tenant_route('/staff/quotations', methods=['GET', 'POST'])
 def staff_quotations():
     ensure_tint_recipe_tables()
     if request.method == 'POST':
@@ -961,7 +1121,7 @@ def staff_quotations():
         } for p in products]
     )
 
-@app.route('/staff/quotations/<int:quotation_id>')
+@tenant_route('/staff/quotations/<int:quotation_id>')
 def staff_quotation_detail(quotation_id):
     ensure_tint_recipe_tables()
     quotation = Quotation.query.get_or_404(quotation_id)
@@ -969,7 +1129,7 @@ def staff_quotation_detail(quotation_id):
     items = QuotationItem.query.filter_by(quotation_id=quotation.id).order_by(QuotationItem.id).all()
     return render_template('staff_quotation_detail.html', quotation=quotation, client=client, items=items)
 
-@app.route('/staff/quotations/<int:quotation_id>/delete', methods=['POST'])
+@tenant_route('/staff/quotations/<int:quotation_id>/delete', methods=['POST'])
 def delete_quotation(quotation_id):
     ensure_tint_recipe_tables()
     quotation = Quotation.query.get_or_404(quotation_id)
@@ -984,7 +1144,7 @@ def delete_quotation(quotation_id):
         flash('Unable to delete the quotation. Please try again.', 'error')
     return redirect(url_for('staff_quotations'))
 
-@app.route('/staff/purchase-orders/<int:order_id>/delete', methods=['POST'])
+@tenant_route('/staff/purchase-orders/<int:order_id>/delete', methods=['POST'])
 def delete_purchase_order(order_id):
     ensure_tint_recipe_tables()
     order = PurchaseOrder.query.get_or_404(order_id)
@@ -1000,7 +1160,7 @@ def delete_purchase_order(order_id):
         flash('Unable to delete the purchase order. Please try again.', 'error')
     return redirect(url_for('staff_purchase_orders'))
 
-@app.route('/admin/proforma-invoices/<int:invoice_id>/delete', methods=['POST'])
+@tenant_route('/admin/proforma-invoices/<int:invoice_id>/delete', methods=['POST'])
 def delete_proforma_invoice(invoice_id):
     if not session.get('logged_in'):
         return redirect(url_for('login'))
@@ -1017,7 +1177,7 @@ def delete_proforma_invoice(invoice_id):
         flash('Unable to delete the proforma invoice. Please try again.', 'error')
     return redirect(url_for('admin_proforma_invoices'))
 
-@app.route('/export-products')
+@tenant_route('/export-products')
 def export_products():
     products = Product.query.order_by(Product.name).all()
     
@@ -1043,7 +1203,7 @@ def export_products():
     
     return response
 
-@app.route('/export-paints')
+@tenant_route('/export-paints')
 def export_paints():
     products = Product.query.filter(Product.sku.ilike('%PNT%')).order_by(Product.name.asc()).all()
     
@@ -1069,7 +1229,7 @@ def export_paints():
     
     return response
 
-@app.route('/export-carpets')
+@tenant_route('/export-carpets')
 def export_carpets():
     products = Product.query.filter(Product.sku.ilike('%CRP%')).order_by(Product.name).all()
     
@@ -1095,7 +1255,7 @@ def export_carpets():
     
     return response
 
-@app.route('/export-inventory')
+@tenant_route('/export-inventory')
 def export_inventory():
     products = Product.query.order_by(Product.name).all()
     
@@ -1121,24 +1281,30 @@ def export_inventory():
     
     return response
 
-@app.route('/login', methods=['GET', 'POST'])
+@tenant_route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        password = request.form.get('password')
-        if password == 'RAV4Adventure2020':
-            session['logged_in'] = True
-            return redirect(url_for('admin_dashboard'))
-        else:
-            flash('Incorrect password', 'error')
+        email = request.form.get('email', '').strip().lower()
+        password = request.form.get('password', '')
+        user = TenantUser.query.filter(
+            TenantUser.tenant_id == g.current_tenant.id,
+            db.func.lower(TenantUser.email) == email
+        ).one_or_none()
+        if user and user.role in ('admin', 'staff') and check_password_hash(user.password_hash, password):
+            session.clear()
+            session['tenant_user_id'] = user.id
+            session['logged_in'] = user.role == 'admin'
+            return redirect(url_for('admin_dashboard' if user.role == 'admin' else 'staff_inventory'))
+        flash('Incorrect email or password', 'error')
     return render_template('login.html')
 
-@app.route('/logout')
+@tenant_route('/logout')
 def logout():
     session.clear()
     flash('Logged out successfully', 'success')
     return redirect(url_for('login'))
 
-@app.route('/admin-dashboard')
+@tenant_route('/admin-dashboard')
 def admin_dashboard():
     if not session.get('logged_in'):
         return redirect(url_for('login'))
@@ -1167,7 +1333,7 @@ def admin_dashboard():
 
     return render_template('admin.html', view=view, display_products=display_products, all_products=all_products, total_items=total_items, low_stock_count=low_stock_count, total_inventory_value=total_inventory_value, today_logs=today_logs, unit_options=get_product_units(), product_categories=product_categories, category_name_by_id=category_names, category_groups=category_groups)
 
-@app.route('/admin/added-products')
+@tenant_route('/admin/added-products')
 def admin_added_products():
     if not session.get('logged_in'):
         return redirect(url_for('login'))
@@ -1198,7 +1364,7 @@ def admin_added_products():
         category_name_by_id=get_product_category_name_map()
     )
 
-@app.route('/staff/purchase-orders', methods=['GET', 'POST'])
+@tenant_route('/staff/purchase-orders', methods=['GET', 'POST'])
 def staff_purchase_orders():
     ensure_tint_recipe_tables()
 
@@ -1368,7 +1534,7 @@ def staff_purchase_orders():
         last_emails=last_emails
     )
 
-@app.route('/staff/purchase-orders/<int:order_id>')
+@tenant_route('/staff/purchase-orders/<int:order_id>')
 def staff_purchase_order_detail(order_id):
     ensure_tint_recipe_tables()
     order = PurchaseOrder.query.get_or_404(order_id)
@@ -1381,7 +1547,7 @@ def staff_purchase_order_detail(order_id):
         emails=po_email_list(order), supplier_link=link, track_order=PO_TRACK_ORDER
     )
 
-@app.route('/staff/purchase-orders/<int:order_id>/send', methods=['POST'])
+@tenant_route('/staff/purchase-orders/<int:order_id>/send', methods=['POST'])
 def staff_purchase_order_send(order_id):
     ensure_tint_recipe_tables()
     order = PurchaseOrder.query.get_or_404(order_id)
@@ -1418,7 +1584,7 @@ def staff_purchase_order_send(order_id):
         flash(f'Unable to send the purchase order: {str(getattr(exc, "orig", exc))[:200]}', 'error')
     return redirect(url_for('staff_purchase_order_detail', order_id=order.id))
 
-@app.route('/staff/purchase-orders/<int:order_id>/review', methods=['POST'])
+@tenant_route('/staff/purchase-orders/<int:order_id>/review', methods=['POST'])
 def staff_purchase_order_review(order_id):
     ensure_tint_recipe_tables()
     order = PurchaseOrder.query.get_or_404(order_id)
@@ -1452,9 +1618,8 @@ def staff_purchase_order_review(order_id):
         flash(f'Unable to update the purchase order: {str(getattr(exc, "orig", exc))[:200]}', 'error')
     return redirect(url_for('staff_purchase_order_detail', order_id=order.id))
 
-@app.route('/po/respond/<token>', methods=['GET', 'POST'])
+@tenant_route('/po/respond/<token>', methods=['GET', 'POST'])
 def supplier_po_response(token):
-    ensure_tint_recipe_tables()
     if not re.fullmatch(r'[A-Za-z0-9_-]{20,64}', token or ''):
         return render_template('supplier_po_response.html', order=None), 404
     order = PurchaseOrder.query.filter_by(approval_token=token).first()
@@ -1526,7 +1691,7 @@ def supplier_po_response(token):
         next_steps=PO_NEXT_STEPS.get(order.status, []), track_order=PO_TRACK_ORDER
     )
 
-@app.route('/admin/add-product', methods=['POST'])
+@tenant_route('/admin/add-product', methods=['POST'])
 def admin_add_product():
     ensure_tint_recipe_tables()
     name = request.form['name'].strip()
@@ -1571,10 +1736,10 @@ def admin_add_product():
     
     return redirect(url_for('admin_dashboard'))
 
-@app.route('/issue-item', methods=['POST'])
+@tenant_route('/issue-item', methods=['POST'])
 def issue_item():
     try:
-        product_id = request.form['product_id']
+        product_id = normalize_product_uuid(request.form['product_id'])
         quantity_used = Decimal(request.form['quantity_used'])
         technician_name = request.form['technician_name']
         project_ref = request.form.get('project_ref', '').strip()
@@ -1645,10 +1810,10 @@ def issue_item():
     
     return redirect(url_for('staff_inventory'))
 
-@app.route('/delete-product/<product_id>', methods=['POST'])
+@tenant_route('/delete-product/<product_id>', methods=['POST'])
 def delete_product(product_id):
     try:
-        product = Product.query.filter_by(id=product_id).first_or_404()
+        product = Product.query.filter_by(id=normalize_product_uuid(product_id)).first_or_404()
         # Delete related logs first to avoid FK constraint
         UsageLog.query.filter_by(product_id=product.id).delete()
         db.session.delete(product)
@@ -1659,12 +1824,16 @@ def delete_product(product_id):
         flash(f'Delete failed: {str(e)}', 'error')
     return redirect(url_for('admin_dashboard'))
 
-@app.route('/admin/transfer-stock', methods=['POST'])
+@tenant_route('/admin/transfer-stock', methods=['POST'])
 def admin_transfer_stock():
     try:
-        product_id = request.form['product_id']
+        product_id = normalize_product_uuid(request.form['product_id'])
         quantity = Decimal(request.form['quantity'])
         
+        try:
+            product_id = normalize_product_uuid(product_id)
+        except (ValueError, TypeError):
+            abort(404)
         product = Product.query.get_or_404(product_id)
         
         if quantity <= 0:
@@ -1698,7 +1867,7 @@ def admin_transfer_stock():
     
     return redirect(url_for('admin_dashboard'))
 
-@app.route('/edit-product/<string:product_id>', methods=['GET', 'POST'])
+@tenant_route('/edit-product/<string:product_id>', methods=['GET', 'POST'])
 def edit_product(product_id):
     ensure_tint_recipe_tables()
     product = Product.query.get_or_404(product_id)
@@ -1745,5 +1914,3 @@ if __name__ == '__main__':
     
     print(f'🚀 Aviation ERP running on port {port}')
     app.run(host='0.0.0.0', debug=True, port=port)
-
-

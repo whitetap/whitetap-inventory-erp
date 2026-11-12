@@ -192,7 +192,7 @@ body.admin-dashboard .modal-content { border: 1px solid var(--admin-line); borde
                   <div class="collapse" id="addProductForm">
                     <div class="card-body border-top">
                       <h3 class="h6 fw-bold mb-3">New product details</h3>
-                      <form method="POST" action="{{ url_for('admin_add_product') }}">
+                      <form method="POST" action="{{ url_for('admin_add_product') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <div class="row g-3">
                           <div class="col-sm-6 col-lg-2"><label class="form-label" for="newSku">SKU <span class="text-danger">*</span></label><input id="newSku" type="text" class="form-control" name="sku" required></div>
                           <div class="col-sm-6 col-lg-3"><label class="form-label" for="newName">Product name <span class="text-danger">*</span></label><input id="newName" type="text" class="form-control" name="name" required></div>
@@ -298,7 +298,7 @@ body.admin-dashboard .modal-content { border: 1px solid var(--admin-line); borde
                                                 <button type="button" class="btn btn-outline-secondary btn-sm" title="Transfer parent stock" aria-label="Transfer stock for {{ product.name }}" onclick="openTransferModal('{{ product.id }}', '{{ product.name }}', {{ product.parent_stock or 0 }})">
                                                     <i class="fas fa-exchange-alt"></i>
                                                 </button>
-                                                <form method="POST" action="{{ url_for('delete_product', product_id=product.id) }}" style="display: inline;" onsubmit="return confirm('Delete {{ product.name }}?');">
+                                                <form method="POST" action="{{ url_for('delete_product', product_id=product.id) }}" style="display: inline;" onsubmit="return confirm('Delete {{ product.name }}?');"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                                     <button type="submit" class="btn btn-outline-danger btn-sm" title="Delete product" aria-label="Delete {{ product.name }}">
                                                         <i class="fas fa-trash"></i>
                                                     </button>
@@ -342,7 +342,7 @@ body.admin-dashboard .modal-content { border: 1px solid var(--admin-line); borde
                 <h5 class="modal-title fw-bold" id="transferModalLabel">Transfer parent stock</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
-      <form method="POST" action="{{ url_for('admin_transfer_stock') }}">
+      <form method="POST" action="{{ url_for('admin_transfer_stock') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="modal-body">
           <input type="hidden" id="transferProductId" name="product_id">
           <div class="mb-3">

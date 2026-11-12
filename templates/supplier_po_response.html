@@ -35,7 +35,7 @@ th { font-size:.72rem; text-transform:uppercase; }
   </ul>
 
   {% if st == 'sent' %}
-  <form method="post">
+  <form method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <p class="text-secondary small">Untick items you cannot supply. Adjust quantity or price if they differ; the buyer will be asked to confirm any change.</p>
     <div class="table-responsive"><table class="table align-middle">
       <thead><tr><th>Can supply</th><th>SKU</th><th>Product</th><th>Unit</th><th>Quantity</th><th>Unit price ({{ order.currency }})</th></tr></thead>
@@ -101,7 +101,7 @@ th { font-size:.72rem; text-transform:uppercase; }
   {% elif st == 'delivered' %}
   <div class="alert alert-success">This order has been delivered. Thank you.</div>
   {% elif next_steps %}
-  <form method="post" class="border rounded p-3 bg-light">
+  <form method="post" class="border rounded p-3 bg-light"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <input type="hidden" name="action" value="advance">
     <h2 class="h6">Update order progress</h2>
     {% if 'out_for_delivery' in next_steps %}
