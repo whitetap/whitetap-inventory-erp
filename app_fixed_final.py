@@ -13,14 +13,13 @@ from io import StringIO
 from flask import Flask, render_template, request, redirect, url_for, flash, session, Response, make_response, jsonify, g, abort, has_request_context
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy import Date, String, bindparam, cast, desc, text, event, inspect, UniqueConstraint, func
+from sqlalchemy import desc, text, event, inspect, UniqueConstraint, func
 from sqlalchemy.engine import make_url
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Session, with_loader_criteria
-from sqlalchemy.types import TypeDecorator
 from werkzeug.security import check_password_hash, generate_password_hash
 import click
-from datetime import date, datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal, ROUND_HALF_UP
 
 def get_database_url(drivername):
@@ -106,18 +105,6 @@ class ProductCategory(TenantOwned, db.Model):
     name = db.Column(db.String(100), nullable=False, index=True)
     created_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
 
-class UsageLogDateTime(TypeDecorator):
-    impl = db.DateTime
-    cache_ok = True
-
-    def process_result_value(self, value, dialect):
-        if value is None or isinstance(value, datetime):
-            return value
-        if isinstance(value, date):
-            return datetime.combine(value, datetime.min.time())
-        return datetime.fromisoformat(value)
-
-
 class UsageLog(TenantOwned, db.Model):
     __tablename__ = 'usage_logs'
 
@@ -127,7 +114,7 @@ class UsageLog(TenantOwned, db.Model):
     quantity_used = db.Column(db.Float, nullable=False)
     technician_name = db.Column(db.String(100), nullable=False)
     project_ref = db.Column(db.String(100))
-    created_at = db.Column(UsageLogDateTime(), default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
     product = db.relationship('Product', lazy='joined')
 
 class TintRecipe(TenantOwned, db.Model):
@@ -585,10 +572,12 @@ def get_usage_period_start(period, today=None):
     return datetime.combine(start_date, datetime.min.time())
 
 
-def usage_log_date():
-    if db.engine.dialect.name == 'sqlite':
-        return func.date(UsageLog.created_at, type_=Date)
-    return cast(UsageLog.created_at, Date)
+def usage_period_bounds(period, today=None):
+    today = today or datetime.now().date()
+    start = get_usage_period_start(period, today)
+    if start is None:
+        return None
+    return start, datetime.combine(today + timedelta(days=1), datetime.min.time())
 
 def normalize_client_name(name):
     return ' '.join(name.casefold().split())
@@ -912,10 +901,10 @@ def export_logs():
     project_ref = request.args.get('project_ref', '').strip()
     if period not in USAGE_PERIOD_LABELS:
         period = 'all'
-    start = get_usage_period_start(period)
+    bounds = usage_period_bounds(period)
     logs_query = db.session.query(UsageLog, Product.name).outerjoin(Product, Product.id == UsageLog.product_id)
-    if start:
-        logs_query = logs_query.filter(usage_log_date() >= start.date())
+    if bounds:
+        logs_query = logs_query.filter(UsageLog.created_at >= bounds[0], UsageLog.created_at < bounds[1])
     if project_ref:
         logs_query = logs_query.filter(UsageLog.project_ref.ilike(f'%{project_ref}%'))
     logs = logs_query.order_by(desc(UsageLog.created_at)).all()
@@ -951,10 +940,10 @@ def admin_usage_logs():
     project_ref = request.args.get('project_ref', '').strip()
     if period not in USAGE_PERIOD_LABELS:
         period = 'daily'
-    start = get_usage_period_start(period)
+    bounds = usage_period_bounds(period)
     logs_query = db.session.query(UsageLog, Product.name).outerjoin(Product, Product.id == UsageLog.product_id)
-    if start:
-        logs_query = logs_query.filter(usage_log_date() >= start.date())
+    if bounds:
+        logs_query = logs_query.filter(UsageLog.created_at >= bounds[0], UsageLog.created_at < bounds[1])
     if project_ref:
         logs_query = logs_query.filter(UsageLog.project_ref.ilike(f'%{project_ref}%'))
     rows = logs_query.order_by(desc(UsageLog.created_at)).all()
@@ -1447,9 +1436,9 @@ def admin_dashboard():
     total_inventory_value = sum((p.current_stock or 0) for p in all_products)
     
     # Today's usage logs count
-    today_prefix = f'{datetime.now().date().isoformat()}%'
+    start_dt, end_dt = usage_period_bounds('daily')
     today_logs = db.session.query(func.count(UsageLog.id)).filter(
-        UsageLog.created_at.like(bindparam('usage_date_prefix', today_prefix, type_=String()))
+        UsageLog.created_at >= start_dt, UsageLog.created_at < end_dt
     ).scalar()
 
     product_categories = ProductCategory.query.order_by(ProductCategory.name).all()
@@ -1472,8 +1461,9 @@ def admin_added_products():
 
     products_query = Product.query
     if period != 'all':
-        start_at = datetime.now(timezone.utc) - timedelta(days=int(period))
-        products_query = products_query.filter(Product.created_at >= start_at)
+        end_at = datetime.now(timezone.utc)
+        start_at = end_at - timedelta(days=int(period))
+        products_query = products_query.filter(Product.created_at >= start_at, Product.created_at < end_at)
     if supplier:
         products_query = products_query.filter(Product.supplier.ilike(f'%{supplier}%'))
     if invoice_number:

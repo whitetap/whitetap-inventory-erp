@@ -3,7 +3,7 @@
 import os
 import re
 import sys
-from datetime import datetime
+from datetime import datetime, timedelta
 from uuid import uuid4
 
 import psycopg2
@@ -51,16 +51,15 @@ try:
                               current_stock=5, parent_stock=0, min_stock_level=0)
             db.session.add(product)
             db.session.flush()
-            db.session.add(UsageLog(product_id=product.id, quantity_used=-1,
-                                    technician_name='Test', project_ref='TEST', created_at=datetime.now()))
+            today = datetime.combine(datetime.now().date(), datetime.min.time())
+            for label, created_at in (
+                ('start', today), ('end', today + timedelta(days=1) - timedelta(microseconds=1)),
+                ('before', today - timedelta(microseconds=1)), ('after', today + timedelta(days=1))
+            ):
+                db.session.add(UsageLog(product_id=product.id, quantity_used=-1,
+                                        technician_name=f'boundary-{label}', project_ref='TEST',
+                                        created_at=created_at))
             db.session.commit()
-
-    with app.app_context():
-        db.session.remove()
-        db.engine.dispose()
-    with admin_connection.cursor() as cursor:
-        cursor.execute(sql.SQL('ALTER TABLE {}.usage_logs ALTER COLUMN created_at TYPE TEXT USING created_at::TEXT')
-                       .format(sql.Identifier(schema)))
 
     client = app.test_client()
     page = client.get('/whitetap/login')
@@ -83,28 +82,20 @@ try:
         assert ProductCategory.query.count() > 0
         assert Product.query.count() == 0
         assert UsageLog.query.count() == 0
-    for path in ('/whitetap/admin-dashboard', '/whitetap/staff-inventory',
-                 '/whitetap/admin/usage-logs?period=daily', '/whitetap/export-logs?period=daily',
+    for path in ('/whitetap/staff-inventory',
                  '/whitetap/admin/proforma-invoices?project_ref=TEST',
                  '/whitetap/staff/quotations', '/whitetap/staff/purchase-orders',
                  '/whitetap/admin/added-products?period=7'):
         response = client.get(path)
         assert response.status_code == 200, (path, response.status_code)
 
-    with app.app_context():
-        db.session.remove()
-        db.engine.dispose()
-    for column_type in ('VARCHAR', 'TEXT'):
-        with admin_connection.cursor() as cursor:
-            cursor.execute(sql.SQL('ALTER TABLE {}.usage_logs ALTER COLUMN created_at TYPE {} USING created_at::{}')
-                           .format(sql.Identifier(schema), sql.SQL(column_type), sql.SQL(column_type)))
-        for path in ('/whitetap/admin-dashboard', '/whitetap/staff-inventory',
-                     '/whitetap/admin/usage-logs?period=daily', '/whitetap/export-logs?period=daily'):
-            response = client.get(path)
-            assert response.status_code == 200, (column_type, path, response.status_code)
-    with admin_connection.cursor() as cursor:
-        cursor.execute(sql.SQL('UPDATE {}.usage_logs SET created_at = %s').format(sql.Identifier(schema)),
-                       (f'{datetime.now().date().isoformat()} invalid timestamp',))
+    for path in ('/whitetap/admin/usage-logs?period=daily', '/whitetap/export-logs?period=daily'):
+        response = client.get(path)
+        assert response.status_code == 200, (path, response.status_code)
+        for label in ('start', 'end'):
+            assert f'boundary-{label}'.encode() in response.data
+        for label in ('before', 'after'):
+            assert f'boundary-{label}'.encode() not in response.data
     dashboard_counts = []
 
     def record_dashboard(sender, template, context, **extra):
@@ -114,13 +105,13 @@ try:
     template_rendered.connect(record_dashboard, app, weak=False)
     try:
         assert client.get('/whitetap/admin-dashboard').status_code == 200
-        assert dashboard_counts == [1], dashboard_counts
+        assert dashboard_counts == [2], dashboard_counts
     finally:
         template_rendered.disconnect(record_dashboard, app)
     with app.app_context():
         db.session.remove()
         db.engine.dispose()
-    print('PostgreSQL signup, tenant isolation, login, navigation, and text/VARCHAR smoke tests passed')
+    print('PostgreSQL signup, tenant isolation, navigation, and timestamp boundary tests passed')
 finally:
     with admin_connection.cursor() as cursor:
         cursor.execute(sql.SQL('DROP SCHEMA {} CASCADE').format(sql.Identifier(schema)))

@@ -108,14 +108,12 @@ set `ERP_TEST_DATABASE_URL` to its local PostgreSQL connection URL, and run
 `python tests/postgres_smoke.py`. The test creates and removes its own schema;
 it requires permission to create schemas and does not inspect the live database.
 
-The dashboard's today's usage count matches the ISO date prefix of `created_at`
-directly using `LIKE`, so the PostgreSQL column must be text or VARCHAR and
-its values must begin with `YYYY-MM-DD`. Usage-log report and export date filters still cast
-`created_at` to `DATE` on PostgreSQL. For those filters, text values
-must be valid PostgreSQL date/timestamp input, and timestamp-with-time-zone
-values are interpreted in the database session time zone. Casting may prevent
-use of a plain `created_at` index. Usage-log values returned as dates or ISO
-timestamp strings are normalized to Python datetimes for display; invalid
-values fail explicitly. Verify the live column type and data before deployment.
-SQLite tests use its `date()` function because SQLite's
-`CAST(... AS DATE)` does not implement PostgreSQL date semantics.
+Usage-log `created_at` must be a native PostgreSQL timestamp without time zone;
+verify the live schema before deployment. Dashboard and filtered usage reports
+compare timestamps using inclusive start and exclusive end bounds without date
+casts. Dates are based on the application server's local calendar day; usage-log
+timestamps are stored as naive datetimes with a UTC default, so server time zone
+configuration must be consistent with the intended reporting day. Filtered
+reports exclude entries from tomorrow onward; all-time reports remain unbounded.
+Added-products periods use a rolling interval ending at the current UTC time,
+excluding future timestamps.

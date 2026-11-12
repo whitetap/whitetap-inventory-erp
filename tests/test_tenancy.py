@@ -1,7 +1,7 @@
 import os
 import re
 import unittest
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from unittest.mock import patch
 from uuid import uuid4
@@ -20,7 +20,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 from app_fixed_final import (
     app, db, Tenant, TenantUser, Product, ProductCategory, PurchaseOrder, UsageLog,
-    DEFAULT_PRODUCT_CATEGORIES, ensure_tint_recipe_tables, usage_log_date, UsageLogDateTime,
+    DEFAULT_PRODUCT_CATEGORIES, ensure_tint_recipe_tables, usage_period_bounds,
     get_project_invoice_lines
 )
 
@@ -320,10 +320,11 @@ class TenantIsolationTests(unittest.TestCase):
 
     def test_dashboard_usage_count_is_direct_and_tenant_scoped(self):
         created_ids = []
-        today = datetime.now().replace(hour=12, minute=0, second=0, microsecond=0)
+        today = datetime.combine(datetime.now().date(), datetime.min.time())
         try:
             for tenant_id, created_at in (
-                (1, today), (1, today - timedelta(days=1)), (2, today)
+                (1, today), (1, today + timedelta(days=1) - timedelta(microseconds=1)),
+                (1, today - timedelta(microseconds=1)), (1, today + timedelta(days=1)), (2, today)
             ):
                 with app.test_request_context('/'):
                     g.current_tenant = db.session.get(Tenant, tenant_id)
@@ -335,12 +336,6 @@ class TenantIsolationTests(unittest.TestCase):
                     db.session.flush()
                     created_ids.append((tenant_id, log.id))
                     db.session.commit()
-
-            with app.app_context(), db.engine.begin() as connection:
-                connection.execute(
-                    text('UPDATE usage_logs SET created_at = :created_at WHERE id = :id'),
-                    {'created_at': f'{today.date().isoformat()} invalid timestamp', 'id': created_ids[0][1]}
-                )
 
             statements = []
             postgres_statements = []
@@ -373,19 +368,19 @@ class TenantIsolationTests(unittest.TestCase):
                 event.remove(Session, 'do_orm_execute', record_orm)
                 template_rendered.disconnect(record_template, app)
             self.assertEqual(response.status_code, 200)
-            self.assertEqual(contexts[0]['today_logs'], 1)
+            self.assertEqual(contexts[0]['today_logs'], 2)
             self.assertEqual(len(statements), 1)
             self.assertNotIn('anon_1', statements[0].lower())
             self.assertEqual(len(re.findall(r'usage_logs\.tenant_id\s*=', statements[0].lower())), 1)
             self.assertEqual(len(postgres_statements), 1)
             pg_sql, pg_parameters = postgres_statements[0]
-            self.assertRegex(pg_sql, r'usage_logs\.created_at\s+LIKE\s+')
-            self.assertNotIn('CAST(', pg_sql.upper())
+            self.assertRegex(pg_sql, r'usage_logs\.created_at\s+>=')
+            self.assertRegex(pg_sql, r'usage_logs\.created_at\s+<\s')
+            for forbidden in ('CAST(', 'LIKE', 'SUBSTR(', 'DATE('):
+                self.assertNotIn(forbidden, pg_sql.upper())
             self.assertEqual(len(re.findall(r'usage_logs\.tenant_id\s*=', pg_sql.lower())), 1)
-            self.assertIn(f'{today.date().isoformat()}%', pg_parameters.values())
-            with app.app_context(), patch.object(db.engine.dialect, 'name', 'postgresql'):
-                pg_date = usage_log_date().compile(dialect=postgresql.dialect())
-                self.assertEqual(str(pg_date), 'CAST(usage_logs.created_at AS DATE)')
+            self.assertIn(today, pg_parameters.values())
+            self.assertIn(today + timedelta(days=1), pg_parameters.values())
         finally:
             for tenant_id, log_id in created_ids:
                 with app.test_request_context('/'):
@@ -395,16 +390,18 @@ class TenantIsolationTests(unittest.TestCase):
 
     def test_usage_period_filters_dates_and_tenants(self):
         created_ids = []
-        today = datetime.now().replace(hour=12, minute=0, second=0, microsecond=0)
+        today = datetime.combine(datetime.now().date(), datetime.min.time())
         try:
-            for tenant_id, created_at in (
-                (1, today), (1, today - timedelta(days=1)), (2, today)
+            for tenant_id, created_at, label in (
+                (1, today, 'start'), (1, today + timedelta(days=1) - timedelta(microseconds=1), 'end'),
+                (1, today - timedelta(microseconds=1), 'before'),
+                (1, today + timedelta(days=1), 'after'), (2, today, 'other')
             ):
                 with app.test_request_context('/'):
                     g.current_tenant = db.session.get(Tenant, tenant_id)
                     log = UsageLog(
                         product_id=self.product_ids[tenant_id - 1], quantity_used=1,
-                        technician_name=f'Tenant-{tenant_id}-{created_at.date()}',
+                        technician_name=f'boundary-{label}',
                         project_ref='period-filter-test', created_at=created_at
                     )
                     db.session.add(log)
@@ -412,16 +409,41 @@ class TenantIsolationTests(unittest.TestCase):
                     created_ids.append((tenant_id, log.id))
                     db.session.commit()
             self.login('whitetap', 'whitetap-password')
+            postgres_statements = []
+
+            def record_orm(execute_state):
+                if execute_state.is_select and 'usage_logs' in str(execute_state.statement):
+                    compiled = execute_state.statement.compile(dialect=postgresql.dialect())
+                    postgres_statements.append((str(compiled), compiled.params))
+
+            event.listen(Session, 'do_orm_execute', record_orm)
+            self.addCleanup(event.remove, Session, 'do_orm_execute', record_orm)
             for path in (
                 '/whitetap/admin/usage-logs?period=daily&project_ref=period-filter-test',
                 '/whitetap/export-logs?period=daily&project_ref=period-filter-test'
             ):
                 with self.subTest(path=path):
+                    postgres_statements.clear()
                     response = self.client.get(path)
                     self.assertEqual(response.status_code, 200)
-                    self.assertIn(f'Tenant-1-{today.date()}'.encode(), response.data)
-                    self.assertNotIn(f'Tenant-1-{(today - timedelta(days=1)).date()}'.encode(), response.data)
-                    self.assertNotIn(f'Tenant-2-{today.date()}'.encode(), response.data)
+                    for label in ('start', 'end'):
+                        self.assertIn(f'boundary-{label}'.encode(), response.data)
+                    for label in ('before', 'after', 'other'):
+                        self.assertNotIn(f'boundary-{label}'.encode(), response.data)
+                    filtered = [(sql, params) for sql, params in postgres_statements
+                                if 'usage_logs.created_at >=' in sql]
+                    self.assertEqual(len(filtered), 1)
+                    pg_sql, params = filtered[0]
+                    self.assertIn('usage_logs.created_at < ', pg_sql)
+                    for forbidden in ('CAST(', 'SUBSTR(', 'DATE('):
+                        self.assertNotIn(forbidden, pg_sql.upper())
+                    self.assertIn(today, params.values())
+                    self.assertIn(today + timedelta(days=1), params.values())
+            response = self.client.get('/whitetap/export-logs?period=all&project_ref=period-filter-test')
+            self.assertEqual(response.status_code, 200)
+            for label in ('before', 'start', 'end', 'after'):
+                self.assertIn(f'boundary-{label}'.encode(), response.data)
+            self.assertNotIn(b'boundary-other', response.data)
         finally:
             for tenant_id, log_id in created_ids:
                 with app.test_request_context('/'):
@@ -429,18 +451,55 @@ class TenantIsolationTests(unittest.TestCase):
                     UsageLog.query.filter_by(id=log_id).delete()
                     db.session.commit()
 
-    def test_usage_log_datetime_normalizes_date_and_iso_text(self):
-        column_type = UsageLogDateTime()
-        expected = datetime(2026, 11, 12, 0, 0)
-        self.assertEqual(column_type.process_result_value(date(2026, 11, 12), None), expected)
-        self.assertEqual(column_type.process_result_value('2026-11-12', None), expected)
-        self.assertEqual(
-            column_type.process_result_value('2026-11-12 15:30:45', None),
-            datetime(2026, 11, 12, 15, 30, 45)
-        )
-        self.assertIsNone(column_type.process_result_value(None, None))
-        with self.assertRaises(ValueError):
-            column_type.process_result_value('invalid', None)
+    def test_usage_period_bounds(self):
+        today = date(2026, 11, 12)
+        expected_end = datetime(2026, 11, 13)
+        for period, expected_start in (
+            ('daily', datetime(2026, 11, 12)), ('weekly', datetime(2026, 11, 9)),
+            ('monthly', datetime(2026, 11, 1)), ('quarterly', datetime(2026, 10, 1)),
+            ('yearly', datetime(2026, 1, 1))
+        ):
+            with self.subTest(period=period):
+                self.assertEqual(usage_period_bounds(period, today), (expected_start, expected_end))
+        self.assertIsNone(usage_period_bounds('all', today))
+
+    def test_added_products_rolling_range_excludes_future_and_other_tenants(self):
+        created_ids = []
+        now = datetime.now(timezone.utc)
+        try:
+            for tenant_id, label, created_at in (
+                (1, 'within', now - timedelta(days=1)),
+                (1, 'old', now - timedelta(days=8)),
+                (1, 'future', now + timedelta(days=1)),
+                (2, 'other', now - timedelta(days=1)),
+            ):
+                with app.test_request_context('/'):
+                    g.current_tenant = db.session.get(Tenant, tenant_id)
+                    product = Product(
+                        name=f'Range-{label}', supplier='range-test-supplier',
+                        current_stock=0, parent_stock=0, min_stock_level=0, created_at=created_at
+                    )
+                    db.session.add(product)
+                    db.session.flush()
+                    created_ids.append((tenant_id, product.id))
+                    db.session.commit()
+            self.login('whitetap', 'whitetap-password')
+            response = self.client.get('/whitetap/admin/added-products?period=7&supplier=range-test-supplier')
+            self.assertEqual(response.status_code, 200)
+            self.assertIn(b'Range-within', response.data)
+            for label in ('old', 'future', 'other'):
+                self.assertNotIn(f'Range-{label}'.encode(), response.data)
+            response = self.client.get('/whitetap/admin/added-products?period=all&supplier=range-test-supplier')
+            self.assertEqual(response.status_code, 200)
+            for label in ('within', 'old', 'future'):
+                self.assertIn(f'Range-{label}'.encode(), response.data)
+            self.assertNotIn(b'Range-other', response.data)
+        finally:
+            for tenant_id, product_id in created_ids:
+                with app.test_request_context('/'):
+                    g.current_tenant = db.session.get(Tenant, tenant_id)
+                    Product.query.filter_by(id=product_id).delete()
+                    db.session.commit()
 
     def test_project_invoice_lines_aggregate_only_current_tenant(self):
         created_ids = []
