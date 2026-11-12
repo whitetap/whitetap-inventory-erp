@@ -1901,6 +1901,40 @@ def edit_product(product_id):
     
     return render_template('edit_product.html', product=product, unit_options=get_product_units(), product_categories=ProductCategory.query.order_by(ProductCategory.name).all(), category_name_by_id=get_product_category_name_map())
 
+def bootstrap_initial_admin():
+    password = os.getenv('INITIAL_ADMIN_PASSWORD')
+    if not password:
+        app.logger.warning('Skipping initial admin creation: INITIAL_ADMIN_PASSWORD is not set')
+        return
+
+    with app.app_context():
+        if db.engine.dialect.name == 'postgresql':
+            db.session.execute(text('SELECT pg_advisory_xact_lock(:key)'), {'key': 878705603052})
+        if TenantUser.query.count() != 0:
+            db.session.commit()
+            return
+
+        email = os.getenv('INITIAL_ADMIN_EMAIL', 'admin@whitetap.com').strip().lower()
+        if len(email) > 255 or not EMAIL_PATTERN.fullmatch(email):
+            raise RuntimeError('INITIAL_ADMIN_EMAIL must be a valid email address')
+        if len(password) < 12:
+            raise RuntimeError('INITIAL_ADMIN_PASSWORD must contain at least 12 characters')
+        tenant = db.session.get(Tenant, 1)
+        if tenant is None or tenant.slug != 'whitetap':
+            raise RuntimeError('Initial admin requires the whitetap tenant to have ID 1')
+
+        db.session.add(TenantUser(
+            tenant_id=1,
+            email=email,
+            password_hash=generate_password_hash(password),
+            role='admin'
+        ))
+        db.session.commit()
+        app.logger.warning('Initial Whitetap admin account created from environment variables')
+
+
+bootstrap_initial_admin()
+
 port = int(os.environ.get('PORT', 10000))
 
 

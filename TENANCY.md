@@ -29,6 +29,21 @@ implemented here.
 Provision accounts using the deployment environment after confirming the
 `whitetap` tenant exists:
 
+Alternatively, to bootstrap the first account automatically at startup, set
+`INITIAL_ADMIN_PASSWORD` to a strong password of at least 12 characters and
+optionally set `INITIAL_ADMIN_EMAIL` (defaults to `admin@whitetap.com`). The
+bootstrap runs when importing the Gunicorn application, and only creates a user
+when the entire `tenant_users` table is empty. It requires the `whitetap` tenant
+to have ID 1 and fails startup if that tenant or the supplied credentials are
+invalid. PostgreSQL startup workers coordinate with a transaction advisory lock;
+do not provision users concurrently through another process that does not take
+the same lock. If the password is absent, startup skips the bootstrap without a
+database check. Remove the initial password from the deployment environment
+after the account has been created and verified, so it cannot be reused if the
+user table is later emptied. Never commit it or put it in a command-line argument.
+
+For further accounts, use:
+
 ```shell
 flask --app app_fixed_final create-tenant-user --tenant-slug whitetap --role admin
 flask --app app_fixed_final create-tenant-user --tenant-slug whitetap --role staff

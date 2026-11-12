@@ -7,6 +7,7 @@ from uuid import uuid4
 os.environ['DATABASE_URL'] = 'sqlite://'
 os.environ['SECRET_KEY'] = 'test-secret-not-for-production'
 os.environ['SESSION_COOKIE_SECURE'] = 'false'
+os.environ['INITIAL_ADMIN_PASSWORD'] = ''
 
 from flask import g, url_for
 from sqlalchemy import select, text
