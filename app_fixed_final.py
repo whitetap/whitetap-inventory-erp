@@ -105,7 +105,7 @@ class ProductCategory(TenantOwned, db.Model):
     name = db.Column(db.String(100), nullable=False, index=True)
     created_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
 
-class UsageLog(TenantOwned, db.Model):
+class UsageLog(db.Model):
     __tablename__ = 'usage_logs'
 
     id = db.Column(db.Integer, primary_key=True)
@@ -279,13 +279,16 @@ def enforce_tenant_scope(execute_state):
             with_loader_criteria(
                 TenantOwned, lambda model: model.tenant_id == tenant_id,
                 include_aliases=True
-            )
+            ),
+            with_loader_criteria(
+                UsageLog, lambda model: model.product.has(Product.tenant_id == tenant_id),
+                include_aliases=True
+            ),
         )
 
 
 TENANT_REFERENCES = {
     Product: [('category_id', ProductCategory)],
-    UsageLog: [('product_id', Product)],
     TintRecipeItem: [('recipe_id', TintRecipe)],
     ProformaInvoice: [('client_id', Client)],
     ProformaInvoiceItem: [('invoice_id', ProformaInvoice), ('product_id', Product)],
@@ -301,6 +304,21 @@ def enforce_tenant_writes(db_session, flush_context, instances):
     objects = set(db_session.new).union(db_session.dirty, db_session.deleted)
     tenant_id = current_tenant_id()
     for obj in objects:
+        if isinstance(obj, UsageLog):
+            if tenant_id is None:
+                raise RuntimeError('A tenant context is required for business writes')
+            state = inspect(obj)
+            if state.attrs.product.history.has_changes():
+                raise ValueError('Assign usage logs using product_id')
+            with db_session.no_autoflush:
+                if obj not in db_session.new:
+                    existing = db_session.query(UsageLog.id).filter(UsageLog.id == obj.id).first()
+                    if not existing:
+                        raise RuntimeError('Cross-tenant usage log write rejected')
+                product = db_session.query(Product.id).filter(Product.id == obj.product_id).first()
+                if not product:
+                    raise ValueError('Invalid tenant reference: UsageLog.product_id')
+            continue
         if not isinstance(obj, TenantOwned):
             continue
         if tenant_id is None:
@@ -1437,7 +1455,10 @@ def admin_dashboard():
     
     # Today's usage logs count
     start_dt, end_dt = usage_period_bounds('daily')
-    today_logs = db.session.query(func.count(UsageLog.id)).filter(
+    today_logs = db.session.query(func.count(UsageLog.id)).join(
+        Product, UsageLog.product_id == Product.id
+    ).filter(
+        Product.tenant_id == current_tenant_id(),
         UsageLog.created_at >= start_dt, UsageLog.created_at < end_dt
     ).scalar()
 

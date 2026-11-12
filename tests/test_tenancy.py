@@ -15,7 +15,7 @@ os.environ.pop('PUBLIC_SIGNUP_ENABLED', None)
 from flask import g, url_for, template_rendered
 from sqlalchemy import event, select, text
 from sqlalchemy.dialects import postgresql
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, aliased
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from app_fixed_final import (
@@ -263,6 +263,54 @@ class TenantIsolationTests(unittest.TestCase):
                 db.session.flush()
             db.session.rollback()
 
+    def test_usage_logs_scope_reads_deletes_and_writes_through_product(self):
+        created_ids = []
+        try:
+            for tenant_id in (1, 2):
+                with app.test_request_context('/'):
+                    g.current_tenant = db.session.get(Tenant, tenant_id)
+                    log = UsageLog(
+                        product_id=self.product_ids[tenant_id - 1], quantity_used=1,
+                        technician_name='Isolation', project_ref=f'owner-{tenant_id}'
+                    )
+                    db.session.add(log)
+                    db.session.flush()
+                    created_ids.append(log.id)
+                    db.session.commit()
+
+            with app.test_request_context('/'):
+                g.current_tenant = db.session.get(Tenant, 1)
+                self.assertEqual(
+                    db.session.query(UsageLog.project_ref).filter(UsageLog.project_ref.like('owner-%')).all(),
+                    [('owner-1',)]
+                )
+                log_alias = aliased(UsageLog)
+                self.assertEqual(
+                    db.session.query(log_alias.id).filter(log_alias.id.in_(created_ids)).all(),
+                    [(created_ids[0],)]
+                )
+                self.assertEqual(UsageLog.query.filter_by(id=created_ids[1]).delete(), 0)
+                own_log = db.session.get(UsageLog, created_ids[0])
+                own_log.product_id = self.product_ids[1]
+                with self.assertRaises(ValueError):
+                    db.session.flush()
+                db.session.rollback()
+
+            with app.test_request_context('/'):
+                g.current_tenant = db.session.get(Tenant, 2)
+                other_log = db.session.get(UsageLog, created_ids[1])
+                g.current_tenant = db.session.get(Tenant, 1)
+                other_log.technician_name = 'Unauthorized'
+                with self.assertRaises(RuntimeError):
+                    db.session.flush()
+                db.session.rollback()
+        finally:
+            for tenant_id, log_id in enumerate(created_ids, start=1):
+                with app.test_request_context('/'):
+                    g.current_tenant = db.session.get(Tenant, tenant_id)
+                    UsageLog.query.filter_by(id=log_id).delete()
+                    db.session.commit()
+
     def test_aggregate_queries_and_bulk_updates(self):
         with app.test_request_context('/'):
             g.current_tenant = db.session.get(Tenant, 1)
@@ -371,14 +419,16 @@ class TenantIsolationTests(unittest.TestCase):
             self.assertEqual(contexts[0]['today_logs'], 2)
             self.assertEqual(len(statements), 1)
             self.assertNotIn('anon_1', statements[0].lower())
-            self.assertEqual(len(re.findall(r'usage_logs\.tenant_id\s*=', statements[0].lower())), 1)
+            self.assertNotIn('usage_logs.tenant_id', statements[0].lower())
+            self.assertRegex(statements[0].lower(), r'products(?:_\d+)?\.tenant_id\s*=')
             self.assertEqual(len(postgres_statements), 1)
             pg_sql, pg_parameters = postgres_statements[0]
             self.assertRegex(pg_sql, r'usage_logs\.created_at\s+>=')
             self.assertRegex(pg_sql, r'usage_logs\.created_at\s+<\s')
             for forbidden in ('CAST(', 'LIKE', 'SUBSTR(', 'DATE('):
                 self.assertNotIn(forbidden, pg_sql.upper())
-            self.assertEqual(len(re.findall(r'usage_logs\.tenant_id\s*=', pg_sql.lower())), 1)
+            self.assertNotIn('usage_logs.tenant_id', pg_sql.lower())
+            self.assertRegex(pg_sql.lower(), r'products(?:_\d+)?\.tenant_id\s*=')
             self.assertIn(today, pg_parameters.values())
             self.assertIn(today + timedelta(days=1), pg_parameters.values())
         finally:

@@ -6,9 +6,15 @@ tenants automatically. It also no longer performs request-time schema changes.
 
 Before deploying, take and verify a restorable backup and test on a restored,
 disposable PostgreSQL copy. Verify that every business table mapped in
-`app_fixed_final.py`, including `usage_logs`, `quotations` and their item tables,
-has a non-null `tenant_id` referencing `tenants`, and that every existing row
-belongs to the correct tenant. Check related rows have matching tenant IDs.
+`app_fixed_final.py`, except `usage_logs`, has a non-null `tenant_id` referencing
+`tenants`, and that every existing row belongs to the correct tenant. Usage logs
+are scoped through their product's tenant; verify every usage log references an
+existing product belonging to the correct tenant. Logs with missing products
+cannot be assigned a tenant and are excluded from tenant queries; investigate
+them before deployment. Because ownership follows the current product, moving
+a product to another tenant would move visibility of its historical logs too;
+do not reassign product ownership without a separate data migration. Check
+related rows have matching tenant IDs.
 Existing rows and tokens are expected to belong to the `whitetap` tenant.
 
 Verify database constraints independently: category names, normalized client
