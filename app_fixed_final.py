@@ -2,6 +2,7 @@ import os
 import re
 import secrets
 import smtplib
+import unicodedata
 import html as htmllib
 from email.message import EmailMessage
 import psycopg2
@@ -44,6 +45,7 @@ app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY')
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['SESSION_COOKIE_SECURE'] = os.environ.get('SESSION_COOKIE_SECURE', 'true').lower() == 'true'
+app.config['PUBLIC_SIGNUP_ENABLED'] = os.environ.get('PUBLIC_SIGNUP_ENABLED', 'false').lower() == 'true'
 if app.config['SQLALCHEMY_DATABASE_URI'] and app.config['SQLALCHEMY_DATABASE_URI'].get_backend_name() == 'postgresql':
     app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {'creator': get_conn}
 
@@ -52,7 +54,7 @@ db = SQLAlchemy(app)
 class Tenant(db.Model):
     __tablename__ = 'tenants'
 
-    id = db.Column(db.BigInteger, primary_key=True)
+    id = db.Column(db.BigInteger().with_variant(db.Integer, 'sqlite'), primary_key=True)
     name = db.Column(db.Text, nullable=False)
     slug = db.Column(db.String(50), nullable=False, unique=True)
     created_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
@@ -61,7 +63,7 @@ class Tenant(db.Model):
 class TenantUser(db.Model):
     __tablename__ = 'tenant_users'
 
-    id = db.Column(db.BigInteger, primary_key=True)
+    id = db.Column(db.BigInteger().with_variant(db.Integer, 'sqlite'), primary_key=True)
     tenant_id = db.Column(db.BigInteger, db.ForeignKey('tenants.id'), nullable=False, index=True)
     email = db.Column(db.String(255), nullable=False)
     password_hash = db.Column(db.Text, nullable=False)
@@ -360,20 +362,24 @@ def add_tenant_slug(endpoint, values):
 
 @app.before_request
 def resolve_tenant_and_authenticate():
-    if request.endpoint not in TENANT_ENDPOINTS:
+    if request.endpoint not in TENANT_ENDPOINTS and request.endpoint != 'signup':
         return
     if not app.config['SECRET_KEY']:
         raise RuntimeError('SECRET_KEY must be configured before serving requests')
-    tenant = Tenant.query.filter_by(slug=g.tenant_slug).first()
-    if tenant is None:
-        abort(404)
-    g.current_tenant = tenant
+    if request.endpoint == 'signup':
+        if not app.config['PUBLIC_SIGNUP_ENABLED']:
+            abort(404)
+    else:
+        tenant = Tenant.query.filter_by(slug=g.tenant_slug).first()
+        if tenant is None:
+            abort(404)
+        g.current_tenant = tenant
     if request.method not in ('GET', 'HEAD', 'OPTIONS'):
         supplied = request.headers.get('X-CSRF-Token') or request.form.get('csrf_token', '')
         expected = session.get('csrf_token', '')
         if not expected or not secrets.compare_digest(expected.encode('utf-8'), supplied.encode('utf-8')):
             abort(400, description='Invalid CSRF token')
-    if request.endpoint in ('login', 'supplier_po_response'):
+    if request.endpoint in ('signup', 'login', 'supplier_po_response'):
         return
     user_id = session.get('tenant_user_id')
     user = TenantUser.query.filter_by(id=user_id, tenant_id=tenant.id).first() if user_id else None
@@ -395,6 +401,13 @@ def csrf_token():
     return session['csrf_token']
 
 
+def lock_user_provisioning():
+    if db.engine.dialect.name == 'postgresql':
+        db.session.connection().exec_driver_sql(
+            'SELECT pg_advisory_xact_lock(%s)', (878705603052,)
+        )
+
+
 @app.cli.command('create-tenant-user')
 @click.option('--tenant-slug', required=True)
 @click.option('--email', prompt=True)
@@ -410,6 +423,7 @@ def create_tenant_user(tenant_slug, email, role, password):
         raise click.ClickException('Invalid email address')
     if len(password) < 12:
         raise click.ClickException('Password must contain at least 12 characters')
+    lock_user_provisioning()
     if TenantUser.query.filter(
         TenantUser.tenant_id == tenant.id, db.func.lower(TenantUser.email) == email
     ).first():
@@ -660,6 +674,57 @@ def get_project_invoice_lines(project_ref):
         'unit': row.unit_of_measure or '',
         'quantity': Decimal(str(row.quantity or 0)).quantize(Decimal('0.001'), rounding=ROUND_HALF_UP)
     } for row in rows]
+
+def organization_slug(name):
+    normalized = unicodedata.normalize('NFKD', name).encode('ascii', 'ignore').decode('ascii')
+    return re.sub(r'[^a-z0-9]+', '-', normalized.lower()).strip('-')[:50].rstrip('-')
+
+
+@app.route('/signup', methods=['GET', 'POST'])
+def signup():
+    if request.method == 'GET':
+        return render_template('signup.html')
+
+    name = ' '.join(request.form.get('organization_name', '').split())
+    email = request.form.get('email', '').strip().lower()
+    password = request.form.get('password', '')
+    slug_base = organization_slug(name)
+    if not name or len(name) > 100 or not slug_base:
+        flash('Enter an organization name of at most 100 characters containing a letter or number.', 'error')
+    elif len(email) > 255 or not EMAIL_PATTERN.fullmatch(email):
+        flash('Enter a valid email address.', 'error')
+    elif len(password) < 12 or len(password) > 1024:
+        flash('Password must contain between 12 and 1024 characters.', 'error')
+    else:
+        try:
+            lock_user_provisioning()
+            if TenantUser.query.filter(func.lower(TenantUser.email) == email).first():
+                flash('This email address is already in use.', 'error')
+                return render_template('signup.html', organization_name=name, email=email), 400
+            slug = slug_base
+            suffix = 1
+            while Tenant.query.filter_by(slug=slug).first():
+                suffix += 1
+                suffix_text = f'-{suffix}'
+                slug = slug_base[:50 - len(suffix_text)].rstrip('-') + suffix_text
+            tenant = Tenant(name=name, slug=slug)
+            db.session.add(tenant)
+            db.session.flush()
+            db.session.add(TenantUser(
+                tenant_id=tenant.id, email=email,
+                password_hash=generate_password_hash(password), role='admin'
+            ))
+            db.session.commit()
+        except IntegrityError:
+            db.session.rollback()
+            app.logger.exception('Organization signup conflicted with an existing record')
+            flash('Unable to create the organization due to an account conflict. Please try again.', 'error')
+            return render_template('signup.html', organization_name=name, email=email), 409
+        session.clear()
+        flash('Organization created. Sign in with your new administrator account.', 'success')
+        return redirect(url_for('login', tenant_slug=slug))
+    return render_template('signup.html', organization_name=name, email=email), 400
+
 
 @tenant_route('/')
 def index():
@@ -1050,7 +1115,11 @@ def staff_quotations():
             unit_price = unit_price.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
             line_total = (quantity * unit_price).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
             unit = (units[index] if index < len(units) else '').strip()[:20]
-            product_id = normalize_product_uuid(product_ids[index]) if index < len(product_ids) else None
+            try:
+                product_id = normalize_product_uuid(product_ids[index]) if index < len(product_ids) else None
+            except (ValueError, TypeError):
+                flash('One or more selected products have an invalid UUID.', 'error')
+                return redirect(url_for('staff_quotations'))
             part_number = (part_numbers[index] if index < len(part_numbers) else '').strip()[:50]
             product_sku = (product_skus[index] if index < len(product_skus) else '').strip()[:50] or part_number
             line_items.append({
@@ -1833,10 +1902,6 @@ def admin_transfer_stock():
         product_id = normalize_product_uuid(request.form['product_id'])
         quantity = Decimal(request.form['quantity'])
         
-        try:
-            product_id = normalize_product_uuid(product_id)
-        except (ValueError, TypeError):
-            abort(404)
         product = Product.query.get_or_404(product_id)
         
         if quantity <= 0:
@@ -1873,6 +1938,10 @@ def admin_transfer_stock():
 @tenant_route('/edit-product/<string:product_id>', methods=['GET', 'POST'])
 def edit_product(product_id):
     ensure_tint_recipe_tables()
+    try:
+        product_id = normalize_product_uuid(product_id)
+    except (ValueError, TypeError):
+        abort(404)
     product = Product.query.get_or_404(product_id)
     
     if request.method == 'POST':
@@ -1911,8 +1980,7 @@ def bootstrap_initial_admin():
         return
 
     with app.app_context():
-        if db.engine.dialect.name == 'postgresql':
-            db.session.execute(text('SELECT pg_advisory_xact_lock(:key)'), {'key': 878705603052})
+        lock_user_provisioning()
         if TenantUser.query.count() != 0:
             db.session.commit()
             return

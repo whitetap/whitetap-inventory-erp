@@ -26,6 +26,22 @@ by the default secure session cookie. For local HTTP development only, set
 proxy; account lockout, password reset and multi-factor authentication are not
 implemented here.
 
+Public organization signup is disabled by default. After provisioning and
+verifying the initial owner, set `PUBLIC_SIGNUP_ENABLED=true` to enable
+`/signup`. The form creates an organization and its first administrator in one
+transaction, generates a unique URL slug, and redirects to its login page.
+Signup rejects email addresses already used by any tenant, case-insensitively;
+other provisioning paths continue to permit the same email in different tenants.
+PostgreSQL application signup and the user-provisioning command use the same
+transaction advisory lock. External writers must honor that lock or enforce
+equivalent database constraints to avoid concurrent duplicate email creation.
+
+Signup does not verify email addresses, implement recovery, CAPTCHA, rate
+limits, or organization approval. Configure rate limiting and abuse protection
+at the reverse proxy and consider email verification before exposing the signup
+form to the public. Signup with an empty user table will prevent the initial-admin
+bootstrap from running on subsequent startups; provision the owner first.
+
 Provision accounts using the deployment environment after confirming the
 `whitetap` tenant exists:
 

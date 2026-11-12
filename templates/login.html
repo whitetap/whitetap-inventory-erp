@@ -45,6 +45,9 @@
                                 <i class="fas fa-sign-in-alt me-2"></i>Enter Dashboard
                             </button>
                         </form>
+                        {% if config.PUBLIC_SIGNUP_ENABLED %}
+                        <p class="mt-4 mb-0"><a href="{{ url_for('signup') }}">Create an organization</a></p>
+                        {% endif %}
                     </div>
                 </div>
             </div>

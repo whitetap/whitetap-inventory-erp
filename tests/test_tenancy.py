@@ -3,6 +3,7 @@ import re
 import unittest
 from datetime import datetime, timedelta
 from decimal import Decimal
+from unittest.mock import patch
 from uuid import uuid4
 
 os.environ['DATABASE_URL'] = 'sqlite://'
@@ -12,10 +13,10 @@ os.environ['INITIAL_ADMIN_PASSWORD'] = ''
 
 from flask import g, url_for, template_rendered
 from sqlalchemy import event, select, text
-from werkzeug.security import generate_password_hash
+from werkzeug.security import check_password_hash, generate_password_hash
 
 from app_fixed_final import (
-    app, db, Tenant, TenantUser, Product, PurchaseOrder, UsageLog
+    app, db, Tenant, TenantUser, Product, ProductCategory, PurchaseOrder, UsageLog
 )
 
 
@@ -77,6 +78,95 @@ class TenantIsolationTests(unittest.TestCase):
         self.assertEqual(own.status_code, 200)
         self.assertEqual(other.status_code, 404)
         self.assertEqual(self.client.get('/other/api/products/lookup?identifier=SKU-2').status_code, 401)
+
+    def test_public_signup_provisions_unique_slug_and_admin(self):
+        app.config['PUBLIC_SIGNUP_ENABLED'] = True
+        self.addCleanup(app.config.update, PUBLIC_SIGNUP_ENABLED=False)
+        page = self.client.get('/signup')
+        self.assertEqual(page.status_code, 200)
+        token = re.search(rb'name="csrf_token" value="([^"]+)"', page.data).group(1).decode()
+        response = self.client.post('/signup', data={
+            'csrf_token': token, 'organization_name': 'Other',
+            'email': ' New@Example.test ', 'password': 'new-password-123'
+        })
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(response.location.endswith('/other-2/login'))
+        with app.app_context():
+            tenant = Tenant.query.filter_by(slug='other-2').one()
+            user = TenantUser.query.filter_by(tenant_id=tenant.id).one()
+            self.assertEqual((user.email, user.role), ('new@example.test', 'admin'))
+            self.assertTrue(check_password_hash(user.password_hash, 'new-password-123'))
+            tenant_id, user_id = tenant.id, user.id
+
+        def cleanup_signup():
+            with app.test_request_context('/'):
+                g.current_tenant = db.session.get(Tenant, tenant_id)
+                ProductCategory.query.delete()
+                db.session.commit()
+            with app.app_context():
+                db.session.delete(db.session.get(TenantUser, user_id))
+                db.session.delete(db.session.get(Tenant, tenant_id))
+                db.session.commit()
+        self.addCleanup(cleanup_signup)
+        login_page = self.client.get(response.location)
+        token = re.search(rb'name="csrf_token" value="([^"]+)"', login_page.data).group(1).decode()
+        login_response = self.client.post('/other-2/login', data={
+            'csrf_token': token, 'email': 'new@example.test', 'password': 'new-password-123'
+        })
+        self.assertTrue(login_response.location.endswith('/other-2/admin-dashboard'))
+        self.assertEqual(self.client.get(login_response.location).status_code, 200)
+        self.assertEqual(self.client.get('/other-2/api/products/lookup?identifier=SKU-1').status_code, 404)
+        self.assertEqual(self.client.get('/whitetap/api/products/lookup?identifier=SKU-1').status_code, 401)
+
+    def test_signup_validation_and_csrf(self):
+        self.assertEqual(self.client.get('/signup').status_code, 404)
+        app.config['PUBLIC_SIGNUP_ENABLED'] = True
+        self.addCleanup(app.config.update, PUBLIC_SIGNUP_ENABLED=False)
+        self.assertEqual(self.client.post('/signup', data={}).status_code, 400)
+        page = self.client.get('/signup')
+        token = re.search(rb'name="csrf_token" value="([^"]+)"', page.data).group(1).decode()
+        base = {'csrf_token': token, 'organization_name': 'Test Company',
+                'email': 'valid@example.test', 'password': 'long-enough-password'}
+        for overrides in (
+            {'organization_name': '!!!'},
+            {'organization_name': 'x' * 101},
+            {'email': 'invalid'},
+            {'email': 'ADMIN@EXAMPLE.TEST'},
+            {'password': 'short'},
+        ):
+            data = dict(base, **overrides)
+            with self.subTest(data=data):
+                self.assertEqual(self.client.post('/signup', data=data).status_code, 400)
+        with app.app_context():
+            self.assertIsNone(Tenant.query.filter_by(slug='test-company').first())
+
+    def test_edit_product_checks_uuid_and_tenant(self):
+        self.login('whitetap', 'whitetap-password')
+        self.assertEqual(self.client.get(f'/whitetap/edit-product/{self.product_ids[0]}').status_code, 200)
+        self.assertEqual(self.client.get(f'/whitetap/edit-product/{self.product_ids[1]}').status_code, 404)
+        self.assertEqual(self.client.get('/whitetap/edit-product/invalid-id').status_code, 404)
+
+    def test_signup_rolls_back_if_user_creation_fails(self):
+        app.config['PUBLIC_SIGNUP_ENABLED'] = True
+        self.addCleanup(app.config.update, PUBLIC_SIGNUP_ENABLED=False)
+        page = self.client.get('/signup')
+        token = re.search(rb'name="csrf_token" value="([^"]+)"', page.data).group(1).decode()
+        with patch('app_fixed_final.generate_password_hash', side_effect=RuntimeError('test failure')):
+            with self.assertRaises(RuntimeError):
+                self.client.post('/signup', data={
+                    'csrf_token': token, 'organization_name': 'Rollback Test',
+                    'email': 'rollback@example.test', 'password': 'long-enough-password'
+                })
+        with app.app_context():
+            self.assertIsNone(Tenant.query.filter_by(slug='rollback-test').first())
+
+    def test_routes_have_no_duplicate_path_and_method(self):
+        routes = set()
+        for rule in app.url_map.iter_rules():
+            for method in rule.methods - {'HEAD', 'OPTIONS'}:
+                key = (rule.rule, method)
+                self.assertNotIn(key, routes)
+                routes.add(key)
 
     def test_legacy_routes_are_whitetap_only(self):
         self.login('other', 'other-password')
