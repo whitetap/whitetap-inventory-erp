@@ -13,13 +13,14 @@ from io import StringIO
 from flask import Flask, render_template, request, redirect, url_for, flash, session, Response, make_response, jsonify, g, abort, has_request_context
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy import desc, text, event, inspect, UniqueConstraint, func
+from sqlalchemy import Date, cast, desc, text, event, inspect, UniqueConstraint, func
 from sqlalchemy.engine import make_url
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Session, with_loader_criteria
+from sqlalchemy.types import TypeDecorator
 from werkzeug.security import check_password_hash, generate_password_hash
 import click
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal, ROUND_HALF_UP
 
 def get_database_url(drivername):
@@ -105,6 +106,18 @@ class ProductCategory(TenantOwned, db.Model):
     name = db.Column(db.String(100), nullable=False, index=True)
     created_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
 
+class UsageLogDateTime(TypeDecorator):
+    impl = db.DateTime
+    cache_ok = True
+
+    def process_result_value(self, value, dialect):
+        if value is None or isinstance(value, datetime):
+            return value
+        if isinstance(value, date):
+            return datetime.combine(value, datetime.min.time())
+        return datetime.fromisoformat(value)
+
+
 class UsageLog(TenantOwned, db.Model):
     __tablename__ = 'usage_logs'
 
@@ -114,7 +127,7 @@ class UsageLog(TenantOwned, db.Model):
     quantity_used = db.Column(db.Float, nullable=False)
     technician_name = db.Column(db.String(100), nullable=False)
     project_ref = db.Column(db.String(100))
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(UsageLogDateTime(), default=datetime.utcnow)
     product = db.relationship('Product', lazy='joined')
 
 class TintRecipe(TenantOwned, db.Model):
@@ -573,7 +586,9 @@ def get_usage_period_start(period, today=None):
 
 
 def usage_log_date():
-    return func.substr(db.cast(UsageLog.created_at, db.String), 1, 10)
+    if db.engine.dialect.name == 'sqlite':
+        return func.date(UsageLog.created_at, type_=Date)
+    return cast(UsageLog.created_at, Date)
 
 def normalize_client_name(name):
     return ' '.join(name.casefold().split())
@@ -900,7 +915,7 @@ def export_logs():
     start = get_usage_period_start(period)
     logs_query = db.session.query(UsageLog, Product.name).outerjoin(Product, Product.id == UsageLog.product_id)
     if start:
-        logs_query = logs_query.filter(usage_log_date() >= start.date().isoformat())
+        logs_query = logs_query.filter(usage_log_date() >= start.date())
     if project_ref:
         logs_query = logs_query.filter(UsageLog.project_ref.ilike(f'%{project_ref}%'))
     logs = logs_query.order_by(desc(UsageLog.created_at)).all()
@@ -939,7 +954,7 @@ def admin_usage_logs():
     start = get_usage_period_start(period)
     logs_query = db.session.query(UsageLog, Product.name).outerjoin(Product, Product.id == UsageLog.product_id)
     if start:
-        logs_query = logs_query.filter(usage_log_date() >= start.date().isoformat())
+        logs_query = logs_query.filter(usage_log_date() >= start.date())
     if project_ref:
         logs_query = logs_query.filter(UsageLog.project_ref.ilike(f'%{project_ref}%'))
     rows = logs_query.order_by(desc(UsageLog.created_at)).all()
@@ -1433,7 +1448,7 @@ def admin_dashboard():
     
     # Today's usage logs count
     today_logs = db.session.query(func.count(UsageLog.id)).filter(
-        usage_log_date() == datetime.now().date().isoformat()
+        usage_log_date() == datetime.now().date()
     ).scalar()
 
     product_categories = ProductCategory.query.order_by(ProductCategory.name).all()

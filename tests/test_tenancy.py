@@ -1,7 +1,7 @@
 import os
 import re
 import unittest
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 from unittest.mock import patch
 from uuid import uuid4
@@ -20,7 +20,8 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 from app_fixed_final import (
     app, db, Tenant, TenantUser, Product, ProductCategory, PurchaseOrder, UsageLog,
-    DEFAULT_PRODUCT_CATEGORIES, ensure_tint_recipe_tables
+    DEFAULT_PRODUCT_CATEGORIES, ensure_tint_recipe_tables, usage_log_date, UsageLogDateTime,
+    get_project_invoice_lines
 )
 
 
@@ -372,9 +373,12 @@ class TenantIsolationTests(unittest.TestCase):
             self.assertEqual(len(re.findall(r'usage_logs\.tenant_id\s*=', statements[0].lower())), 1)
             self.assertEqual(len(postgres_statements), 1)
             pg_sql, pg_parameters = postgres_statements[0]
-            self.assertIn('CAST(usage_logs.created_at AS VARCHAR)', pg_sql)
+            self.assertIn('date(usage_logs.created_at)', pg_sql)
             self.assertEqual(len(re.findall(r'usage_logs\.tenant_id\s*=', pg_sql.lower())), 1)
-            self.assertIn(today.date().isoformat(), pg_parameters.values())
+            self.assertIn(today.date(), pg_parameters.values())
+            with app.app_context(), patch.object(db.engine.dialect, 'name', 'postgresql'):
+                pg_date = usage_log_date().compile(dialect=postgresql.dialect())
+                self.assertEqual(str(pg_date), 'CAST(usage_logs.created_at AS DATE)')
         finally:
             for tenant_id, log_id in created_ids:
                 with app.test_request_context('/'):
@@ -411,6 +415,44 @@ class TenantIsolationTests(unittest.TestCase):
                     self.assertIn(f'Tenant-1-{today.date()}'.encode(), response.data)
                     self.assertNotIn(f'Tenant-1-{(today - timedelta(days=1)).date()}'.encode(), response.data)
                     self.assertNotIn(f'Tenant-2-{today.date()}'.encode(), response.data)
+        finally:
+            for tenant_id, log_id in created_ids:
+                with app.test_request_context('/'):
+                    g.current_tenant = db.session.get(Tenant, tenant_id)
+                    UsageLog.query.filter_by(id=log_id).delete()
+                    db.session.commit()
+
+    def test_usage_log_datetime_normalizes_date_and_iso_text(self):
+        column_type = UsageLogDateTime()
+        expected = datetime(2026, 11, 12, 0, 0)
+        self.assertEqual(column_type.process_result_value(date(2026, 11, 12), None), expected)
+        self.assertEqual(column_type.process_result_value('2026-11-12', None), expected)
+        self.assertEqual(
+            column_type.process_result_value('2026-11-12 15:30:45', None),
+            datetime(2026, 11, 12, 15, 30, 45)
+        )
+        self.assertIsNone(column_type.process_result_value(None, None))
+        with self.assertRaises(ValueError):
+            column_type.process_result_value('invalid', None)
+
+    def test_project_invoice_lines_aggregate_only_current_tenant(self):
+        created_ids = []
+        try:
+            for tenant_id in (1, 2):
+                with app.test_request_context('/'):
+                    g.current_tenant = db.session.get(Tenant, tenant_id)
+                    log = UsageLog(
+                        product_id=self.product_ids[tenant_id - 1], quantity_used=-2,
+                        technician_name='Technician', project_ref='invoice-aggregate-test'
+                    )
+                    db.session.add(log)
+                    db.session.flush()
+                    created_ids.append((tenant_id, log.id))
+                    db.session.commit()
+                    lines = get_project_invoice_lines('invoice-aggregate-test')
+                    self.assertEqual(len(lines), 1)
+                    self.assertEqual(lines[0]['product_id'], self.product_ids[tenant_id - 1])
+                    self.assertEqual(lines[0]['quantity'], 2)
         finally:
             for tenant_id, log_id in created_ids:
                 with app.test_request_context('/'):

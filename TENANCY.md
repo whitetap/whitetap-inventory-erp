@@ -103,10 +103,16 @@ Run `python -m unittest discover -s tests -v` to exercise the isolated SQLite
 tests. They do not validate PostgreSQL migrations, actual production constraints,
 or real production data.
 
-Usage-log date filters use the first ten characters of `created_at` converted to
-text, and expect date/timestamp values or text beginning with an ISO date
-(`YYYY-MM-DD`). PostgreSQL timestamp-with-time-zone values are rendered in the
-database session time zone. Non-ISO or malformed text must be cleaned or migrated
-before relying on date filters; casting to text may prevent use of a plain
-`created_at` index. These comparisons do not normalize the values returned by
-PostgreSQL: the application model expects timestamp-compatible values.
+For PostgreSQL smoke tests, create a disposable local database named `erp_test`,
+set `ERP_TEST_DATABASE_URL` to its local PostgreSQL connection URL, and run
+`python tests/postgres_smoke.py`. The test creates and removes its own schema;
+it requires permission to create schemas and does not inspect the live database.
+
+Usage-log date filters cast `created_at` to `DATE` on PostgreSQL. Text values
+must be valid PostgreSQL date/timestamp input, and timestamp-with-time-zone
+values are interpreted in the database session time zone. Casting may prevent
+use of a plain `created_at` index. Usage-log values returned as dates or ISO
+timestamp strings are normalized to Python datetimes for display; invalid
+values fail explicitly. Verify the live column type and data before deployment.
+SQLite tests use its `date()` function because SQLite's
+`CAST(... AS DATE)` does not implement PostgreSQL date semantics.
