@@ -17,7 +17,8 @@ from sqlalchemy import event, select, text
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from app_fixed_final import (
-    app, db, Tenant, TenantUser, Product, ProductCategory, PurchaseOrder, UsageLog
+    app, db, Tenant, TenantUser, Product, ProductCategory, PurchaseOrder, UsageLog,
+    DEFAULT_PRODUCT_CATEGORIES, ensure_tint_recipe_tables
 )
 
 
@@ -102,6 +103,12 @@ class TenantIsolationTests(unittest.TestCase):
             self.assertEqual((user.email, user.role), ('new@example.test', 'admin'))
             self.assertTrue(check_password_hash(user.password_hash, 'new-password-123'))
             tenant_id, user_id = tenant.id, user.id
+        with app.test_request_context('/'):
+            g.current_tenant = db.session.get(Tenant, tenant_id)
+            self.assertEqual(
+                {category.name for category in ProductCategory.query.all()},
+                set(DEFAULT_PRODUCT_CATEGORIES)
+            )
 
         def cleanup_signup():
             with app.test_request_context('/'):
@@ -145,6 +152,31 @@ class TenantIsolationTests(unittest.TestCase):
                 self.assertEqual(self.client.post('/signup', data=data).status_code, 400)
         with app.app_context():
             self.assertIsNone(Tenant.query.filter_by(slug='test-company').first())
+
+    def test_category_seed_is_per_tenant_and_idempotent(self):
+        for tenant_id in (1, 2):
+            with app.test_request_context('/'):
+                g.current_tenant = db.session.get(Tenant, tenant_id)
+                ensure_tint_recipe_tables()
+                ensure_tint_recipe_tables()
+                categories = ProductCategory.query.all()
+                self.assertEqual({category.name for category in categories}, set(DEFAULT_PRODUCT_CATEGORIES))
+                self.assertEqual(len(categories), len(DEFAULT_PRODUCT_CATEGORIES))
+                self.assertTrue(all(category.tenant_id == tenant_id for category in categories))
+
+    def test_signup_rolls_back_if_category_seeding_fails(self):
+        app.config['PUBLIC_SIGNUP_ENABLED'] = True
+        page = self.client.get('/signup')
+        token = re.search(rb'name="csrf_token" value="([^"]+)"', page.data).group(1).decode()
+        with patch('app_fixed_final.seed_product_categories', side_effect=RuntimeError('test failure')):
+            with self.assertRaises(RuntimeError):
+                self.client.post('/signup', data={
+                    'csrf_token': token, 'organization_name': 'Failed Seed',
+                    'email': 'seed@example.test', 'password': 'long-enough-password'
+                })
+        with app.app_context():
+            self.assertIsNone(Tenant.query.filter_by(slug='failed-seed').first())
+            self.assertIsNone(TenantUser.query.filter_by(email='seed@example.test').first())
 
     def test_public_landing_uses_private_organization_login(self):
         app.config['PUBLIC_SIGNUP_ENABLED'] = False

@@ -99,7 +99,7 @@ class Product(TenantOwned, db.Model):
 
 class ProductCategory(TenantOwned, db.Model):
     __tablename__ = 'product_categories'
-    __table_args__ = (UniqueConstraint('tenant_id', 'name'),)
+    __table_args__ = (UniqueConstraint('tenant_id', 'name', name='product_categories_tenant_name_key'),)
 
     id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid4)
     name = db.Column(db.String(100), nullable=False, index=True)
@@ -463,15 +463,33 @@ def money_filter(value):
 def inject_po_labels():
     return {'po_status_labels': PO_STATUS_LABELS}
 
-def ensure_tint_recipe_tables():
-    for category_name in (
-        'Aviation paints & pigments', 'Carpet & textile', 'Other supplies',
-        'Exterior paint', 'Interior paint', 'Matt black', 'Walkway grit',
-        'Anti static', 'Clear coat', 'Metallic paint', 'Carpets'
-    ):
-        category = ProductCategory.query.filter(db.func.lower(ProductCategory.name) == category_name.lower()).first()
+DEFAULT_PRODUCT_CATEGORIES = (
+    'Aviation paints & pigments', 'Carpet & textile', 'Other supplies',
+    'Exterior paint', 'Interior paint', 'Matt black', 'Walkway grit',
+    'Anti static', 'Clear coat', 'Metallic paint', 'Carpets'
+)
+
+
+def seed_product_categories():
+    tenant_id = current_tenant_id()
+    if tenant_id is None:
+        raise RuntimeError('A tenant context is required to seed product categories')
+    if db.engine.dialect.name == 'postgresql':
+        db.session.connection().exec_driver_sql(
+            'SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))',
+            (f'product-categories:{tenant_id}',)
+        )
+    for category_name in DEFAULT_PRODUCT_CATEGORIES:
+        category = ProductCategory.query.filter(
+            ProductCategory.tenant_id == tenant_id,
+            db.func.lower(ProductCategory.name) == category_name.lower()
+        ).first()
         if not category:
-            db.session.add(ProductCategory(name=category_name))
+            db.session.add(ProductCategory(tenant_id=tenant_id, name=category_name))
+
+
+def ensure_tint_recipe_tables():
+    seed_product_categories()
     db.session.commit()
 
 def get_product_category_name_map():
@@ -711,6 +729,8 @@ def signup():
             tenant = Tenant(name=name, slug=slug)
             db.session.add(tenant)
             db.session.flush()
+            g.current_tenant = tenant
+            seed_product_categories()
             db.session.add(TenantUser(
                 tenant_id=tenant.id, email=email,
                 password_hash=generate_password_hash(password), role='admin'
