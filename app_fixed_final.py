@@ -333,7 +333,7 @@ ADMIN_ENDPOINTS = {
 }
 
 
-def tenant_route(rule, **options):
+def tenant_route(rule, legacy=True, **options):
     def register(view):
         endpoint = options.get('endpoint', view.__name__)
         TENANT_ENDPOINTS.add(endpoint)
@@ -341,7 +341,8 @@ def tenant_route(rule, **options):
             app.add_url_rule('/po/respond/<tenant_slug>/<token>', view_func=view, **options)
         else:
             app.add_url_rule('/<tenant_slug>' + rule, view_func=view, **options)
-        app.add_url_rule(rule, view_func=view, **options)
+        if legacy:
+            app.add_url_rule(rule, view_func=view, **options)
         return view
     return register
 
@@ -726,7 +727,21 @@ def signup():
     return render_template('signup.html', organization_name=name, email=email), 400
 
 
-@tenant_route('/')
+@app.route('/')
+def landing():
+    return render_template('index.html')
+
+
+@app.route('/organization-login')
+def organization_login():
+    slug = request.args.get('slug', '').strip().lower()
+    if not re.fullmatch(r'[a-z0-9](?:[a-z0-9-]{0,48}[a-z0-9])?', slug):
+        flash('Enter a valid organization URL slug.', 'error')
+        return redirect(url_for('landing'))
+    return redirect(url_for('login', tenant_slug=slug))
+
+
+@tenant_route('/', legacy=False)
 def index():
     return render_template('index.html')
 

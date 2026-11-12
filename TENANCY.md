@@ -30,6 +30,9 @@ Public organization signup is disabled by default. After provisioning and
 verifying the initial owner, set `PUBLIC_SIGNUP_ENABLED=true` to enable
 `/signup`. The form creates an organization and its first administrator in one
 transaction, generates a unique URL slug, and redirects to its login page.
+The public landing page displays the signup form only when enabled. Existing
+users can enter their organization's slug to reach its login page; organization
+names are not publicly listed. The tenant table has no active/inactive status.
 Signup rejects email addresses already used by any tenant, case-insensitively;
 other provisioning paths continue to permit the same email in different tenants.
 PostgreSQL application signup and the user-provisioning command use the same

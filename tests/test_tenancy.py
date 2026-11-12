@@ -82,8 +82,9 @@ class TenantIsolationTests(unittest.TestCase):
     def test_public_signup_provisions_unique_slug_and_admin(self):
         app.config['PUBLIC_SIGNUP_ENABLED'] = True
         self.addCleanup(app.config.update, PUBLIC_SIGNUP_ENABLED=False)
-        page = self.client.get('/signup')
+        page = self.client.get('/')
         self.assertEqual(page.status_code, 200)
+        self.assertIn(b'action="/signup"', page.data)
         token = re.search(rb'name="csrf_token" value="([^"]+)"', page.data).group(1).decode()
         response = self.client.post('/signup', data={
             'csrf_token': token, 'organization_name': 'Other',
@@ -139,6 +140,25 @@ class TenantIsolationTests(unittest.TestCase):
                 self.assertEqual(self.client.post('/signup', data=data).status_code, 400)
         with app.app_context():
             self.assertIsNone(Tenant.query.filter_by(slug='test-company').first())
+
+    def test_public_landing_uses_private_organization_login(self):
+        response = self.client.get('/')
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'Organization signup is currently unavailable', response.data)
+        self.assertNotIn(b'action="/signup"', response.data)
+        self.assertNotIn(b'Whitetap', response.data)
+        self.assertNotIn(b'/whitetap/login', response.data)
+        self.assertNotIn(b'Staff Inventory Portal', response.data)
+        self.assertEqual(
+            self.client.get('/organization-login?slug=OTHER').location,
+            '/other/login'
+        )
+        self.assertEqual(
+            self.client.get('/organization-login?slug=whitetap').location,
+            '/whitetap/login'
+        )
+        self.assertEqual(self.client.get('/organization-login?slug=../../other').location, '/')
+        self.assertEqual(self.client.get('/unknown-company/login').status_code, 404)
 
     def test_edit_product_checks_uuid_and_tenant(self):
         self.login('whitetap', 'whitetap-password')
