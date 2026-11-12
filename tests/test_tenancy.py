@@ -31,8 +31,8 @@ class TenantIsolationTests(unittest.TestCase):
         with app.app_context():
             db.create_all()
             db.session.add_all([
-                Tenant(id=1, name='Whitetap', slug='whitetap'),
-                Tenant(id=2, name='Other', slug='other'),
+                Tenant(id=1, name='Whitetap', slug='whitetap', approval_status='approved', is_active=True),
+                Tenant(id=2, name='Other', slug='other', approval_status='approved', is_active=True),
                 TenantUser(id=1, tenant_id=1, email='admin@example.test',
                            password_hash=generate_password_hash('whitetap-password'), role='admin'),
                 TenantUser(id=2, tenant_id=2, email='admin@example.test',
@@ -85,6 +85,66 @@ class TenantIsolationTests(unittest.TestCase):
         self.assertEqual(other.status_code, 404)
         self.assertEqual(self.client.get('/other/api/products/lookup?identifier=SKU-2').status_code, 401)
 
+    def test_owner_approval_lock_unlock_and_existing_sessions(self):
+        owner = app.test_client()
+        original = app.config['SUPER_ADMIN_PASSWORD_HASH']
+        app.config['SUPER_ADMIN_PASSWORD_HASH'] = generate_password_hash('owner-test-password')
+        self.addCleanup(app.config.update, SUPER_ADMIN_PASSWORD_HASH=original)
+        self.login('whitetap', 'whitetap-password')
+        self.assertEqual(self.client.get('/super-admin/tenants').status_code, 302)
+        self.assertEqual(owner.get('/super-admin/tenants').status_code, 302)
+        self.assertEqual(owner.post('/super-admin/tenants/1/lock').status_code, 400)
+        page = owner.get('/super-admin/owner-login')
+        token = re.search(rb'name="csrf_token" value="([^"]+)"', page.data).group(1).decode()
+        self.assertEqual(owner.post('/super-admin/tenants/1/lock').status_code, 400)
+        response = owner.post('/super-admin/owner-login', data={'csrf_token': token, 'password': 'wrong'})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(owner.get('/super-admin/tenants').status_code, 302)
+        response = owner.post('/super-admin/owner-login', data={'csrf_token': token, 'password': 'owner-test-password'})
+        self.assertEqual(response.status_code, 302)
+        page = owner.get('/super-admin/tenants')
+        self.assertEqual(page.status_code, 200)
+        token = re.search(rb'name="csrf_token" value="([^"]+)"', page.data).group(1).decode()
+        self.assertEqual(owner.post('/super-admin/tenants/1/lock', data={'csrf_token': token}).status_code, 302)
+        try:
+            self.assertEqual(self.client.get('/whitetap/api/products/lookup?identifier=SKU-1').status_code, 403)
+            self.assertEqual(self.client.get('/po/respond/whitetap/token-1-abcdefghijklmnop').status_code, 403)
+            response = self.login('whitetap', 'whitetap-password')
+            self.assertEqual(response.status_code, 403)
+            self.assertIn(b'This account has been locked', response.data)
+            self.assertEqual(owner.post('/super-admin/tenants/1/unlock', data={'csrf_token': token}).status_code, 302)
+            self.assertEqual(self.login('whitetap', 'whitetap-password').status_code, 302)
+            self.assertEqual(self.client.get('/po/respond/whitetap/token-1-abcdefghijklmnop').status_code, 200)
+            self.assertEqual(self.client.get('/whitetap/api/products/lookup?identifier=SKU-1').status_code, 200)
+            with app.app_context():
+                tenant = db.session.get(Tenant, 1)
+                tenant.approval_status, tenant.is_active = 'suspended', True
+                db.session.commit()
+            self.assertEqual(self.client.get('/po/respond/whitetap/token-1-abcdefghijklmnop').status_code, 403)
+            self.assertEqual(self.login('whitetap', 'whitetap-password').status_code, 403)
+            self.assertEqual(owner.post('/super-admin/tenants/1/unlock', data={'csrf_token': token}).status_code, 302)
+            self.assertEqual(owner.post('/super-admin/tenants/1/approve', data={'csrf_token': token}).status_code, 409)
+            self.assertEqual(owner.post('/super-admin/tenants/99999/lock', data={'csrf_token': token}).status_code, 404)
+            with owner.session_transaction() as owner_session:
+                owner_session['super_admin_issued'] = (datetime.now(timezone.utc) - timedelta(minutes=31)).timestamp()
+            self.assertEqual(owner.get('/super-admin/tenants').status_code, 302)
+            owner.post('/super-admin/owner-login', data={'csrf_token': token, 'password': 'owner-test-password'})
+            self.assertEqual(owner.get('/super-admin/tenants').status_code, 200)
+            app.config['SUPER_ADMIN_PASSWORD_HASH'] = generate_password_hash('rotated-test-password')
+            self.assertEqual(owner.get('/super-admin/tenants').status_code, 302)
+        finally:
+            with app.app_context():
+                tenant = db.session.get(Tenant, 1)
+                tenant.approval_status, tenant.is_active = 'approved', True
+                db.session.commit()
+
+    def test_owner_access_disabled_without_password(self):
+        original = app.config['SUPER_ADMIN_PASSWORD_HASH']
+        app.config['SUPER_ADMIN_PASSWORD_HASH'] = ''
+        self.addCleanup(app.config.update, SUPER_ADMIN_PASSWORD_HASH=original)
+        self.assertEqual(self.client.get('/super-admin/owner-login').status_code, 503)
+        self.assertEqual(self.client.get('/super-admin/tenants').status_code, 503)
+
     def test_public_signup_provisions_unique_slug_and_admin(self):
         self.assertTrue(app.config['PUBLIC_SIGNUP_ENABLED'])
         page = self.client.get('/')
@@ -104,6 +164,7 @@ class TenantIsolationTests(unittest.TestCase):
             user = TenantUser.query.filter_by(tenant_id=tenant.id).one()
             self.assertEqual((user.email, user.role), ('new@example.test', 'admin'))
             self.assertTrue(check_password_hash(user.password_hash, 'new-password-123'))
+            self.assertEqual((tenant.approval_status, tenant.is_active), ('pending', False))
             tenant_id, user_id = tenant.id, user.id
         with app.test_request_context('/'):
             g.current_tenant = db.session.get(Tenant, tenant_id)
@@ -121,6 +182,22 @@ class TenantIsolationTests(unittest.TestCase):
         self.addCleanup(cleanup_signup)
         login_page = self.client.get(response.location)
         token = re.search(rb'name="csrf_token" value="([^"]+)"', login_page.data).group(1).decode()
+        login_response = self.client.post('/other-2/login', data={
+            'csrf_token': token, 'email': 'new@example.test', 'password': 'new-password-123'
+        })
+        self.assertEqual(login_response.status_code, 403)
+        self.assertIn(b'pending approval by the system administrator', login_response.data)
+        original_hash = app.config['SUPER_ADMIN_PASSWORD_HASH']
+        app.config['SUPER_ADMIN_PASSWORD_HASH'] = generate_password_hash('owner-test-password')
+        self.addCleanup(app.config.update, SUPER_ADMIN_PASSWORD_HASH=original_hash)
+        owner = app.test_client()
+        owner_page = owner.get('/super-admin/owner-login')
+        owner_token = re.search(rb'name="csrf_token" value="([^"]+)"', owner_page.data).group(1).decode()
+        owner.post('/super-admin/owner-login', data={'csrf_token': owner_token, 'password': 'owner-test-password'})
+        owner_page = owner.get('/super-admin/tenants')
+        owner_token = re.search(rb'name="csrf_token" value="([^"]+)"', owner_page.data).group(1).decode()
+        self.assertEqual(owner.post(f'/super-admin/tenants/{tenant_id}/unlock', data={'csrf_token': owner_token}).status_code, 409)
+        self.assertEqual(owner.post(f'/super-admin/tenants/{tenant_id}/approve', data={'csrf_token': owner_token}).status_code, 302)
         login_response = self.client.post('/other-2/login', data={
             'csrf_token': token, 'email': 'new@example.test', 'password': 'new-password-123'
         })

@@ -4,6 +4,7 @@ import secrets
 import smtplib
 import unicodedata
 import html as htmllib
+import hashlib
 from email.message import EmailMessage
 import psycopg2
 from dotenv import load_dotenv
@@ -46,6 +47,7 @@ app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['SESSION_COOKIE_SECURE'] = os.environ.get('SESSION_COOKIE_SECURE', 'true').lower() == 'true'
 app.config['PUBLIC_SIGNUP_ENABLED'] = os.environ.get('PUBLIC_SIGNUP_ENABLED', 'true').lower() == 'true'
+app.config['SUPER_ADMIN_PASSWORD_HASH'] = os.environ.get('SUPER_ADMIN_PASSWORD_HASH', '')
 if app.config['SQLALCHEMY_DATABASE_URI'] and app.config['SQLALCHEMY_DATABASE_URI'].get_backend_name() == 'postgresql':
     app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {'creator': get_conn}
 
@@ -57,6 +59,8 @@ class Tenant(db.Model):
     id = db.Column(db.BigInteger().with_variant(db.Integer, 'sqlite'), primary_key=True)
     name = db.Column(db.Text, nullable=False)
     slug = db.Column(db.String(50), nullable=False, unique=True)
+    approval_status = db.Column(db.String(50), nullable=False, default='pending', server_default='pending')
+    is_active = db.Column(db.Boolean, nullable=False, default=False, server_default=db.false())
     created_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
 
@@ -381,14 +385,15 @@ def add_tenant_slug(endpoint, values):
 
 @app.before_request
 def resolve_tenant_and_authenticate():
-    if request.endpoint not in TENANT_ENDPOINTS and request.endpoint != 'signup':
+    super_admin_endpoints = ('super_admin_login', 'super_admin_tenants', 'super_admin_tenant_action', 'super_admin_logout')
+    if request.endpoint not in TENANT_ENDPOINTS and request.endpoint != 'signup' and request.endpoint not in super_admin_endpoints:
         return
     if not app.config['SECRET_KEY']:
         raise RuntimeError('SECRET_KEY must be configured before serving requests')
     if request.endpoint == 'signup':
         if not app.config['PUBLIC_SIGNUP_ENABLED']:
             abort(404)
-    else:
+    elif request.endpoint in TENANT_ENDPOINTS:
         tenant = Tenant.query.filter_by(slug=g.tenant_slug).first()
         if tenant is None:
             abort(404)
@@ -398,8 +403,22 @@ def resolve_tenant_and_authenticate():
         expected = session.get('csrf_token', '')
         if not expected or not secrets.compare_digest(expected.encode('utf-8'), supplied.encode('utf-8')):
             abort(400, description='Invalid CSRF token')
-    if request.endpoint in ('signup', 'login', 'supplier_po_response'):
+    if request.endpoint in super_admin_endpoints:
+        if not app.config['SUPER_ADMIN_PASSWORD_HASH']:
+            abort(503, description='Super administrator access is not configured')
+        if request.endpoint != 'super_admin_login' and not super_admin_authenticated():
+            return redirect(url_for('super_admin_login'))
         return
+    if request.endpoint in ('signup', 'login', 'supplier_po_response'):
+        if request.endpoint == 'supplier_po_response' and not tenant_can_access(tenant):
+            abort(403, description='Organization account is unavailable')
+        return
+    if not tenant_can_access(tenant):
+        session.clear()
+        if request.endpoint.startswith('api_') or request.endpoint == 'delete_tint_recipe' or request.is_json:
+            return jsonify({'error': 'Organization account is unavailable'}), 403
+        flash(tenant_access_message(tenant), 'error')
+        return redirect(url_for('login'))
     user_id = session.get('tenant_user_id')
     user = TenantUser.query.filter_by(id=user_id, tenant_id=tenant.id).first() if user_id else None
     if not user or user.role not in ('admin', 'staff'):
@@ -418,6 +437,81 @@ def csrf_token():
     if 'csrf_token' not in session:
         session['csrf_token'] = secrets.token_urlsafe(32)
     return session['csrf_token']
+
+
+def tenant_can_access(tenant):
+    return tenant.approval_status == 'approved' and tenant.is_active
+
+
+def tenant_access_message(tenant):
+    if tenant.approval_status == 'pending':
+        return 'Your organization account is pending approval by the system administrator.'
+    return 'This account has been locked. Please contact support.'
+
+
+def super_admin_authenticated():
+    issued = session.get('super_admin_issued')
+    fingerprint = session.get('super_admin_credential')
+    expected = hashlib.sha256(app.config['SUPER_ADMIN_PASSWORD_HASH'].encode('utf-8')).hexdigest()
+    now = datetime.now(timezone.utc).timestamp()
+    return (isinstance(issued, (int, float)) and 0 <= now - issued < 1800
+            and isinstance(fingerprint, str) and secrets.compare_digest(fingerprint, expected))
+
+
+@app.cli.command('generate-super-admin-hash')
+@click.password_option()
+def generate_super_admin_hash(password):
+    """Generate the password hash for the owner dashboard."""
+    if len(password) < 12:
+        raise click.ClickException('Password must contain at least 12 characters')
+    click.echo(generate_password_hash(password))
+
+
+@app.route('/super-admin/owner-login', methods=['GET', 'POST'])
+def super_admin_login():
+    if request.method == 'POST':
+        password = request.form.get('password', '')
+        if check_password_hash(app.config['SUPER_ADMIN_PASSWORD_HASH'], password):
+            session.clear()
+            session['super_admin_issued'] = datetime.now(timezone.utc).timestamp()
+            session['super_admin_credential'] = hashlib.sha256(
+                app.config['SUPER_ADMIN_PASSWORD_HASH'].encode('utf-8')
+            ).hexdigest()
+            return redirect(url_for('super_admin_tenants'))
+        flash('Incorrect password.', 'error')
+    return render_template('super_admin_login.html')
+
+
+@app.route('/super-admin/tenants')
+def super_admin_tenants():
+    return render_template('super_admin_tenants.html', tenants=Tenant.query.order_by(Tenant.name, Tenant.id).all())
+
+
+@app.route('/super-admin/tenants/<int:tenant_id>/<action>', methods=['POST'])
+def super_admin_tenant_action(tenant_id, action):
+    if action not in ('approve', 'lock', 'unlock'):
+        abort(404)
+    tenant = Tenant.query.filter_by(id=tenant_id).with_for_update().first_or_404()
+    if action == 'approve' and tenant.approval_status == 'pending':
+        tenant.approval_status = 'approved'
+        tenant.is_active = True
+    elif action == 'lock' and tenant.approval_status in ('approved', 'suspended'):
+        tenant.is_active = False
+    elif action == 'unlock' and tenant.approval_status in ('approved', 'suspended'):
+        tenant.approval_status = 'approved'
+        tenant.is_active = True
+    else:
+        abort(409, description='Invalid organization status transition')
+    db.session.commit()
+    app.logger.info('Super administrator %s organization id %s', action, tenant_id)
+    flash('Organization status updated.', 'success')
+    return redirect(url_for('super_admin_tenants'))
+
+
+@app.route('/super-admin/logout', methods=['POST'])
+def super_admin_logout():
+    session.clear()
+    return redirect(url_for('super_admin_login'))
 
 
 def lock_user_provisioning():
@@ -717,7 +811,7 @@ def signup():
                 suffix += 1
                 suffix_text = f'-{suffix}'
                 slug = slug_base[:50 - len(suffix_text)].rstrip('-') + suffix_text
-            tenant = Tenant(name=name, slug=slug)
+            tenant = Tenant(name=name, slug=slug, approval_status='pending', is_active=False)
             db.session.add(tenant)
             db.session.flush()
             db.session.add(TenantUser(
@@ -731,7 +825,7 @@ def signup():
             flash('Unable to create the organization due to an account conflict. Please try again.', 'error')
             return render_template('signup.html', organization_name=name, email=email), 409
         session.clear()
-        flash('Organization created. Sign in with your new administrator account.', 'success')
+        flash('Organization created. Your account is pending system owner approval.', 'success')
         return redirect(url_for('login', tenant_slug=slug))
     return render_template('signup.html', organization_name=name, email=email), 400
 
@@ -1367,6 +1461,9 @@ def export_inventory():
 @tenant_route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
+        if not tenant_can_access(g.current_tenant):
+            flash(tenant_access_message(g.current_tenant), 'error')
+            return render_template('login.html'), 403
         email = request.form.get('email', '').strip().lower()
         password = request.form.get('password', '')
         user = TenantUser.query.filter(

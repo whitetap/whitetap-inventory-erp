@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Organization approvals</title>
+  <style>body{font:16px system-ui;margin:2rem;color:#17233a}main{max-width:1100px;margin:auto}table{border-collapse:collapse;width:100%}th,td{text-align:left;padding:.75rem;border-bottom:1px solid #ddd}form{display:inline}button{padding:.45rem .8rem;cursor:pointer}@media(max-width:650px){.table-wrap{overflow-x:auto}}</style>
+</head>
+<body><main>
+  <h1>Organizations</h1>
+  {% for category, message in get_flashed_messages(with_categories=true) %}<p role="status">{{ message }}</p>{% endfor %}
+  <form method="post" action="{{ url_for('super_admin_logout') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button type="submit">Sign out</button></form>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Organization</th><th>Slug</th><th>Approval</th><th>Account</th><th>Action</th></tr></thead>
+    <tbody>{% for tenant in tenants %}<tr>
+      <td>{{ tenant.name }}</td><td>{{ tenant.slug }}</td><td>{{ tenant.approval_status }}</td><td>{{ 'Active' if tenant.is_active else 'Locked' }}</td>
+      <td>
+        {% if tenant.approval_status == 'pending' %}{% set action = 'approve' %}{% set label = 'Approve' %}
+        {% elif tenant.approval_status in ('approved', 'suspended') %}{% set action = 'lock' if tenant.is_active and tenant.approval_status == 'approved' else 'unlock' %}{% set label = 'Lock' if action == 'lock' else 'Unlock' %}
+        {% else %}{% set action = none %}{% endif %}
+        {% if action %}<form method="post" action="{{ url_for('super_admin_tenant_action', tenant_id=tenant.id, action=action) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button type="submit">{{ label }}</button></form>{% else %}Requires database review{% endif %}
+      </td>
+    </tr>{% else %}<tr><td colspan="5">No organizations found.</td></tr>{% endfor %}</tbody>
+  </table></div>
+</main></body></html>

@@ -40,7 +40,7 @@ try:
     app.config['TESTING'] = True
     with app.app_context():
         db.create_all()
-        db.session.add(Tenant(name='Whitetap', slug='whitetap'))
+        db.session.add(Tenant(name='Whitetap', slug='whitetap', approval_status='approved', is_active=True))
         db.session.flush()
         db.session.add(TenantUser(tenant_id=1, email='admin@example.test',
                                   password_hash=generate_password_hash('long-enough-password'), role='admin'))
@@ -78,6 +78,7 @@ try:
     assert signup.status_code == 302 and signup.location.endswith('/second-company/login')
     with app.app_context(), app.test_request_context('/'):
         tenant = Tenant.query.filter_by(slug='second-company').one()
+        assert tenant.approval_status == 'pending' and not tenant.is_active
         g.current_tenant = tenant
         assert ProductCategory.query.count() == 0
         assert Product.query.count() == 0

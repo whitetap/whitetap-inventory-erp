@@ -21,6 +21,8 @@ class BootstrapTests(unittest.TestCase):
                     id INTEGER PRIMARY KEY,
                     name TEXT NOT NULL,
                     slug VARCHAR(50) NOT NULL UNIQUE,
+                    approval_status VARCHAR(50) NOT NULL DEFAULT 'approved',
+                    is_active BOOLEAN NOT NULL DEFAULT 1,
                     created_at TIMESTAMP
                 );
                 CREATE TABLE tenant_users (

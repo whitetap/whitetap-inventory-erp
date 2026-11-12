@@ -17,6 +17,13 @@ do not reassign product ownership without a separate data migration. Check
 related rows have matching tenant IDs.
 Existing rows and tokens are expected to belong to the `whitetap` tenant.
 
+Before deploying the approval workflow, take a verified backup and run
+`migrations/tenant_approval.sql` on a restored PostgreSQL copy first, then on
+production as a controlled migration. On first run it marks all existing
+organizations approved and active; new rows default to pending and inactive.
+It preserves statuses on rerun and aborts if only one approval column exists
+or existing values are null. It does not delete tenant data.
+
 Verify database constraints independently: category names, normalized client
 names, invoice numbers, quotation numbers and purchase order numbers must be
 unique per tenant rather than globally; `tenant_users` must prevent duplicate
@@ -52,17 +59,18 @@ Public organization signup is enabled by default. Set
 verifying the initial owner, or whenever public registrations should be paused.
 The form at `/signup` creates an organization and its first administrator in one
 transaction, generates a unique URL slug, and redirects to its login page.
+New organizations cannot log in until the owner approves them.
 The public landing page displays the signup form only when enabled. Existing
 users can enter their organization's slug to reach its login page; organization
-names are not publicly listed. The tenant table has no active/inactive status.
+names are not publicly listed.
 Signup rejects email addresses already used by any tenant, case-insensitively;
 other provisioning paths continue to permit the same email in different tenants.
 PostgreSQL application signup and the user-provisioning command use the same
 transaction advisory lock. External writers must honor that lock or enforce
 equivalent database constraints to avoid concurrent duplicate email creation.
 
-Signup does not verify email addresses, implement recovery, CAPTCHA, rate
-limits, or organization approval. Configure rate limiting and abuse protection
+Signup does not verify email addresses, implement recovery, CAPTCHA or rate
+limits. Configure rate limiting and abuse protection
 at the reverse proxy and consider email verification before exposing the signup
 form to the public. Signup with an empty user table will prevent the initial-admin
 bootstrap from running on subsequent startups; provision the owner first.
@@ -91,9 +99,28 @@ flask --app app_fixed_final create-tenant-user --tenant-slug whitetap --role sta
 ```
 
 The command prompts for email and password; passwords are hashed with Werkzeug.
-Create accounts for each company and staff member. It does not create companies
-or provide a super-admin dashboard. Passwords must be at least 12 characters.
+Create accounts for each company and staff member. It does not create companies.
+Passwords must be at least 12 characters.
 Do not pass passwords on the command line.
+
+### System owner approvals
+
+Run `flask --app app_fixed_final generate-super-admin-hash` in a trusted
+environment and enter a unique owner password of at least 12 characters when
+prompted. Set the resulting hash as the secret environment variable
+`SUPER_ADMIN_PASSWORD_HASH` on the deployment; do not commit it. The owner
+signs in at `/super-admin/owner-login` and manages organizations at
+`/super-admin/tenants`. Without the hash, these routes return 503. Changing the
+hash invalidates owner sessions; sessions also expire after 30 minutes.
+Configure strict reverse-proxy rate limiting and access restrictions for the
+owner login before exposing it: the application does not implement rate
+limiting, MFA, or centralized revocation of signed cookies. Rotate `SECRET_KEY`
+to revoke all signed sessions if needed.
+
+Approve activates pending organizations. Locking blocks tenant login, existing
+tenant sessions on their next request, and supplier links; unlocking restores
+access without deleting data. Unlock cannot bypass pending approval. This check
+is application-level and cannot cancel requests already in progress.
 
 Users sign in at `/<tenant_slug>/login`. All staff routes now require an account;
 admin routes require the `admin` role. Old unprefixed application routes resolve
