@@ -348,6 +348,9 @@ def enforce_tenant_writes(db_session, flush_context, instances):
 
 
 TENANT_ENDPOINTS = set()
+SUPER_ADMIN_ENDPOINTS = frozenset({
+    'super_admin_login', 'super_admin_tenants', 'super_admin_tenant_action', 'super_admin_logout'
+})
 ADMIN_ENDPOINTS = {
     'admin_dashboard', 'admin_usage_logs', 'admin_proforma_invoices',
     'proforma_invoice_detail', 'delete_proforma_invoice', 'admin_added_products',
@@ -385,8 +388,7 @@ def add_tenant_slug(endpoint, values):
 
 @app.before_request
 def resolve_tenant_and_authenticate():
-    super_admin_endpoints = ('super_admin_login', 'super_admin_tenants', 'super_admin_tenant_action', 'super_admin_logout')
-    if request.endpoint not in TENANT_ENDPOINTS and request.endpoint != 'signup' and request.endpoint not in super_admin_endpoints:
+    if request.endpoint not in TENANT_ENDPOINTS and request.endpoint != 'signup' and request.endpoint not in SUPER_ADMIN_ENDPOINTS:
         return
     if not app.config['SECRET_KEY']:
         raise RuntimeError('SECRET_KEY must be configured before serving requests')
@@ -403,7 +405,7 @@ def resolve_tenant_and_authenticate():
         expected = session.get('csrf_token', '')
         if not expected or not secrets.compare_digest(expected.encode('utf-8'), supplied.encode('utf-8')):
             abort(400, description='Invalid CSRF token')
-    if request.endpoint in super_admin_endpoints:
+    if request.endpoint in SUPER_ADMIN_ENDPOINTS:
         if not app.config['SUPER_ADMIN_PASSWORD_HASH']:
             abort(503, description='Super administrator access is not configured')
         if request.endpoint != 'super_admin_login' and not super_admin_authenticated():
@@ -430,6 +432,13 @@ def resolve_tenant_and_authenticate():
     session['logged_in'] = user.role == 'admin'
     if request.endpoint in ADMIN_ENDPOINTS and user.role != 'admin':
         abort(403)
+
+
+@app.after_request
+def prevent_super_admin_caching(response):
+    if request.endpoint in SUPER_ADMIN_ENDPOINTS:
+        response.headers['Cache-Control'] = 'no-store'
+    return response
 
 
 @app.template_global()
@@ -483,8 +492,20 @@ def super_admin_login():
 
 
 @app.route('/super-admin/tenants')
+@app.route('/super-admin/dashboard')
 def super_admin_tenants():
-    return render_template('super_admin_tenants.html', tenants=Tenant.query.order_by(Tenant.name, Tenant.id).all())
+    initial_admin_email = (
+        db.select(TenantUser.email)
+        .where(TenantUser.tenant_id == Tenant.id, TenantUser.role == 'admin')
+        .order_by(TenantUser.id)
+        .limit(1)
+        .correlate(Tenant)
+        .scalar_subquery()
+    )
+    tenants = db.session.query(Tenant, initial_admin_email.label('initial_admin_email')).order_by(
+        Tenant.name, Tenant.id
+    ).all()
+    return render_template('super_admin_tenants.html', tenants=tenants)
 
 
 @app.route('/super-admin/tenants/<int:tenant_id>/<action>', methods=['POST'])

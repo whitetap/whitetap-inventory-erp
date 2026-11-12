@@ -110,7 +110,12 @@ environment and enter a unique owner password of at least 12 characters when
 prompted. Set the resulting hash as the secret environment variable
 `SUPER_ADMIN_PASSWORD_HASH` on the deployment; do not commit it. The owner
 signs in at `/super-admin/owner-login` and manages organizations at
-`/super-admin/tenants`. Without the hash, these routes return 503. Changing the
+`/super-admin/dashboard` (the older `/super-admin/tenants` link also works).
+The dashboard displays the earliest remaining administrator email per tenant,
+not a verified owner: the schema does not record an owner separately. If no
+administrator exists, it shows "No administrator". `/super-admin/login` remains
+available to an organization whose slug is `super-admin`; it is not the owner
+login. Without the hash, owner routes return 503. Changing the
 hash invalidates owner sessions; sessions also expire after 30 minutes.
 Configure strict reverse-proxy rate limiting and access restrictions for the
 owner login before exposing it: the application does not implement rate
