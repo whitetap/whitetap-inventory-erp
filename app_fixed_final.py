@@ -319,7 +319,7 @@ def enforce_tenant_writes(db_session, flush_context, instances):
                 continue
             with db_session.no_autoflush:
                 exists = db_session.query(target.id).filter(
-                    target.id == value, target.tenant_id == tenant_id
+                    target.id == value
                 ).first()
             if not exists:
                 raise ValueError(f'Invalid tenant reference: {type(obj).__name__}.{field}')
@@ -481,7 +481,6 @@ def seed_product_categories():
         )
     for category_name in DEFAULT_PRODUCT_CATEGORIES:
         category = ProductCategory.query.filter(
-            ProductCategory.tenant_id == tenant_id,
             db.func.lower(ProductCategory.name) == category_name.lower()
         ).first()
         if not category:
@@ -571,6 +570,10 @@ def get_usage_period_start(period, today=None):
     else:
         return None
     return datetime.combine(start_date, datetime.min.time())
+
+
+def usage_log_date():
+    return func.substr(db.cast(UsageLog.created_at, db.String), 1, 10)
 
 def normalize_client_name(name):
     return ' '.join(name.casefold().split())
@@ -897,7 +900,7 @@ def export_logs():
     start = get_usage_period_start(period)
     logs_query = db.session.query(UsageLog, Product.name).outerjoin(Product, Product.id == UsageLog.product_id)
     if start:
-        logs_query = logs_query.filter(UsageLog.created_at >= start)
+        logs_query = logs_query.filter(usage_log_date() >= start.date().isoformat())
     if project_ref:
         logs_query = logs_query.filter(UsageLog.project_ref.ilike(f'%{project_ref}%'))
     logs = logs_query.order_by(desc(UsageLog.created_at)).all()
@@ -936,7 +939,7 @@ def admin_usage_logs():
     start = get_usage_period_start(period)
     logs_query = db.session.query(UsageLog, Product.name).outerjoin(Product, Product.id == UsageLog.product_id)
     if start:
-        logs_query = logs_query.filter(UsageLog.created_at >= start)
+        logs_query = logs_query.filter(usage_log_date() >= start.date().isoformat())
     if project_ref:
         logs_query = logs_query.filter(UsageLog.project_ref.ilike(f'%{project_ref}%'))
     rows = logs_query.order_by(desc(UsageLog.created_at)).all()
@@ -1430,8 +1433,7 @@ def admin_dashboard():
     
     # Today's usage logs count
     today_logs = db.session.query(func.count(UsageLog.id)).filter(
-        func.date(UsageLog.created_at) == datetime.now().date(),
-        UsageLog.tenant_id == g.current_tenant.id
+        usage_log_date() == datetime.now().date().isoformat()
     ).scalar()
 
     product_categories = ProductCategory.query.order_by(ProductCategory.name).all()

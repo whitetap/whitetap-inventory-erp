@@ -102,3 +102,11 @@ role and review all new code and database access paths.
 Run `python -m unittest discover -s tests -v` to exercise the isolated SQLite
 tests. They do not validate PostgreSQL migrations, actual production constraints,
 or real production data.
+
+Usage-log date filters use the first ten characters of `created_at` converted to
+text, and expect date/timestamp values or text beginning with an ISO date
+(`YYYY-MM-DD`). PostgreSQL timestamp-with-time-zone values are rendered in the
+database session time zone. Non-ISO or malformed text must be cleaned or migrated
+before relying on date filters; casting to text may prevent use of a plain
+`created_at` index. These comparisons do not normalize the values returned by
+PostgreSQL: the application model expects timestamp-compatible values.

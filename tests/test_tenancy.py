@@ -14,6 +14,8 @@ os.environ.pop('PUBLIC_SIGNUP_ENABLED', None)
 
 from flask import g, url_for, template_rendered
 from sqlalchemy import event, select, text
+from sqlalchemy.dialects import postgresql
+from sqlalchemy.orm import Session
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from app_fixed_final import (
@@ -334,6 +336,7 @@ class TenantIsolationTests(unittest.TestCase):
                     db.session.commit()
 
             statements = []
+            postgres_statements = []
             contexts = []
 
             def record_sql(conn, cursor, statement, parameters, context, executemany):
@@ -344,21 +347,70 @@ class TenantIsolationTests(unittest.TestCase):
                 if template.name == 'admin.html':
                     contexts.append(context)
 
+            def record_orm(execute_state):
+                if execute_state.is_select and 'count(' in str(execute_state.statement).lower():
+                    compiled = execute_state.statement.compile(dialect=postgresql.dialect())
+                    if 'usage_logs' in str(compiled).lower():
+                        postgres_statements.append((str(compiled), compiled.params))
+
             self.login('whitetap', 'whitetap-password')
             with app.app_context():
                 engine = db.engine
             event.listen(engine, 'before_cursor_execute', record_sql)
+            event.listen(Session, 'do_orm_execute', record_orm)
             template_rendered.connect(record_template, app, weak=False)
             try:
                 response = self.client.get('/whitetap/admin-dashboard')
             finally:
                 event.remove(engine, 'before_cursor_execute', record_sql)
+                event.remove(Session, 'do_orm_execute', record_orm)
                 template_rendered.disconnect(record_template, app)
             self.assertEqual(response.status_code, 200)
             self.assertEqual(contexts[0]['today_logs'], 1)
             self.assertEqual(len(statements), 1)
             self.assertNotIn('anon_1', statements[0].lower())
-            self.assertIn('usage_logs.tenant_id', statements[0].lower())
+            self.assertEqual(len(re.findall(r'usage_logs\.tenant_id\s*=', statements[0].lower())), 1)
+            self.assertEqual(len(postgres_statements), 1)
+            pg_sql, pg_parameters = postgres_statements[0]
+            self.assertIn('CAST(usage_logs.created_at AS VARCHAR)', pg_sql)
+            self.assertEqual(len(re.findall(r'usage_logs\.tenant_id\s*=', pg_sql.lower())), 1)
+            self.assertIn(today.date().isoformat(), pg_parameters.values())
+        finally:
+            for tenant_id, log_id in created_ids:
+                with app.test_request_context('/'):
+                    g.current_tenant = db.session.get(Tenant, tenant_id)
+                    UsageLog.query.filter_by(id=log_id).delete()
+                    db.session.commit()
+
+    def test_usage_period_filters_dates_and_tenants(self):
+        created_ids = []
+        today = datetime.now().replace(hour=12, minute=0, second=0, microsecond=0)
+        try:
+            for tenant_id, created_at in (
+                (1, today), (1, today - timedelta(days=1)), (2, today)
+            ):
+                with app.test_request_context('/'):
+                    g.current_tenant = db.session.get(Tenant, tenant_id)
+                    log = UsageLog(
+                        product_id=self.product_ids[tenant_id - 1], quantity_used=1,
+                        technician_name=f'Tenant-{tenant_id}-{created_at.date()}',
+                        project_ref='period-filter-test', created_at=created_at
+                    )
+                    db.session.add(log)
+                    db.session.flush()
+                    created_ids.append((tenant_id, log.id))
+                    db.session.commit()
+            self.login('whitetap', 'whitetap-password')
+            for path in (
+                '/whitetap/admin/usage-logs?period=daily&project_ref=period-filter-test',
+                '/whitetap/export-logs?period=daily&project_ref=period-filter-test'
+            ):
+                with self.subTest(path=path):
+                    response = self.client.get(path)
+                    self.assertEqual(response.status_code, 200)
+                    self.assertIn(f'Tenant-1-{today.date()}'.encode(), response.data)
+                    self.assertNotIn(f'Tenant-1-{(today - timedelta(days=1)).date()}'.encode(), response.data)
+                    self.assertNotIn(f'Tenant-2-{today.date()}'.encode(), response.data)
         finally:
             for tenant_id, log_id in created_ids:
                 with app.test_request_context('/'):
