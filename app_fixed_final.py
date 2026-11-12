@@ -45,7 +45,7 @@ app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY')
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['SESSION_COOKIE_SECURE'] = os.environ.get('SESSION_COOKIE_SECURE', 'true').lower() == 'true'
-app.config['PUBLIC_SIGNUP_ENABLED'] = os.environ.get('PUBLIC_SIGNUP_ENABLED', 'false').lower() == 'true'
+app.config['PUBLIC_SIGNUP_ENABLED'] = os.environ.get('PUBLIC_SIGNUP_ENABLED', 'true').lower() == 'true'
 if app.config['SQLALCHEMY_DATABASE_URI'] and app.config['SQLALCHEMY_DATABASE_URI'].get_backend_name() == 'postgresql':
     app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {'creator': get_conn}
 

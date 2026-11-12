@@ -1,18 +1,18 @@
-<form method="post" action="{{ url_for('signup') }}">
+<form class="signup-form" method="post" action="{{ url_for('signup') }}">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <div class="mb-3">
         <label class="form-label" for="organization_name">Organization name</label>
-        <input class="form-control" id="organization_name" name="organization_name" maxlength="100" value="{{ organization_name|default('') }}" required>
+        <input class="form-control" id="organization_name" name="organization_name" maxlength="100" autocomplete="organization" placeholder="e.g. Northstar Aviation" value="{{ organization_name|default('') }}" required>
         <div class="form-text text-light">Your organization URL is generated from this name.</div>
     </div>
     <div class="mb-3">
         <label class="form-label" for="email">Admin email</label>
-        <input class="form-control" id="email" name="email" type="email" maxlength="255" autocomplete="email" value="{{ email|default('') }}" required>
+        <input class="form-control" id="email" name="email" type="email" maxlength="255" autocomplete="email" placeholder="you@company.com" value="{{ email|default('') }}" required>
     </div>
     <div class="mb-3">
-        <label class="form-label" for="password">Password</label>
-        <input class="form-control" id="password" name="password" type="password" minlength="12" maxlength="1024" autocomplete="new-password" required>
+        <label class="form-label" for="password">Admin password</label>
+        <input class="form-control" id="password" name="password" type="password" minlength="12" maxlength="1024" autocomplete="new-password" placeholder="At least 12 characters" required>
         <div class="form-text text-light">Use at least 12 characters.</div>
     </div>
-    <button class="btn btn-primary" type="submit">Create organization</button>
+    <button class="btn btn-primary signup-submit" type="submit">Create organization <span aria-hidden="true">&rarr;</span></button>
 </form>

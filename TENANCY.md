@@ -26,9 +26,10 @@ by the default secure session cookie. For local HTTP development only, set
 proxy; account lockout, password reset and multi-factor authentication are not
 implemented here.
 
-Public organization signup is disabled by default. After provisioning and
-verifying the initial owner, set `PUBLIC_SIGNUP_ENABLED=true` to enable
-`/signup`. The form creates an organization and its first administrator in one
+Public organization signup is enabled by default. Set
+`PUBLIC_SIGNUP_ENABLED=false` to disable signup while provisioning and
+verifying the initial owner, or whenever public registrations should be paused.
+The form at `/signup` creates an organization and its first administrator in one
 transaction, generates a unique URL slug, and redirects to its login page.
 The public landing page displays the signup form only when enabled. Existing
 users can enter their organization's slug to reach its login page; organization

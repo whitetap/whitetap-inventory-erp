@@ -3,42 +3,82 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Aviation ERP</title>
+    <meta name="theme-color" content="#09111f">
+    <title>Aviation ERP | Your operations, in focus</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/landing.css') }}" rel="stylesheet">
 </head>
-<body class="bg-dark text-light">
-    <main class="container py-5">
-        <header class="mb-5">
-            <h1>Aviation ERP</h1>
-            <p class="lead">Inventory management for your organization.</p>
+<body>
+    <div class="page-shell">
+        <header class="site-header">
+            <a class="brand" href="{{ url_for('landing') }}" aria-label="Aviation ERP home">
+                <span class="brand-mark" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none"><path d="M3 16.5 12 4l9 12.5M7 16h10M9.3 20h5.4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </span>
+                <span class="brand-name">aviation<span> / </span>erp</span>
+            </a>
+            <span class="header-note"><span class="status-dot"></span> Your workspace, your way</span>
         </header>
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% for category, message in messages %}
-                <div class="alert {{ 'alert-danger' if category == 'error' else 'alert-success' }}" role="alert">{{ message }}</div>
-            {% endfor %}
-        {% endwith %}
-        <div class="row g-5">
-            <section class="col-md-6" aria-labelledby="signup-title">
-                <h2 class="h3" id="signup-title">Create an organization</h2>
-                {% if config.PUBLIC_SIGNUP_ENABLED %}
-                    <p>Set up your organization and its first administrator account.</p>
-                    {% include '_signup_form.html' %}
-                {% else %}
-                    <p>Organization signup is currently unavailable. Contact the system owner.</p>
-                {% endif %}
-            </section>
-            <section class="col-md-6" aria-labelledby="login-title">
-                <h2 class="h3" id="login-title">Sign in to your organization</h2>
-                <p>Enter the organization slug from your login URL. Organization names are not listed publicly.</p>
-                <form method="get" action="{{ url_for('organization_login') }}">
-                    <div class="mb-3">
-                        <label class="form-label" for="slug">Organization slug</label>
-                        <input class="form-control" id="slug" name="slug" maxlength="50" required>
+
+        <main class="main-content">
+            <div class="intro">
+                <span class="eyebrow"><span class="eyebrow-line"></span> ONE PLACE FOR YOUR OPERATIONS</span>
+                <h1>Better control.<br><span>Clearer skies.</span></h1>
+                <p>Bring your inventory and day-to-day operations together in a workspace built for your organization.</p>
+            </div>
+
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% for category, message in messages %}
+                    <div class="notice {{ 'notice-error' if category == 'error' else 'notice-success' }}" role="alert">{{ message }}</div>
+                {% endfor %}
+            {% endwith %}
+
+            <div class="workspace-grid">
+                <section class="panel signup-panel" aria-labelledby="signup-title">
+                    <div class="panel-heading">
+                        <div>
+                            <span class="section-label">GET STARTED</span>
+                            <h2 id="signup-title">Create your workspace</h2>
+                            <p>Set up an organization and its first administrator.</p>
+                        </div>
+                        <span class="panel-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none"><path d="M4 20h16M6 20V7l6-3 6 3v13M9 10h.01M15 10h.01M9 14h.01M15 14h.01M11 20v-3h2v3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        </span>
                     </div>
-                    <button class="btn btn-outline-light" type="submit">Continue to sign in</button>
-                </form>
-            </section>
-        </div>
-    </main>
+                    {% if config.PUBLIC_SIGNUP_ENABLED %}
+                        {% include '_signup_form.html' %}
+                    {% else %}
+                        <p class="unavailable">Organization signup is currently unavailable. Contact the system owner.</p>
+                    {% endif %}
+                </section>
+
+                <section class="panel signin-panel" aria-labelledby="login-title">
+                    <div class="panel-heading">
+                        <div>
+                            <span class="section-label">ALREADY A MEMBER?</span>
+                            <h2 id="login-title">Welcome back</h2>
+                            <p>Head to your organization's sign-in page.</p>
+                        </div>
+                        <span class="panel-icon secondary" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none"><path d="M10 17l5-5-5-5M15 12H3M14 4h3a3 3 0 0 1 3 3v10a3 3 0 0 1-3 3h-3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        </span>
+                    </div>
+                    <form class="signin-form" method="get" action="{{ url_for('organization_login') }}">
+                        <label class="form-label" for="slug">Organization slug</label>
+                        <input class="form-control" id="slug" name="slug" maxlength="50" placeholder="e.g. northstar-aviation" required>
+                        <p class="field-help">Find this in your organization's login URL.</p>
+                        <button class="btn signin-submit" type="submit">Continue to sign in <span aria-hidden="true">&rarr;</span></button>
+                    </form>
+                    <div class="privacy-note">
+                        <span class="privacy-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none"><path d="M12 3 5 6v5c0 4.4 3 7.8 7 10 4-2.2 7-5.6 7-10V6l-7-3ZM9.5 12l1.7 1.7 3.5-3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        </span>
+                        <div><strong>Made for your organization</strong><p>Organization names are not listed publicly.</p></div>
+                    </div>
+                </section>
+            </div>
+        </main>
+        <footer class="site-footer"><span>Aviation ERP</span><span>Built for the work behind every flight.</span></footer>
+    </div>
 </body>
 </html>

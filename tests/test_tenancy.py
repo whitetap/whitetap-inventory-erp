@@ -10,6 +10,7 @@ os.environ['DATABASE_URL'] = 'sqlite://'
 os.environ['SECRET_KEY'] = 'test-secret-not-for-production'
 os.environ['SESSION_COOKIE_SECURE'] = 'false'
 os.environ['INITIAL_ADMIN_PASSWORD'] = ''
+os.environ.pop('PUBLIC_SIGNUP_ENABLED', None)
 
 from flask import g, url_for, template_rendered
 from sqlalchemy import event, select, text
@@ -61,6 +62,8 @@ class TenantIsolationTests(unittest.TestCase):
 
     def setUp(self):
         self.client = app.test_client()
+        original_signup_setting = app.config['PUBLIC_SIGNUP_ENABLED']
+        self.addCleanup(app.config.update, PUBLIC_SIGNUP_ENABLED=original_signup_setting)
 
     def login(self, slug, password):
         page = self.client.get(f'/{slug}/login')
@@ -80,11 +83,12 @@ class TenantIsolationTests(unittest.TestCase):
         self.assertEqual(self.client.get('/other/api/products/lookup?identifier=SKU-2').status_code, 401)
 
     def test_public_signup_provisions_unique_slug_and_admin(self):
-        app.config['PUBLIC_SIGNUP_ENABLED'] = True
-        self.addCleanup(app.config.update, PUBLIC_SIGNUP_ENABLED=False)
+        self.assertTrue(app.config['PUBLIC_SIGNUP_ENABLED'])
         page = self.client.get('/')
         self.assertEqual(page.status_code, 200)
         self.assertIn(b'action="/signup"', page.data)
+        self.assertIn(b'minlength="12"', page.data)
+        self.assertIn(b'/static/css/landing.css', page.data)
         token = re.search(rb'name="csrf_token" value="([^"]+)"', page.data).group(1).decode()
         response = self.client.post('/signup', data={
             'csrf_token': token, 'organization_name': 'Other',
@@ -120,6 +124,7 @@ class TenantIsolationTests(unittest.TestCase):
         self.assertEqual(self.client.get('/whitetap/api/products/lookup?identifier=SKU-1').status_code, 401)
 
     def test_signup_validation_and_csrf(self):
+        app.config['PUBLIC_SIGNUP_ENABLED'] = False
         self.assertEqual(self.client.get('/signup').status_code, 404)
         app.config['PUBLIC_SIGNUP_ENABLED'] = True
         self.addCleanup(app.config.update, PUBLIC_SIGNUP_ENABLED=False)
@@ -142,6 +147,7 @@ class TenantIsolationTests(unittest.TestCase):
             self.assertIsNone(Tenant.query.filter_by(slug='test-company').first())
 
     def test_public_landing_uses_private_organization_login(self):
+        app.config['PUBLIC_SIGNUP_ENABLED'] = False
         response = self.client.get('/')
         self.assertEqual(response.status_code, 200)
         self.assertIn(b'Organization signup is currently unavailable', response.data)
