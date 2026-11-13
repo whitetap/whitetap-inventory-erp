@@ -147,6 +147,14 @@ security: direct connections, SQL executed outside request handling, and future
 code bypassing the ORM require their own protection. Use a restricted database
 role and review all new code and database access paths.
 
+Product and category routes also use explicit current-tenant predicates, and
+tenant responses use `Cache-Control: no-store`. These controls use the tenant ID
+already stored on each row; they cannot identify or repair records previously
+assigned to the wrong company. Before deploying, inspect ownership on a
+restored copy and reconcile any incorrect assignments only after confirming
+their rightful owner; do not bulk-reassign records without a verified backup.
+Ensure the hosting proxy and any external caches respect `no-store`.
+
 Run `python -m unittest discover -s tests -v` to exercise the isolated SQLite
 tests. They do not validate PostgreSQL migrations, actual production constraints,
 or real production data.

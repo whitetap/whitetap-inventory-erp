@@ -268,6 +268,21 @@ def current_tenant_id():
     return identity[0] if identity else None
 
 
+def required_tenant_id():
+    tenant_id = current_tenant_id()
+    if tenant_id is None:
+        raise RuntimeError('A tenant context is required for business queries')
+    return tenant_id
+
+
+def tenant_products():
+    return Product.query.filter(Product.tenant_id == required_tenant_id())
+
+
+def tenant_categories():
+    return ProductCategory.query.filter(ProductCategory.tenant_id == required_tenant_id())
+
+
 @event.listens_for(Session, 'do_orm_execute')
 def enforce_tenant_scope(execute_state):
     if execute_state.is_from_statement and has_request_context():
@@ -320,7 +335,9 @@ def enforce_tenant_writes(db_session, flush_context, instances):
                     existing = db_session.query(UsageLog.id).filter(UsageLog.id == obj.id).first()
                     if not existing:
                         raise RuntimeError('Cross-tenant usage log write rejected')
-                product = db_session.query(Product.id).filter(Product.id == obj.product_id).first()
+                product = db_session.query(Product.id).filter(
+                    Product.id == obj.product_id, Product.tenant_id == tenant_id
+                ).first()
                 if not product:
                     raise ValueError('Invalid tenant reference: UsageLog.product_id')
             continue
@@ -437,7 +454,7 @@ def resolve_tenant_and_authenticate():
 
 @app.after_request
 def prevent_super_admin_caching(response):
-    if request.endpoint in SUPER_ADMIN_ENDPOINTS:
+    if request.endpoint in SUPER_ADMIN_ENDPOINTS or request.endpoint in TENANT_ENDPOINTS:
         response.headers['Cache-Control'] = 'no-store'
     return response
 
@@ -626,7 +643,7 @@ def inject_po_labels():
     return {'po_status_labels': PO_STATUS_LABELS}
 
 def get_product_category_name_map():
-    return {str(category.id): category.name for category in ProductCategory.query.order_by(ProductCategory.name).all()}
+    return {str(category.id): category.name for category in tenant_categories().order_by(ProductCategory.name).all()}
 
 def build_category_groups(products, categories):
     grouped = {str(category.id): [] for category in categories}
@@ -648,7 +665,7 @@ def resolve_product_category():
         category_name = request.form.get('custom_category_name', '').strip()
         if not category_name or len(category_name) > 100:
             return None
-        category = ProductCategory.query.filter(db.func.lower(ProductCategory.name) == category_name.lower()).first()
+        category = tenant_categories().filter(db.func.lower(ProductCategory.name) == category_name.lower()).first()
         if not category:
             category = ProductCategory(name=category_name)
             db.session.add(category)
@@ -657,12 +674,13 @@ def resolve_product_category():
     if not selected_id:
         return None
     try:
-        return ProductCategory.query.get(PythonUUID(selected_id))
+        return tenant_categories().filter_by(id=PythonUUID(selected_id)).first()
     except (ValueError, TypeError):
         return None
 
 def get_product_units():
     rows = db.session.query(Product.unit_of_measure).filter(
+        Product.tenant_id == required_tenant_id(),
         Product.unit_of_measure.isnot(None),
         Product.unit_of_measure != ''
     ).distinct().order_by(Product.unit_of_measure).all()
@@ -815,6 +833,7 @@ def get_project_invoice_lines(project_ref):
         Product.unit_of_measure,
         db.func.sum(db.func.abs(UsageLog.quantity_used)).label('quantity')
     ).join(Product, Product.id == UsageLog.product_id).filter(
+        Product.tenant_id == required_tenant_id(),
         db.func.lower(UsageLog.project_ref) == project_ref.casefold(),
         UsageLog.quantity_used < 0,
         UsageLog.technician_name != 'TRANSFER_TO_STAFF'
@@ -904,10 +923,10 @@ def staff_inventory():
     search_query = request.args.get('search', '')
     activity_filter = request.args.get('activity_filter', '')
     
-    all_products = Product.query.all()
+    all_products = tenant_products().all()
 
     # Group products by the categories managed in the admin workspace
-    product_categories = ProductCategory.query.order_by(ProductCategory.name).all()
+    product_categories = tenant_categories().order_by(ProductCategory.name).all()
     category_groups = build_category_groups(all_products, product_categories)
 
     # Apply search filter
@@ -937,7 +956,7 @@ def api_product_lookup():
     if not identifier:
         return jsonify({'success': False, 'error': 'Provide a QR code or SKU.'}), 400
 
-    product = Product.query.filter(db.or_(
+    product = tenant_products().filter(db.or_(
         db.func.lower(Product.qr_code) == identifier.casefold(),
         db.func.lower(Product.sku) == identifier.casefold()
     )).first()
@@ -976,7 +995,7 @@ def api_tint_recipes():
             return jsonify({'success': False, 'error': 'Recipe not found.'}), 404
 
         items = TintRecipeItem.query.filter_by(recipe_id=recipe.id).order_by(TintRecipeItem.product_name).all()
-        matched_products = Product.query.filter(Product.name.in_([item.product_name for item in items])).all() if items else []
+        matched_products = tenant_products().filter(Product.name.in_([item.product_name for item in items])).all() if items else []
         products_by_name = {product.name: product for product in matched_products}
         return jsonify({
             'success': True,
@@ -1025,7 +1044,9 @@ def export_logs():
     if period not in USAGE_PERIOD_LABELS:
         period = 'all'
     bounds = usage_period_bounds(period)
-    logs_query = db.session.query(UsageLog, Product.name).outerjoin(Product, Product.id == UsageLog.product_id)
+    logs_query = db.session.query(UsageLog, Product.name).join(Product, Product.id == UsageLog.product_id).filter(
+        Product.tenant_id == required_tenant_id()
+    )
     if bounds:
         logs_query = logs_query.filter(UsageLog.created_at >= bounds[0], UsageLog.created_at < bounds[1])
     if project_ref:
@@ -1064,7 +1085,9 @@ def admin_usage_logs():
     if period not in USAGE_PERIOD_LABELS:
         period = 'daily'
     bounds = usage_period_bounds(period)
-    logs_query = db.session.query(UsageLog, Product.name).outerjoin(Product, Product.id == UsageLog.product_id)
+    logs_query = db.session.query(UsageLog, Product.name).join(Product, Product.id == UsageLog.product_id).filter(
+        Product.tenant_id == required_tenant_id()
+    )
     if bounds:
         logs_query = logs_query.filter(UsageLog.created_at >= bounds[0], UsageLog.created_at < bounds[1])
     if project_ref:
@@ -1341,7 +1364,7 @@ def staff_quotations():
     quotations = db.session.query(Quotation, Client.name).join(
         Client, Client.id == Quotation.client_id
     ).order_by(Quotation.created_at.desc()).limit(100).all()
-    products = Product.query.order_by(Product.name).all()
+    products = tenant_products().order_by(Product.name).all()
     return render_template(
         'staff_quotations.html',
         quotations=quotations,
@@ -1406,7 +1429,7 @@ def delete_proforma_invoice(invoice_id):
 
 @tenant_route('/export-products')
 def export_products():
-    products = Product.query.order_by(Product.name).all()
+    products = tenant_products().order_by(Product.name).all()
     
     output = StringIO()
     writer = csv.writer(output)
@@ -1432,7 +1455,7 @@ def export_products():
 
 @tenant_route('/export-paints')
 def export_paints():
-    products = Product.query.filter(Product.sku.ilike('%PNT%')).order_by(Product.name.asc()).all()
+    products = tenant_products().filter(Product.sku.ilike('%PNT%')).order_by(Product.name.asc()).all()
     
     output = StringIO()
     writer = csv.writer(output)
@@ -1458,7 +1481,7 @@ def export_paints():
 
 @tenant_route('/export-carpets')
 def export_carpets():
-    products = Product.query.filter(Product.sku.ilike('%CRP%')).order_by(Product.name).all()
+    products = tenant_products().filter(Product.sku.ilike('%CRP%')).order_by(Product.name).all()
     
     output = StringIO()
     writer = csv.writer(output)
@@ -1484,7 +1507,7 @@ def export_carpets():
 
 @tenant_route('/export-inventory')
 def export_inventory():
-    products = Product.query.order_by(Product.name).all()
+    products = tenant_products().order_by(Product.name).all()
     
     output = StringIO()
     writer = csv.writer(output)
@@ -1541,10 +1564,10 @@ def admin_dashboard():
         
     view = request.args.get('view', 'summary')
     
-    all_products = Product.query.order_by(Product.name).all()
+    all_products = tenant_products().order_by(Product.name).all()
     
     if view == 'inventory':
-        display_products = Product.query.filter(Product.current_stock <= Product.min_stock_level).limit(6).all()
+        display_products = tenant_products().filter(Product.current_stock <= Product.min_stock_level).limit(6).all()
     else:
         display_products = all_products
         
@@ -1562,7 +1585,7 @@ def admin_dashboard():
         UsageLog.created_at >= start_dt, UsageLog.created_at < end_dt
     ).scalar()
 
-    product_categories = ProductCategory.query.order_by(ProductCategory.name).all()
+    product_categories = tenant_categories().order_by(ProductCategory.name).all()
     category_names = get_product_category_name_map()
     category_groups = build_category_groups(all_products, product_categories)
 
@@ -1579,7 +1602,7 @@ def admin_added_products():
     supplier = request.args.get('supplier', '').strip()
     invoice_number = request.args.get('invoice_number', '').strip()
 
-    products_query = Product.query
+    products_query = tenant_products()
     if period != 'all':
         end_at = datetime.now(timezone.utc)
         start_at = end_at - timedelta(days=int(period))
@@ -1626,7 +1649,7 @@ def staff_purchase_orders():
         except ValueError as exc:
             return request_error(str(exc))
 
-        supplier_products = Product.query.filter(
+        supplier_products = tenant_products().filter(
             db.func.lower(Product.supplier) == supplier.casefold()
         ).all()
         products_by_id = {normalize_product_uuid(product.id): product for product in supplier_products}
@@ -1726,6 +1749,7 @@ def staff_purchase_orders():
             return redirect(url_for('staff_purchase_orders', supplier=supplier, currency=currency, vat_mode=vat_mode))
 
     suppliers = [row[0] for row in db.session.query(Product.supplier).filter(
+        Product.tenant_id == required_tenant_id(),
         Product.supplier.isnot(None), Product.supplier != ''
     ).distinct().order_by(Product.supplier).all()]
     supplier = request.args.get('supplier', '').strip()
@@ -1736,7 +1760,7 @@ def staff_purchase_orders():
     if vat_mode not in ('standard', 'exempt'):
         vat_mode = 'standard'
 
-    supplier_products = Product.query.filter(
+    supplier_products = tenant_products().filter(
         db.func.lower(Product.supplier) == supplier.casefold()
     ).order_by(Product.name).all() if supplier else []
     low_stock_products = []
@@ -1979,7 +2003,7 @@ def issue_item():
             flash('Tinting recipes require a project reference of no more than 100 characters.', 'error')
             return redirect(url_for('staff_inventory'))
         
-        product = Product.query.get(product_id)
+        product = tenant_products().filter_by(id=product_id).first()
         if not product:
             flash('Product not found!', 'error')
             return redirect(url_for('staff_inventory'))
@@ -2042,7 +2066,7 @@ def issue_item():
 @tenant_route('/delete-product/<product_id>', methods=['POST'])
 def delete_product(product_id):
     try:
-        product = Product.query.filter_by(id=normalize_product_uuid(product_id)).first_or_404()
+        product = tenant_products().filter_by(id=normalize_product_uuid(product_id)).first_or_404()
         # Delete related logs first to avoid FK constraint
         UsageLog.query.filter_by(product_id=product.id).delete()
         db.session.delete(product)
@@ -2059,7 +2083,7 @@ def admin_transfer_stock():
         product_id = normalize_product_uuid(request.form['product_id'])
         quantity = Decimal(request.form['quantity'])
         
-        product = Product.query.get_or_404(product_id)
+        product = tenant_products().filter_by(id=product_id).first_or_404()
         
         if quantity <= 0:
             flash('Quantity must be greater than 0.', 'error')
@@ -2098,17 +2122,17 @@ def edit_product(product_id):
         product_id = normalize_product_uuid(product_id)
     except (ValueError, TypeError):
         abort(404)
-    product = Product.query.get_or_404(product_id)
+    product = tenant_products().filter_by(id=product_id).first_or_404()
     
     if request.method == 'POST':
         unit_of_measure = get_submitted_unit()
         if not unit_of_measure or len(unit_of_measure) > 20:
             flash('Enter a unit of measure no longer than 20 characters.', 'error')
-            return render_template('edit_product.html', product=product, unit_options=get_product_units(), product_categories=ProductCategory.query.order_by(ProductCategory.name).all(), category_name_by_id=get_product_category_name_map())
+            return render_template('edit_product.html', product=product, unit_options=get_product_units(), product_categories=tenant_categories().order_by(ProductCategory.name).all(), category_name_by_id=get_product_category_name_map())
         category = resolve_product_category()
         if not category:
             flash('Choose a valid product category.', 'error')
-            return render_template('edit_product.html', product=product, unit_options=get_product_units(), product_categories=ProductCategory.query.order_by(ProductCategory.name).all(), category_name_by_id=get_product_category_name_map())
+            return render_template('edit_product.html', product=product, unit_options=get_product_units(), product_categories=tenant_categories().order_by(ProductCategory.name).all(), category_name_by_id=get_product_category_name_map())
         product.sku = request.form['sku'].strip()
         product.name = request.form['name'].strip()
         product.supplier = request.form.get('supplier', '').strip() or None
@@ -2127,7 +2151,7 @@ def edit_product(product_id):
             db.session.rollback()
             flash('SKU already exists. Please choose a unique SKU.', 'error')
     
-    return render_template('edit_product.html', product=product, unit_options=get_product_units(), product_categories=ProductCategory.query.order_by(ProductCategory.name).all(), category_name_by_id=get_product_category_name_map())
+    return render_template('edit_product.html', product=product, unit_options=get_product_units(), product_categories=tenant_categories().order_by(ProductCategory.name).all(), category_name_by_id=get_product_category_name_map())
 
 def bootstrap_initial_admin():
     password = os.getenv('INITIAL_ADMIN_PASSWORD')

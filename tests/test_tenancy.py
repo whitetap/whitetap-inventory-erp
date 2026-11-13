@@ -20,7 +20,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 from app_fixed_final import (
     app, db, Tenant, TenantUser, Product, ProductCategory, PurchaseOrder, UsageLog,
-    usage_period_bounds, get_project_invoice_lines
+    Client, ProformaInvoice, usage_period_bounds, get_project_invoice_lines, tenant_products
 )
 
 
@@ -87,6 +87,110 @@ class TenantIsolationTests(unittest.TestCase):
         self.assertEqual(own.status_code, 200)
         self.assertEqual(other.status_code, 404)
         self.assertEqual(self.client.get('/other/api/products/lookup?identifier=SKU-2').status_code, 401)
+
+    def test_inventory_surfaces_are_isolated_between_tenants(self):
+        created = []
+        try:
+            for tenant_id, label in ((1, 'ALPHAPRIVATE'), (2, 'BETAPRIVATE')):
+                with app.test_request_context('/'):
+                    g.current_tenant = db.session.get(Tenant, tenant_id)
+                    category = ProductCategory(name=f'{label} category')
+                    db.session.add(category)
+                    db.session.flush()
+                    product = Product(
+                        name=f'{label} product', sku=f'PNT-CRP-{label}',
+                        qr_code=f'QR-{label}', supplier=f'{label} supplier',
+                        unit_of_measure='private-unit-' + label, category_id=category.id,
+                        current_stock=1, parent_stock=0, min_stock_level=2
+                    )
+                    db.session.add(product)
+                    db.session.flush()
+                    created.append((tenant_id, product.id, category.id))
+                    db.session.commit()
+
+            for slug, password, own, other in (
+                ('whitetap', 'whitetap-password', 'ALPHAPRIVATE', 'BETAPRIVATE'),
+                ('other', 'other-password', 'BETAPRIVATE', 'ALPHAPRIVATE')
+            ):
+                self.login(slug, password)
+                for suffix in (
+                    '/staff-inventory', '/export-products', '/export-inventory',
+                    '/export-paints', '/export-carpets', '/staff/quotations',
+                    f'/staff/purchase-orders?supplier={own}%20supplier'
+                ):
+                    with self.subTest(slug=slug, route=suffix):
+                        response = self.client.get(f'/{slug}{suffix}')
+                        self.assertEqual(response.status_code, 200)
+                        self.assertEqual(response.headers.get('Cache-Control'), 'no-store')
+                        self.assertIn(own.encode(), response.data)
+                        self.assertNotIn(other.encode(), response.data)
+                response = self.client.get(f'/{slug}/api/products/lookup?identifier=PNT-CRP-{other}')
+                self.assertEqual(response.status_code, 404)
+                response = self.client.get(f'/{slug}/api/products/lookup?identifier=PNT-CRP-{own}')
+                self.assertEqual(response.status_code, 200)
+            self.login('whitetap', 'whitetap-password')
+            for suffix in ('/admin-dashboard?view=inventory', '/admin/added-products'):
+                response = self.client.get('/whitetap' + suffix)
+                self.assertEqual(response.status_code, 200)
+                self.assertIn(b'ALPHAPRIVATE', response.data)
+                self.assertNotIn(b'BETAPRIVATE', response.data)
+            self.assertEqual(self.client.get(f'/whitetap/edit-product/{created[1][1]}').status_code, 404)
+            with self.client.session_transaction() as sess:
+                sess['csrf_token'] = 'i' * 32
+            response = self.client.post('/whitetap/admin/add-product', data={
+                'csrf_token': 'i' * 32, 'name': 'Forbidden category', 'sku': 'FORBIDDEN-CATEGORY',
+                'unit_of_measure': 'each', 'category_id': str(created[1][2])
+            }, follow_redirects=True)
+            self.assertIn(b'Please choose a valid category', response.data)
+            with app.test_request_context('/'):
+                g.current_tenant = db.session.get(Tenant, 1)
+                self.assertIsNone(tenant_products().filter_by(sku='FORBIDDEN-CATEGORY').first())
+            with app.test_request_context('/'):
+                g.current_tenant = db.session.get(Tenant, 2)
+                self.assertIsNotNone(db.session.get(Product, created[1][1]))
+                g.current_tenant = db.session.get(Tenant, 1)
+                self.assertIsNone(tenant_products().filter_by(id=created[1][1]).first())
+        finally:
+            for tenant_id, product_id, category_id in created:
+                with app.test_request_context('/'):
+                    g.current_tenant = db.session.get(Tenant, tenant_id)
+                    Product.query.filter_by(id=product_id).delete()
+                    ProductCategory.query.filter_by(id=category_id).delete()
+                    db.session.commit()
+
+    def test_business_inserts_receive_current_tenant(self):
+        with app.app_context(), self.assertRaises(RuntimeError):
+            tenant_products()
+        with app.test_request_context('/'):
+            g.current_tenant = db.session.get(Tenant, 2)
+            try:
+                category = ProductCategory(name='Ownership test')
+                client = Client(id=91001, name='Ownership test', normalized_name='ownership test')
+                order = PurchaseOrder(
+                    id=91002, po_number='OWNERSHIP-TEST', supplier='Supplier',
+                    currency='USD', vat_mode='exempt', vat_rate=0,
+                    subtotal=0, vat_amount=0, total=0
+                )
+                db.session.add_all([category, client, order])
+                db.session.flush()
+                product = Product(
+                    name='Ownership test', sku='OWNERSHIP', category_id=category.id,
+                    current_stock=0, parent_stock=0, min_stock_level=0
+                )
+                invoice = ProformaInvoice(
+                    id=91003, invoice_number='OWNERSHIP-TEST', client_id=client.id,
+                    project_ref='test', currency='USD', tax_mode='exempt', tax_rate=0,
+                    subtotal=0, tax_amount=0, total=0
+                )
+                db.session.add_all([product, invoice])
+                db.session.flush()
+                for item in (category, client, order, product, invoice):
+                    self.assertEqual(item.tenant_id, 2)
+                db.session.add(Product(name='Wrong owner', tenant_id=1))
+                with self.assertRaises(RuntimeError):
+                    db.session.flush()
+            finally:
+                db.session.rollback()
 
     def test_owner_approval_lock_unlock_and_existing_sessions(self):
         owner = app.test_client()
