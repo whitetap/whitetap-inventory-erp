@@ -65,6 +65,9 @@ class TenantIsolationTests(unittest.TestCase):
 
     def setUp(self):
         self.client = app.test_client()
+        env_patch = patch.dict(os.environ, {'SUPER_ADMIN_PASSWORD': '', 'INITIAL_ADMIN_PASSWORD': ''})
+        env_patch.start()
+        self.addCleanup(env_patch.stop)
         original_signup_setting = app.config['PUBLIC_SIGNUP_ENABLED']
         self.addCleanup(app.config.update, PUBLIC_SIGNUP_ENABLED=original_signup_setting)
 
@@ -158,6 +161,48 @@ class TenantIsolationTests(unittest.TestCase):
         self.assertEqual(self.client.get('/super-admin/owner-login').status_code, 503)
         self.assertEqual(self.client.get('/super-admin/tenants').status_code, 503)
         self.assertEqual(self.client.get('/super-admin/dashboard').status_code, 503)
+
+    def test_owner_environment_password_precedence_fallback_and_rotation(self):
+        original = app.config['SUPER_ADMIN_PASSWORD_HASH']
+        app.config['SUPER_ADMIN_PASSWORD_HASH'] = ''
+        self.addCleanup(app.config.update, SUPER_ADMIN_PASSWORD_HASH=original)
+        os.environ['INITIAL_ADMIN_PASSWORD'] = 'initial-password-test'
+        page = self.client.get('/super-admin/owner-login')
+        self.assertEqual(page.status_code, 200)
+        token = re.search(rb'name="csrf_token" value="([^"]+)"', page.data).group(1).decode()
+        self.assertEqual(self.client.post('/super-admin/owner-login', data={
+            'csrf_token': token, 'password': 'initial-password-test'
+        }).status_code, 302)
+        self.assertEqual(self.client.get('/super-admin/dashboard').status_code, 200)
+        os.environ['SUPER_ADMIN_PASSWORD'] = 'dedicated-password-test'
+        self.assertEqual(self.client.get('/super-admin/dashboard').status_code, 302)
+        page = self.client.get('/super-admin/owner-login')
+        token = re.search(rb'name="csrf_token" value="([^"]+)"', page.data).group(1).decode()
+        self.assertEqual(self.client.post('/super-admin/owner-login', data={
+            'csrf_token': token, 'password': 'initial-password-test'
+        }).status_code, 200)
+        app.config['SUPER_ADMIN_PASSWORD_HASH'] = generate_password_hash('hash-password-test')
+        self.assertEqual(self.client.post('/super-admin/owner-login', data={
+            'csrf_token': token, 'password': 'hash-password-test'
+        }).status_code, 200)
+        self.assertEqual(self.client.post('/super-admin/owner-login', data={
+            'csrf_token': token, 'password': 'dedicated-password-test'
+        }).status_code, 302)
+        self.assertEqual(self.client.get('/super-admin/dashboard').status_code, 200)
+        os.environ['SUPER_ADMIN_PASSWORD'] = ''
+        self.assertEqual(self.client.get('/super-admin/dashboard').status_code, 302)
+        page = self.client.get('/super-admin/owner-login')
+        token = re.search(rb'name="csrf_token" value="([^"]+)"', page.data).group(1).decode()
+        self.assertEqual(self.client.post('/super-admin/owner-login', data={
+            'csrf_token': token, 'password': 'initial-password-test'
+        }).status_code, 200)
+        self.assertEqual(self.client.post('/super-admin/owner-login', data={
+            'csrf_token': token, 'password': 'hash-password-test'
+        }).status_code, 302)
+        app.config['SUPER_ADMIN_PASSWORD_HASH'] = ''
+        self.assertEqual(self.client.get('/super-admin/dashboard').status_code, 302)
+        os.environ['INITIAL_ADMIN_PASSWORD'] = ''
+        self.assertEqual(self.client.get('/super-admin/owner-login').status_code, 503)
 
     def test_company_named_super_admin_keeps_its_login_route(self):
         with app.app_context():

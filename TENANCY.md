@@ -105,18 +105,23 @@ Do not pass passwords on the command line.
 
 ### System owner approvals
 
-Run `flask --app app_fixed_final generate-super-admin-hash` in a trusted
-environment and enter a unique owner password of at least 12 characters when
-prompted. Set the resulting hash as the secret environment variable
-`SUPER_ADMIN_PASSWORD_HASH` on the deployment; do not commit it. The owner
+Configure a unique, strong owner credential using `SUPER_ADMIN_PASSWORD`, or
+run `flask --app app_fixed_final generate-super-admin-hash` in a trusted
+environment and set its output as `SUPER_ADMIN_PASSWORD_HASH`. Do not commit
+either credential. The selected credential is the first nonempty value in this
+order: `SUPER_ADMIN_PASSWORD`, `SUPER_ADMIN_PASSWORD_HASH`, then
+`INITIAL_ADMIN_PASSWORD`. The fallback grants system-wide access to anyone
+who knows the initial tenant admin password; configure a separate owner
+credential and remove the bootstrap password after provisioning. The owner
 signs in at `/super-admin/owner-login` and manages organizations at
 `/super-admin/dashboard` (the older `/super-admin/tenants` link also works).
 The dashboard displays the earliest remaining administrator email per tenant,
 not a verified owner: the schema does not record an owner separately. If no
 administrator exists, it shows "No administrator". `/super-admin/login` remains
 available to an organization whose slug is `super-admin`; it is not the owner
-login. Without the hash, owner routes return 503. Changing the
-hash invalidates owner sessions; sessions also expire after 30 minutes.
+login. No email or username is required. Without any configured credential,
+owner routes return 503. Changing the selected credential invalidates owner
+sessions; sessions also expire after 30 minutes.
 Configure strict reverse-proxy rate limiting and access restrictions for the
 owner login before exposing it: the application does not implement rate
 limiting, MFA, or centralized revocation of signed cookies. Rotate `SECRET_KEY`

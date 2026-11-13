@@ -5,6 +5,7 @@ import smtplib
 import unicodedata
 import html as htmllib
 import hashlib
+import hmac
 from email.message import EmailMessage
 import psycopg2
 from dotenv import load_dotenv
@@ -406,7 +407,7 @@ def resolve_tenant_and_authenticate():
         if not expected or not secrets.compare_digest(expected.encode('utf-8'), supplied.encode('utf-8')):
             abort(400, description='Invalid CSRF token')
     if request.endpoint in SUPER_ADMIN_ENDPOINTS:
-        if not app.config['SUPER_ADMIN_PASSWORD_HASH']:
+        if not super_admin_credential():
             abort(503, description='Super administrator access is not configured')
         if request.endpoint != 'super_admin_login' and not super_admin_authenticated():
             return redirect(url_for('super_admin_login'))
@@ -458,10 +459,34 @@ def tenant_access_message(tenant):
     return 'This account has been locked. Please contact support.'
 
 
+def super_admin_credential():
+    password = os.environ.get('SUPER_ADMIN_PASSWORD')
+    if password:
+        return 'password', password
+    password_hash = app.config['SUPER_ADMIN_PASSWORD_HASH']
+    if password_hash:
+        return 'hash', password_hash
+    password = os.environ.get('INITIAL_ADMIN_PASSWORD')
+    return ('password', password) if password else None
+
+
+def super_admin_credential_fingerprint(credential):
+    kind, value = credential
+    if kind == 'hash':
+        return hashlib.sha256(value.encode('utf-8')).hexdigest()
+    key = app.config['SECRET_KEY']
+    if isinstance(key, str):
+        key = key.encode('utf-8')
+    return hmac.new(key, b'super-admin-password:' + value.encode('utf-8'), hashlib.sha256).hexdigest()
+
+
 def super_admin_authenticated():
     issued = session.get('super_admin_issued')
     fingerprint = session.get('super_admin_credential')
-    expected = hashlib.sha256(app.config['SUPER_ADMIN_PASSWORD_HASH'].encode('utf-8')).hexdigest()
+    credential = super_admin_credential()
+    if not credential:
+        return False
+    expected = super_admin_credential_fingerprint(credential)
     now = datetime.now(timezone.utc).timestamp()
     return (isinstance(issued, (int, float)) and 0 <= now - issued < 1800
             and isinstance(fingerprint, str) and secrets.compare_digest(fingerprint, expected))
@@ -480,12 +505,16 @@ def generate_super_admin_hash(password):
 def super_admin_login():
     if request.method == 'POST':
         password = request.form.get('password', '')
-        if check_password_hash(app.config['SUPER_ADMIN_PASSWORD_HASH'], password):
+        credential = super_admin_credential()
+        if credential is None:
+            abort(503, description='Super administrator access is not configured')
+        kind, value = credential
+        valid = (check_password_hash(value, password) if kind == 'hash'
+                 else secrets.compare_digest(value.encode('utf-8'), password.encode('utf-8')))
+        if valid:
             session.clear()
             session['super_admin_issued'] = datetime.now(timezone.utc).timestamp()
-            session['super_admin_credential'] = hashlib.sha256(
-                app.config['SUPER_ADMIN_PASSWORD_HASH'].encode('utf-8')
-            ).hexdigest()
+            session['super_admin_credential'] = super_admin_credential_fingerprint(credential)
             return redirect(url_for('super_admin_tenants'))
         flash('Incorrect password.', 'error')
     return render_template('super_admin_login.html')
